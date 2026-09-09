@@ -30,6 +30,7 @@ Supabase and deployment setup is documented in [SUPABASE_SETUP_CHECKLIST.md](SUP
 
 - Deploy `frontend` as a Vercel Next.js project.
 - Deploy `backend` as a Render Docker web service.
+- The backend is pinned to Python 3.12 because the pinned ML and Supabase dependencies do not provide compatible wheels for Python 3.14.
 - Set backend `CORS_ORIGINS` to the Vercel URL.
 - Keep generated reports and job state in managed storage when those features are added; Render's local filesystem is ephemeral.
 

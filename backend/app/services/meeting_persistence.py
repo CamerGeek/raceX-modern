@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+import re
 from typing import Any
 
 import pandas as pd
@@ -31,6 +32,8 @@ TROT_COLUMNS = {
     "RACE_DATE", "HIPPODROME", "REF_COURSE", "PRIZE_NAME", "DIST",
     "RACE_CONDITIONS", "DESCRIPTIF", "Q+", "TABLE_INDEX", "COURSE_ID", "MEETING_ID",
 }
+
+INTEGER_COLUMNS = {"AGE", "DIST.", "HANDICAP_DISTANCE", "DIST", "TABLE_INDEX", "HIPPOID", "DSCP"}
 
 
 def persist_scraped_meeting(
@@ -84,6 +87,7 @@ def persist_scraped_meeting(
         races.append({"id": race["id"], "race_key": normalized_key, "url": source_url, "race_type": race_type, "q_plus": q_plus})
         for runner_index, row in enumerate(dataframe_records(race_frame), start=1):
             payload = {key: value for key, value in row.items() if key in (FLAT_COLUMNS if race_type == "flat" else TROT_COLUMNS)}
+            payload = _normalize_integer_columns(payload)
             payload["race_id"] = race["id"]
             payload.setdefault("N°", str(runner_index))
             payload["runner_number"] = payload["N°"]
@@ -108,6 +112,24 @@ def persist_scraped_meeting(
 
 def _runner_table(race_type: str) -> str:
     return FLAT_TABLE if race_type == "flat" else TROT_TABLE
+
+
+def _normalize_integer_columns(payload: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(payload)
+    for column in INTEGER_COLUMNS & normalized.keys():
+        value = normalized[column]
+        if value is None or isinstance(value, bool):
+            continue
+        if isinstance(value, int):
+            continue
+        if isinstance(value, float):
+            normalized[column] = int(value) if value.is_integer() else None
+            continue
+
+        text = str(value).strip().replace("\u00a0", " ")
+        match = re.fullmatch(r"([+-]?\d(?:[\d ]*\d)?)[ ]*m?", text, re.IGNORECASE)
+        normalized[column] = int(match.group(1).replace(" ", "")) if match else None
+    return normalized
 
 
 def _first_column(frame: pd.DataFrame, candidates: tuple[str, ...]) -> str | None:
