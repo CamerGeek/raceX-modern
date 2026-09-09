@@ -243,18 +243,29 @@ create table if not exists public.trot_race_runners (
     "DIST." integer,
     "SEXE" text,
     "AGE" integer,
-    "POIDS" numeric(10, 2),
+    "DERNIÈRES PERF." text,
     "MUSIQUE" text,
+    "REC." numeric(10, 2),
+    "DEF." text,
     "JOCKEY" text,
     "ENTRAINEUR" text,
     "JOCKEY_MUSIC" text,
     "TRAINER_MUSIC" text,
     "FORME_J" numeric(10, 2),
     "FORME_T" numeric(10, 2),
+    "FA" numeric(10, 2),
+    "FM" numeric(10, 2),
     "IF" numeric(10, 2),
     "S_COEFF" numeric(10, 2),
-    "IC" numeric(10, 2),
-    "HANDICAP_DISTANCE" integer,
+    "S_COEFF_norm" numeric(10, 2),
+    "disq_count" integer,
+    "disq_harness_rate" numeric(10, 4),
+    "disq_mounted_rate" numeric(10, 4),
+    "recent_disq_count" integer,
+    "recent_disq_rate" numeric(10, 4),
+    "DQ_Risk" numeric(10, 2),
+    "DQ_Risk_Amplified" numeric(10, 2),
+    "shoeing_aggressiveness" numeric(10, 4),
     "HORSE_LINK" text,
     "RACE_URL" text,
     "RACE_DATE" text,
@@ -278,6 +289,20 @@ create index if not exists idx_flat_race_runners_race_id on public.flat_race_run
 create index if not exists idx_trot_race_runners_race_id on public.trot_race_runners(race_id);
 alter table public.flat_race_runners add column if not exists runner_number text;
 alter table public.trot_race_runners add column if not exists runner_number text;
+alter table public.trot_race_runners add column if not exists "DERNIÈRES PERF." text;
+alter table public.trot_race_runners add column if not exists "REC." numeric(10, 2);
+alter table public.trot_race_runners add column if not exists "DEF." text;
+alter table public.trot_race_runners add column if not exists "FA" numeric(10, 2);
+alter table public.trot_race_runners add column if not exists "FM" numeric(10, 2);
+alter table public.trot_race_runners add column if not exists "S_COEFF_norm" numeric(10, 2);
+alter table public.trot_race_runners add column if not exists "disq_count" integer;
+alter table public.trot_race_runners add column if not exists "disq_harness_rate" numeric(10, 4);
+alter table public.trot_race_runners add column if not exists "disq_mounted_rate" numeric(10, 4);
+alter table public.trot_race_runners add column if not exists "recent_disq_count" integer;
+alter table public.trot_race_runners add column if not exists "recent_disq_rate" numeric(10, 4);
+alter table public.trot_race_runners add column if not exists "DQ_Risk" numeric(10, 2);
+alter table public.trot_race_runners add column if not exists "DQ_Risk_Amplified" numeric(10, 2);
+alter table public.trot_race_runners add column if not exists "shoeing_aggressiveness" numeric(10, 4);
 update public.flat_race_runners set runner_number = "N°" where runner_number is null;
 update public.trot_race_runners set runner_number = "N°" where runner_number is null;
 create unique index if not exists uq_flat_race_runners_race_number on public.flat_race_runners(race_id, runner_number);

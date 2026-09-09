@@ -26,14 +26,16 @@ FLAT_COLUMNS = {
 }
 
 TROT_COLUMNS = {
-    "N°", "CHEVAL", "COTE", "DIST.", "SEXE", "AGE", "POIDS", "MUSIQUE",
-    "JOCKEY", "ENTRAINEUR", "JOCKEY_MUSIC", "TRAINER_MUSIC", "FORME_J", "FORME_T",
-    "IF", "S_COEFF", "IC", "HANDICAP_DISTANCE", "HORSE_LINK", "RACE_URL",
+    "N°", "CHEVAL", "COTE", "DIST.", "SEXE", "AGE", "DERNIÈRES PERF.", "MUSIQUE",
+    "REC.", "DEF.", "JOCKEY", "ENTRAINEUR", "JOCKEY_MUSIC", "TRAINER_MUSIC", "FORME_J", "FORME_T",
+    "FA", "FM", "IF", "S_COEFF", "S_COEFF_norm", "disq_count", "disq_harness_rate",
+    "disq_mounted_rate", "recent_disq_count", "recent_disq_rate", "DQ_Risk", "DQ_Risk_Amplified",
+    "shoeing_aggressiveness", "HORSE_LINK", "RACE_URL",
     "RACE_DATE", "HIPPODROME", "REF_COURSE", "PRIZE_NAME", "DIST",
     "RACE_CONDITIONS", "DESCRIPTIF", "Q+", "TABLE_INDEX", "COURSE_ID", "MEETING_ID",
 }
 
-INTEGER_COLUMNS = {"AGE", "DIST.", "HANDICAP_DISTANCE", "DIST", "TABLE_INDEX", "HIPPOID", "DSCP"}
+INTEGER_COLUMNS = {"AGE", "DIST.", "DIST", "TABLE_INDEX", "HIPPOID", "DSCP", "disq_count", "recent_disq_count"}
 
 
 def persist_scraped_meeting(
@@ -86,6 +88,8 @@ def persist_scraped_meeting(
         persisted_races += 1
         races.append({"id": race["id"], "race_key": normalized_key, "url": source_url, "race_type": race_type, "q_plus": q_plus})
         for runner_index, row in enumerate(dataframe_records(race_frame), start=1):
+            if race_type == "trot":
+                row = _normalize_trot_row(row)
             payload = {key: value for key, value in row.items() if key in (FLAT_COLUMNS if race_type == "flat" else TROT_COLUMNS)}
             payload = _normalize_integer_columns(payload)
             payload["race_id"] = race["id"]
@@ -129,6 +133,43 @@ def _normalize_integer_columns(payload: dict[str, Any]) -> dict[str, Any]:
         text = str(value).strip().replace("\u00a0", " ")
         match = re.fullmatch(r"([+-]?\d(?:[\d ]*\d)?)[ ]*m?", text, re.IGNORECASE)
         normalized[column] = int(match.group(1).replace(" ", "")) if match else None
+    return normalized
+
+
+def _normalize_trot_row(row: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(row)
+    if normalized.get("REC.") is not None:
+        from model_functions import time_to_seconds
+
+        value = normalized["REC."]
+        if isinstance(value, str):
+            normalized["REC."] = time_to_seconds(value)
+    if not normalized.get("SEXE") and normalized.get("SEX"):
+        normalized["SEXE"] = normalized["SEX"]
+    if not normalized.get("MUSIQUE"):
+        for source_column in ("DERNIÈRES PERF.", "DERNIÈRES PERF", "DERNIERES PERF.", "DERNIERES PERF", "PERFORMANCES"):
+            if normalized.get(source_column):
+                normalized["MUSIQUE"] = normalized[source_column]
+                break
+    performance = normalized.get("DERNIÈRES PERF.") or normalized.get("MUSIQUE")
+    if performance:
+        from model_functions import compute_d_perf, parse_performance_string, success_coefficient
+
+        fitness = compute_d_perf(str(performance))
+        if not normalized.get("FA"):
+            normalized["FA"] = fitness.get("a")
+        if not normalized.get("FM"):
+            normalized["FM"] = fitness.get("m")
+        if not normalized.get("IF"):
+            normalized["IF"] = fitness.get("a") or fitness.get("m")
+        if not normalized.get("S_COEFF"):
+            normalized["S_COEFF"] = success_coefficient(str(performance), "a")
+        parsed = parse_performance_string(str(performance))
+        for column, value in parsed.items():
+            if not normalized.get(column):
+                normalized[column] = value.item() if hasattr(value, "item") else value
+        if not normalized.get("DERNIÈRES PERF."):
+            normalized["DERNIÈRES PERF."] = str(performance)
     return normalized
 
 

@@ -25,6 +25,8 @@ from favorable_cordes import compute_favorable_corde_horses
 
 router = APIRouter(prefix="/races", tags=["races"])
 
+TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
+
 
 def _saved_frame(client: SupabaseClientWrapper, race_id: str) -> tuple[pd.DataFrame, dict]:
     race = client.select_one("races", filters=[("id", "eq", race_id)])
@@ -33,7 +35,20 @@ def _saved_frame(client: SupabaseClientWrapper, race_id: str) -> tuple[pd.DataFr
     table = "flat_race_runners" if race["race_type"] == "flat" else "trot_race_runners"
     rows = client.list(table, filters=[("race_id", "eq", race_id)], limit=1000, order_by=("runner_number", "asc"))
     frame = pd.DataFrame([row.get("raw_data") if isinstance(row.get("raw_data"), dict) else row for row in rows])
+    if race["race_type"] == "trot":
+        frame = frame.drop(columns=TROT_DISPLAY_EXCLUDED_COLUMNS, errors="ignore")
     return frame, race
+
+
+def _display_frame(source: pd.DataFrame, analyzed: pd.DataFrame, race_type: str) -> pd.DataFrame:
+    display = analyzed if not analyzed.empty else source.copy()
+    if not source.empty and not analyzed.empty:
+        computed_columns = [column for column in analyzed.columns if column not in source.columns]
+        if computed_columns:
+            display = source.join(analyzed[computed_columns], how="left")
+    if race_type == "trot":
+        display = display.drop(columns=TROT_DISPLAY_EXCLUDED_COLUMNS, errors="ignore")
+    return display
 
 
 @router.get("/detect-type")
@@ -77,8 +92,9 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
             include_handicap=request.include_handicap,
             max_horses=request.max_horses,
         )
-        prognosis_rows = _prognosis_rows(prognosis, analyzed)
-        sections = _legacy_sections(frame, analyzed, race_type, request.include_handicap)
+        display_frame = _display_frame(frame, analyzed, race_type)
+        prognosis_rows = _prognosis_rows(prognosis, analyzed, race_type)
+        sections = _legacy_sections(display_frame, analyzed, race_type, request.include_handicap)
         overview = _flat_overview(frame, analyzed, prognosis_rows) if race_type == "flat" else {}
     except HTTPException:
         raise
@@ -87,9 +103,9 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
     return AnalysisResponse(
         race_type=race_type,
         source=source,
-        row_count=len(analyzed),
-        columns=[str(column) for column in analyzed.columns],
-        rows=dataframe_records(analyzed),
+        row_count=len(display_frame),
+        columns=[str(column) for column in display_frame.columns],
+        rows=dataframe_records(display_frame),
         model_version="initial-migration",
         prognosis=prognosis_rows,
         signals=_analysis_signals(analyzed),
@@ -121,7 +137,7 @@ def combinations(request: BettingRequest) -> dict[str, Any]:
         raise
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Combination generation failed: {exc}") from exc
-def _prognosis_rows(prognosis: pd.DataFrame, analyzed: pd.DataFrame) -> list[dict]:
+def _prognosis_rows(prognosis: pd.DataFrame, analyzed: pd.DataFrame, race_type: str = "flat") -> list[dict]:
     """Keep legacy prognosis order while returning the full horse records."""
     if prognosis is None or prognosis.empty or analyzed.empty:
         return []
@@ -131,6 +147,8 @@ def _prognosis_rows(prognosis: pd.DataFrame, analyzed: pd.DataFrame) -> list[dic
     values = prognosis.iloc[:, 0].tolist()
     indexed = {str(value).removesuffix(".0"): row for value, row in zip(analyzed[number_column], dataframe_records(analyzed))}
     rows = [indexed[str(value).removesuffix(".0")] for value in values if str(value).removesuffix(".0") in indexed]
+    if race_type == "trot":
+        return rows
     return sorted(rows, key=lambda row: float(row.get("Composite", -1) or -1), reverse=True)
 
 
