@@ -36,6 +36,13 @@ TROT_COLUMNS = {
 }
 
 INTEGER_COLUMNS = {"AGE", "DIST.", "DIST", "TABLE_INDEX", "HIPPOID", "DSCP", "disq_count", "recent_disq_count"}
+NUMERIC_COLUMNS = {
+    "COTE", "POIDS", "PAST_POIDS", "FORME_J", "FORME_T", "FORME", "IF", "S_COEFF", "IC",
+    "COMPOSITE_SCORE", "CLASS_ADVANTAGE", "J-DECH.", "N_WEIGHT", "ALLOCATION", "REC.", "FA", "FM",
+    "S_COEFF_norm", "disq_harness_rate", "disq_mounted_rate", "recent_disq_rate", "DQ_Risk",
+    "DQ_Risk_Amplified", "shoeing_aggressiveness", "STARTERS", "NUM_STARTERS", "DISTANCE",
+    "HANDICAP_DISTANCE", "LICE", "G", "P", "M", "N", "R", "Q", "Q+"
+}
 
 
 def persist_scraped_meeting(
@@ -43,24 +50,26 @@ def persist_scraped_meeting(
     *,
     meeting_date: date,
     meeting_name: str | None,
-    meeting_url: str,
+    meeting_url: str | None,
     race_type: str,
     source: str = "zone-turf",
     client: SupabaseClientWrapper | None = None,
+    meeting: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if race_type not in {"flat", "trot"}:
         raise ValueError("race_type must be flat or trot")
     if frame.empty:
-        return {"meeting": None, "race_count": 0, "runner_count": 0, "runner_table": _runner_table(race_type)}
+        return {"meeting": meeting, "race_count": 0, "runner_count": 0, "runner_table": _runner_table(race_type), "races": []}
 
     supabase = client or SupabaseClientWrapper()
-    meeting = _get_or_create_meeting(
-        supabase,
-        source=source,
-        meeting_date=meeting_date.isoformat(),
-        meeting_name=meeting_name,
-        meeting_url=meeting_url,
-    )
+    if meeting is None:
+        meeting = _get_or_create_meeting(
+            supabase,
+            source=source,
+            meeting_date=meeting_date.isoformat(),
+            meeting_name=meeting_name,
+            meeting_url=meeting_url,
+        )
     runner_table = _runner_table(race_type)
     race_key_column = _first_column(frame, ("REF_COURSE", "ID_COURSE", "COURSE_ID"))
     if not race_key_column:
@@ -101,7 +110,7 @@ def persist_scraped_meeting(
                 key="race_id",
                 key_value=race["id"],
                 payload=payload,
-                on_conflict="race_id,runner_number",
+                on_conflict='race_id,"N°"',
             )
             persisted_runners += 1
 
@@ -120,19 +129,54 @@ def _runner_table(race_type: str) -> str:
 
 def _normalize_integer_columns(payload: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(payload)
-    for column in INTEGER_COLUMNS & normalized.keys():
-        value = normalized[column]
+    for column, value in list(normalized.items()):
         if value is None or isinstance(value, bool):
             continue
         if isinstance(value, int):
             continue
         if isinstance(value, float):
-            normalized[column] = int(value) if value.is_integer() else None
+            if column in INTEGER_COLUMNS:
+                normalized[column] = int(value) if value.is_integer() else value
+            continue
+
+        if column not in INTEGER_COLUMNS and column not in NUMERIC_COLUMNS:
             continue
 
         text = str(value).strip().replace("\u00a0", " ")
-        match = re.fullmatch(r"([+-]?\d(?:[\d ]*\d)?)[ ]*m?", text, re.IGNORECASE)
-        normalized[column] = int(match.group(1).replace(" ", "")) if match else None
+        if not text or text in {"-", "—", "–", "--", "-.-"}:
+            normalized[column] = None
+            continue
+
+        cleaned = text.replace(" ", "")
+        if cleaned.endswith("m") and cleaned[:-1].replace("-", "").replace(".", "").replace(",", "").isdigit():
+            cleaned = cleaned[:-1]
+
+        cleaned = re.sub(r"[^0-9,\.\-]", "", cleaned)
+        if not cleaned or cleaned in {"-", "--", "-."}:
+            normalized[column] = None
+            continue
+
+        if cleaned.count(",") and "." not in cleaned:
+            cleaned = cleaned.replace(",", ".")
+        elif cleaned.count(",") and cleaned.count("."):
+            if cleaned.rfind(",") > cleaned.rfind("."):
+                cleaned = cleaned.replace(".", "").replace(",", ".")
+            else:
+                cleaned = cleaned.replace(",", "")
+
+        if cleaned.startswith("-") and cleaned.count("-") == 1:
+            cleaned = cleaned[1:]
+
+        try:
+            number = float(cleaned)
+        except ValueError:
+            normalized[column] = None
+            continue
+
+        if column in INTEGER_COLUMNS:
+            normalized[column] = int(number) if number.is_integer() else number
+        else:
+            normalized[column] = number
     return normalized
 
 
@@ -194,14 +238,22 @@ def _is_q_plus(frame: pd.DataFrame) -> bool:
 
 
 def _get_or_create_meeting(client: SupabaseClientWrapper, *, source: str, meeting_date: str, meeting_name: str | None, meeting_url: str) -> dict[str, Any]:
-    existing = client.select_one("meetings", filters=[("source", "eq", source), ("url", "eq", meeting_url)], order_by=("created_at", "desc"))
+    existing = client.select_one(
+        "meetings",
+        filters=[("source", "eq", source), ("meeting_date", "eq", meeting_date), ("url", "eq", meeting_url)],
+        order_by=("created_at", "desc"),
+    )
     if existing:
         return existing
     return client.insert("meetings", {"source": source, "meeting_date": meeting_date, "name": meeting_name, "url": meeting_url, "metadata": {}})
 
 
 def _get_or_create_race(client: SupabaseClientWrapper, *, meeting_id: str, source: str, race_type: str, source_url: str, race_key: str, rows: list[dict[str, Any]], q_plus: bool = False) -> dict[str, Any]:
-    existing = client.select_one("races", filters=[("source_url", "eq", source_url)], order_by=("created_at", "desc"))
+    existing = client.select_one(
+        "races",
+        filters=[("meeting_id", "eq", meeting_id), ("race_key", "eq", race_key)],
+        order_by=("created_at", "desc"),
+    )
     payload = {
         "meeting_id": meeting_id,
         "source": source,

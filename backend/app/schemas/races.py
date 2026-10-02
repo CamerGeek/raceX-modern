@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -33,6 +33,14 @@ class RaceResponse(BaseModel):
     rows: list[dict[str, Any]]
 
 
+class ModelPredictionResponse(BaseModel):
+    status: Literal["ready", "unsupported", "unavailable"]
+    model_version: str | None = None
+    bet_list: list[int] = Field(default_factory=list)
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+    message: str | None = None
+
+
 class AnalysisResponse(RaceResponse):
     model_config = ConfigDict(protected_namespaces=())
 
@@ -43,3 +51,4 @@ class AnalysisResponse(RaceResponse):
     overview: dict[str, Any] = {}
     race_details: str = ""
     handicap: dict[str, Any] | None = None
+    model_predictions: ModelPredictionResponse | None = None

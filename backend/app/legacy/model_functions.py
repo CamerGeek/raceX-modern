@@ -433,6 +433,11 @@ import re
 
 def success_coefficient(horse_music, discipline):
     try:
+        # A source page can omit the discipline in its race conditions. There
+        # is no discipline-specific coefficient to calculate in that case.
+        if not isinstance(discipline, str) or not discipline.strip():
+            return 0.0
+        discipline = discipline.lower()
         # Handle non-string inputs (NaN, float, None)
         if not isinstance(horse_music, str):
             if pd.isna(horse_music):
@@ -446,7 +451,7 @@ def success_coefficient(horse_music, discipline):
         filtered = []
         for token in tokens:
             rank_str, disc = token[:-1], token[-1].lower()
-            if disc == discipline.lower():
+            if disc == discipline:
                 if rank_str.upper() in ['D', 'A', 'T', 'NP'] or rank_str == '0':
                     score = MAX_SCORE
                 elif rank_str.isdigit():

@@ -1,0 +1,122 @@
+{
+  "created": "2026-09-29T17:16:17",
+  "catboost_version": "1.2.10",
+  "feature_columns": [
+    "COTE",
+    "POIDS",
+    "GAIN",
+    "IC",
+    "FORME",
+    "S_COEFF",
+    "AGE",
+    "NUMERO",
+    "CORDE",
+    "SEXE",
+    "HIPPOID",
+    "N_WEIGHT",
+    "OEILL.|0",
+    "OEILL.|1",
+    "OEILL.|2",
+    "GRP|1",
+    "GRP|2",
+    "GRP|3",
+    "Q+|0",
+    "Q+|1",
+    "LICE|0",
+    "LICE|1",
+    "LICE|2",
+    "CLASSE|1",
+    "CLASSE|2",
+    "CLASSE|3",
+    "CLASSE|4",
+    "HANDICAP|0",
+    "HANDICAP|1",
+    "LISTED|0",
+    "LISTED|1"
+  ],
+  "per_race_z_features": [
+    "COTE",
+    "POIDS",
+    "GAIN",
+    "IC",
+    "FORME",
+    "S_COEFF",
+    "AGE"
+  ],
+  "raw_features": [
+    "NUMERO",
+    "CORDE",
+    "SEXE",
+    "HIPPOID",
+    "N_WEIGHT"
+  ],
+  "binary_features": [
+    "OEILL.|0",
+    "OEILL.|1",
+    "OEILL.|2",
+    "GRP|1",
+    "GRP|2",
+    "GRP|3",
+    "Q+|0",
+    "Q+|1",
+    "LICE|0",
+    "LICE|1",
+    "LICE|2",
+    "CLASSE|1",
+    "CLASSE|2",
+    "CLASSE|3",
+    "CLASSE|4",
+    "HANDICAP|0",
+    "HANDICAP|1",
+    "LISTED|0",
+    "LISTED|1"
+  ],
+  "dropped_features": {
+    "DIST": "constant within a race; original global z-score statistics are lost",
+    "NUM_STARTERS": "constant within a race; original global z-score statistics are lost"
+  },
+  "probability_note": "models use auto_class_weights=Balanced, so positive-class probabilities are inflated; use them for ranking, not as true probabilities",
+  "random_seed": 42,
+  "training": {
+    "data": "C:\\Users\\HP\\plat.csv",
+    "rows": 165913,
+    "races": 16221,
+    "train_rows": 132759,
+    "test_rows": 33154,
+    "place_rate": 0.2927618691723976,
+    "dark_rate": 0.058470403163103556
+  },
+  "models": {
+    "place_bet": {
+      "file": "place_bet.cbm",
+      "target": "RANG <= 3",
+      "test_auc": 0.7299,
+      "test_auc_odds_baseline": 0.7015,
+      "test_top3_recall": 0.5096,
+      "best_iteration": 649
+    },
+    "dark_horse": {
+      "file": "dark_horse.cbm",
+      "target": "DARK_HORSE (trained on the RANG<=6 subset)",
+      "test_auc": 0.8702,
+      "best_iteration": 377
+    },
+    "rank": {
+      "file": "rank.cbm",
+      "target": "min(RANG, 8)",
+      "classes": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "test_accuracy": 0.3021,
+      "test_winner_hit_rate": 0.2798,
+      "best_iteration": 518
+    }
+  }
+}

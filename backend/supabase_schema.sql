@@ -339,9 +339,38 @@ create table if not exists public.profiles (
 
 create index if not exists idx_meetings_date on public.meetings(meeting_date);
 create index if not exists idx_meetings_source on public.meetings(source);
+
+-- Do not discard historical scrape data while introducing the natural keys.
+-- If either query finds legacy duplicates, this migration stops before creating
+-- an index. Resolve the reported records deliberately, then run it again.
+do $$
+begin
+    if exists (
+        select 1
+        from public.meetings
+        where url is not null
+        group by source, meeting_date, url
+        having count(*) > 1
+    ) then
+        raise exception 'Duplicate meetings exist for (source, meeting_date, url); resolve them before creating uq_meetings_source_date_url.';
+    end if;
+
+    if exists (
+        select 1
+        from public.races
+        where race_key is not null
+        group by meeting_id, race_key
+        having count(*) > 1
+    ) then
+        raise exception 'Duplicate races exist for (meeting_id, race_key); resolve them before creating uq_races_meeting_race_key.';
+    end if;
+end $$;
+
+create unique index if not exists uq_meetings_source_date_url on public.meetings(source, meeting_date, url) where url is not null;
 create index if not exists idx_races_meeting_id on public.races(meeting_id);
 create index if not exists idx_races_source_url on public.races(source_url);
 create index if not exists idx_races_race_key on public.races(race_key);
+create unique index if not exists uq_races_meeting_race_key on public.races(meeting_id, race_key) where race_key is not null;
 create index if not exists idx_race_runners_race_id on public.race_runners(race_id);
 create index if not exists idx_race_runners_horse_name on public.race_runners("CHEVAL");
 create index if not exists idx_analysis_runs_race_id on public.analysis_runs(race_id);

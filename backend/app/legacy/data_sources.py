@@ -44,12 +44,33 @@ class ZoneTurfDataSource(RaceDataSource):
         return scrape_zone_turf_trot(url, progress_callback=progress_callback, cancel_check=cancel_check)
 
 
+class TurfomaniaDataSource(RaceDataSource):
+    """Data source for turfomania.fr"""
+
+    def __init__(self):
+        self.name = "Turfomania"
+        self.base_url = "https://www.turfomania.fr"
+
+    def scrape_flat(self, url, progress_callback=None, cancel_check=None):
+        """Scrape a flat race from turfomania (one URL per race)"""
+        print(f"[INFO] Scraping flat race from {self.name}: {url}")
+        from turfomania_race import scrape_turfomania_flat
+        return scrape_turfomania_flat(url, progress_callback=progress_callback, cancel_check=cancel_check)
+
+    def scrape_trot(self, url, progress_callback=None, cancel_check=None):
+        """Scrape a trot race from turfomania (one URL per race)"""
+        print(f"[INFO] Scraping trot race from {self.name}: {url}")
+        from turfomania_race import scrape_turfomania_trot
+        return scrape_turfomania_trot(url, progress_callback=progress_callback, cancel_check=cancel_check)
+
+
 class DataSourceManager:
-    """Manages data sources (currently Zone-Turf only)"""
-    
+    """Manages data sources"""
+
     def __init__(self):
         self.sources = {
             'zone-turf': ZoneTurfDataSource(),
+            'turfomania': TurfomaniaDataSource(),
         }
         self.default_source = 'zone-turf'
     

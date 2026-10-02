@@ -5,9 +5,11 @@ from fastapi import APIRouter, HTTPException, Query
 from app.schemas.races import AnalysisRequest, AnalysisResponse, BettingRequest, RaceResponse, ScrapeRequest
 from app.services.betting_service import generate_combinations, simulate_race
 from app.services.analysis_service import analyze_race
+from app.services.model_prediction_service import predict_race as predict_model_race
 from app.services.scraping_service import detect_race_type, scrape_race
 from app.services.serialization import dataframe_records
 from app.services.supabase_client import SupabaseClientWrapper
+from app.services.turfomania_download import parse_turfomania_meeting_url
 from race_scraper_app import (
     analyze_class_ic,
     analyze_fitness_if,
@@ -54,9 +56,21 @@ def _display_frame(source: pd.DataFrame, analyzed: pd.DataFrame, race_type: str)
 @router.get("/detect-type")
 def detect_type(url: str = Query(min_length=1)) -> dict[str, str]:
     try:
+        turfomania_id = parse_turfomania_meeting_url(url)
+        if turfomania_id:
+            race_type = _turfomania_race_type(turfomania_id)
+            if race_type:
+                return {"race_type": race_type}
+            raise ValueError(f"No races found for Turfomania meeting {turfomania_id}")
         return {"race_type": detect_race_type(url)}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Race type detection failed: {exc}") from exc
+
+
+def _turfomania_race_type(meeting_id: str) -> str | None:
+    client = SupabaseClientWrapper()
+    races = client.list("races", filters=[("meeting_id", "eq", meeting_id)], limit=500, order_by=("race_key", "asc"))
+    return next((race.get("race_type") for race in races if race.get("race_type") in {"flat", "trot"}), None)
 
 
 @router.post("/scrape", response_model=RaceResponse)
@@ -96,6 +110,7 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
         prognosis_rows = _prognosis_rows(prognosis, analyzed, race_type)
         sections = _legacy_sections(display_frame, analyzed, race_type, request.include_handicap)
         overview = _flat_overview(frame, analyzed, prognosis_rows) if race_type == "flat" else {}
+        model_predictions = predict_model_race(frame, race_type, source)
     except HTTPException:
         raise
     except Exception as exc:
@@ -113,6 +128,7 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
         overview=overview,
         race_details=str(frame["DESCRIPTIF"].iloc[0]) if "DESCRIPTIF" in frame.columns and not frame.empty else "",
         handicap=handicap,
+        model_predictions=model_predictions,
     )
 
 
@@ -227,7 +243,7 @@ def _flat_overview(frame: pd.DataFrame, composite: pd.DataFrame, prognosis: list
     return {
         "prognosis": prognosis_rows,
         "summary": horse_rows(composite),
-        "upset_potential": horse_rows(consistency),
+        "upset_potential": horse_rows(divergence),
         "consistency_score": horse_rows(consistency),
         "odds_divergence": horse_rows(divergence),
         "best_starting_posts": best_posts,
