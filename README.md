@@ -34,4 +34,6 @@ Supabase and deployment setup is documented in [SUPABASE_SETUP_CHECKLIST.md](SUP
 - Set backend `CORS_ORIGINS` to the Vercel URL.
 - Keep generated reports and job state in managed storage when those features are added; Render's local filesystem is ephemeral.
 
+The frontend is installable as a PWA. Its service worker caches the app shell and static Next.js assets, and shows an offline page when a navigation cannot reach the network. Race data and API responses are not cached, so analysis requires a connection.
+
 The original `raceX` project remains unchanged and is the behavioral reference during migration.

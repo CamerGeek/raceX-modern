@@ -1,18 +1,35 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import PwaRegister from "./pwa-register";
 
 export const metadata: Metadata = {
   title: "RaceX Analysis Desk",
   description: "Horse racing analysis and handicap intelligence.",
+  applicationName: "RaceX",
+  manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/favicon.png",
-    shortcut: "/favicon.png",
-    apple: "/favicon.png",
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.png", sizes: "any" },
+    ],
+    shortcut: "/icon.svg",
+    apple: "/apple-touch-icon.png",
   },
+  appleWebApp: {
+    capable: true,
+    title: "RaceX",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#103b32",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en"><body>{children}</body></html>
+    <html lang="en"><body><PwaRegister />{children}</body></html>
   );
 }

@@ -148,6 +148,13 @@ h2 { font-size: 2.4rem; font-weight: 500; margin: .4rem 0 0; }
 .starting-mark { color: var(--orange); font: 700 3rem Georgia, serif; }
 .pulse { animation: pulse 1.2s infinite ease-in-out; }
 @keyframes pulse { 50% { opacity: .25; } }
+.offline-page { min-height: 100svh; display: grid; place-items: center; padding: 1.5rem; background: radial-gradient(circle at 85% 8%, #dce8d5 0, transparent 27rem), var(--paper); }
+.offline-page section { width: min(100%, 32rem); padding: clamp(1.5rem, 6vw, 3rem); border: 1px solid var(--line); background: var(--panel); box-shadow: 0 14px 34px rgba(16, 59, 50, 0.09); }
+.offline-mark { display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: .7rem; color: white; background: var(--deep); font: 800 1rem ui-sans-serif, system-ui, sans-serif; }
+.offline-kicker { margin: 1.5rem 0 .5rem; color: var(--green); font: 700 .68rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .15em; }
+.offline-page h1 { margin: 0; font-size: clamp(2rem, 8vw, 3rem); font-weight: 500; }
+.offline-page section > p:not(.offline-kicker) { color: var(--muted); font: 1rem/1.55 ui-sans-serif, system-ui, sans-serif; }
+.offline-page button { margin-top: .5rem; padding: .8rem 1rem; border: 0; color: white; background: var(--orange); cursor: pointer; font: 700 .8rem ui-sans-serif, system-ui, sans-serif; }
 .handicap-strip { display: flex; justify-content: space-between; gap: 1rem; padding: 1rem 0; font: .78rem ui-sans-serif, system-ui, sans-serif; }
 .handicap-strip span { color: var(--muted); }
 .table-wrap { overflow-x: auto; }
