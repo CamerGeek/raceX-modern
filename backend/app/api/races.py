@@ -1,15 +1,27 @@
-import pandas as pd
+from datetime import date
 from typing import Any
+
+import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 
-from app.schemas.races import AnalysisRequest, AnalysisResponse, BettingRequest, RaceResponse, ScrapeRequest
+from app.schemas.races import (
+    AnalysisRequest,
+    AnalysisResponse,
+    BettingRequest,
+    RaceResponse,
+    ScrapeRequest,
+    TurfomaniaQuinteAnalysisRequest,
+    TurfomaniaQuinteAnalysisResponse,
+)
 from app.services.betting_service import generate_combinations, simulate_race
 from app.services.analysis_service import analyze_race
 from app.services.model_prediction_service import predict_race as predict_model_race
+from app.services.meeting_persistence import persist_scraped_meeting
 from app.services.scraping_service import detect_race_type, scrape_race
 from app.services.serialization import dataframe_records
 from app.services.supabase_client import SupabaseClientWrapper
 from app.services.turfomania_download import parse_turfomania_meeting_url
+from app.services.turfomania_quinte import scrape_turfomania_quinte, turfomania_quinte_race_type
 from race_scraper_app import (
     analyze_class_ic,
     analyze_fitness_if,
@@ -100,21 +112,38 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
             source = race.get("source", source)
         else:
             frame = scrape_race(request.url, race_type, source)
-        analyzed, prognosis, handicap = analyze_race(
+        return _analysis_response(
             frame,
-            race_type,
+            race_type=race_type,
+            source=source,
             include_handicap=request.include_handicap,
             max_horses=request.max_horses,
         )
-        display_frame = _display_frame(frame, analyzed, race_type)
-        prognosis_rows = _prognosis_rows(prognosis, analyzed, race_type)
-        sections = _legacy_sections(display_frame, analyzed, race_type, request.include_handicap)
-        overview = _flat_overview(frame, analyzed, prognosis_rows) if race_type == "flat" else {}
-        model_predictions = predict_model_race(frame, race_type, source)
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Race analysis failed: {exc}") from exc
+
+
+def _analysis_response(
+    frame: pd.DataFrame,
+    *,
+    race_type: str,
+    source: str,
+    include_handicap: bool,
+    max_horses: int,
+) -> AnalysisResponse:
+    analyzed, prognosis, handicap = analyze_race(
+        frame,
+        race_type,
+        include_handicap=include_handicap,
+        max_horses=max_horses,
+    )
+    display_frame = _display_frame(frame, analyzed, race_type)
+    prognosis_rows = _prognosis_rows(prognosis, analyzed, race_type)
+    sections = _legacy_sections(display_frame, analyzed, race_type, include_handicap)
+    overview = _flat_overview(frame, analyzed, prognosis_rows) if race_type == "flat" else {}
+    model_predictions = predict_model_race(frame, race_type, source)
     return AnalysisResponse(
         race_type=race_type,
         source=source,
@@ -130,6 +159,48 @@ def analyze(request: AnalysisRequest) -> AnalysisResponse:
         handicap=handicap,
         model_predictions=model_predictions,
     )
+
+
+@router.post("/turfomania/quinte/analyze", response_model=TurfomaniaQuinteAnalysisResponse)
+def analyze_turfomania_quinte(
+    request: TurfomaniaQuinteAnalysisRequest,
+) -> TurfomaniaQuinteAnalysisResponse:
+    client = SupabaseClientWrapper()
+    meeting = client.select_one("meetings", filters=[("id", "eq", request.meeting_id)])
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Selected Turfomania meeting not found")
+    if meeting.get("source") != "turfomania":
+        raise HTTPException(status_code=422, detail="Selected meeting is not a Turfomania meeting")
+
+    try:
+        frame = scrape_turfomania_quinte(meeting)
+        race_type = turfomania_quinte_race_type(frame)
+        persisted = persist_scraped_meeting(
+            frame,
+            meeting_date=date.fromisoformat(str(meeting["meeting_date"])),
+            meeting_name=meeting.get("name"),
+            meeting_url=None,
+            race_type=race_type,
+            source="turfomania",
+            client=client,
+            meeting=meeting,
+        )
+        if not persisted["races"]:
+            raise ValueError("No Quinté race was persisted")
+        response = _analysis_response(
+            frame,
+            race_type=race_type,
+            source="turfomania",
+            include_handicap=request.include_handicap,
+            max_horses=request.max_horses,
+        )
+        return TurfomaniaQuinteAnalysisResponse(**response.model_dump(), race_id=persisted["races"][0]["id"])
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Turfomania Quinté analysis failed: {exc}") from exc
 
 
 @router.post("/simulate")

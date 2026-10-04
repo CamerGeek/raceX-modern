@@ -64,28 +64,37 @@ def detect_discipline(conditions_text: str) -> str | None:
 def parse_race_metadata(soup: BeautifulSoup, url: str) -> dict[str, Any]:
     title_block = soup.find("div", class_="table-head-bloc-title")
     h1 = title_block.find("h1") if title_block else soup.find("h1")
-    h2 = soup.find("h2", class_="date")
+    h2 = soup.select_one(".table-head-bloc-title .date") or soup.find("h2", class_="date")
     title = soup.find("title")
     conditions_div = soup.select_one("div.detailCourseCaract2-pictos")
 
     conditions = _clean(conditions_div.get_text(" ")) if conditions_div else ""
-    descriptif = _clean(h1.get_text()) if h1 else ""
+    title_text = title_block.select_one(".h2") if title_block else None
+    detail_text = title_block.select_one(".detail") if title_block else None
+    descriptif = _clean(title_text.get_text()) if title_text else (_clean(h1.get_text()) if h1 else "")
     if not conditions and title_block:
-        detail = title_block.find("div", class_="detail")
-        conditions = _clean(detail.get_text(" ")) if detail else ""
+        conditions = _clean(detail_text.get_text(" ")) if detail_text else ""
     if not descriptif:
         old_detail = soup.find("div", class_="detailCourseCaract")
         descriptif = _clean(old_detail.get_text(" ")) if old_detail else ""
     header2 = _clean(h2.get_text()) if h2 else ""
     hippodrome = ""
-    if title and "-" in title.get_text():
+    venue_match = re.search(r"\(([^()]+)\)", descriptif)
+    if venue_match:
+        hippodrome = _clean(venue_match.group(1))
+    elif title and "-" in title.get_text():
         hippodrome = _clean(title.get_text().split("-")[-1])
 
     ref_course = None
     match = re.search(r"R(\d+)\s*C(\d+)", header2, re.IGNORECASE)
     if match:
         ref_course = f"R{match.group(1)}C{match.group(2)}"
-    elif header2:
+    if not ref_course and title_block:
+        race_code = title_block.select_one(".rc_big")
+        match = re.search(r"R(\d+)\s*C(\d+)", race_code.get_text(" ") if race_code else "", re.IGNORECASE)
+        if match:
+            ref_course = f"R{match.group(1)}C{match.group(2)}"
+    if not ref_course and header2:
         ref_course = clean_ref_course(header2)
 
     race_date = None
@@ -101,7 +110,7 @@ def parse_race_metadata(soup: BeautifulSoup, url: str) -> dict[str, Any]:
         start_time = match.group(1)
 
     distance = None
-    match = re.search(r"(\d[\d\s\u00a0]*)\s*m\b", conditions)
+    match = re.search(r"(\d[\d\s\u00a0]*)\s*m(?:ètres?)?", conditions, re.IGNORECASE)
     if match:
         distance = clean_distance(match.group(1))
 
@@ -126,7 +135,11 @@ def parse_race_metadata(soup: BeautifulSoup, url: str) -> dict[str, Any]:
         "DIST": distance,
         "ALLOCATION": allocation,
         "STARTERS": starters,
-        "Q+": ("quinté" in conditions.lower()) or ("quinte" in conditions.lower()),
+        "Q+": (
+            bool(title_block and (title_block.select_one(".specialQuinte") or title_block.select_one('[title="Quinté+"]')))
+            or ("quinté" in conditions.lower())
+            or ("quinte" in conditions.lower())
+        ),
         "RACE_URL": url,
     }
 

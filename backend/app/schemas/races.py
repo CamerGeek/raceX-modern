@@ -15,6 +15,12 @@ class AnalysisRequest(ScrapeRequest):
     max_horses: int = Field(default=8, ge=1, le=30)
 
 
+class TurfomaniaQuinteAnalysisRequest(BaseModel):
+    meeting_id: str = Field(min_length=1)
+    include_handicap: bool = True
+    max_horses: int = Field(default=8, ge=1, le=30)
+
+
 class BettingRequest(BaseModel):
     race_id: str = Field(min_length=1)
     race_type: str = Field(pattern="^(flat|trot)$")
@@ -52,3 +58,7 @@ class AnalysisResponse(RaceResponse):
     race_details: str = ""
     handicap: dict[str, Any] | None = None
     model_predictions: ModelPredictionResponse | None = None
+
+
+class TurfomaniaQuinteAnalysisResponse(AnalysisResponse):
+    race_id: str

@@ -39,6 +39,31 @@ def test_parse_runners_accepts_a_table_without_tbody_or_tableau_line_class() -> 
     }]
 
 
+def test_parse_quinte_title_block_metadata() -> None:
+    soup = BeautifulSoup(
+        '''<div class="table-head-bloc-title">
+        <div class="rc_big">R1C4<span class="specialQuinte">Spécial Quinté+</span></div>
+        <div class="h2">QATAR PRIX DE LA PLACE DES VOSGES (LONGCHAMP)</div>
+        <div class="date">Samedi 03 Octobre 2026 - 15h15</div>
+        <div class="detail">Plat - Handicap Classe 1 - 2500 mètres</div>
+        <span title="Quinté+">Q+</span></div>''',
+        "html.parser",
+    )
+
+    metadata = turfomania_race.parse_race_metadata(
+        soup,
+        "https://www.turfomania.fr/quinte/",
+    )
+
+    assert metadata["REF_COURSE"] == "R1C4"
+    assert metadata["DESCRIPTIF"] == "QATAR PRIX DE LA PLACE DES VOSGES (LONGCHAMP)"
+    assert metadata["RACE_DATE"] == "03/10/2026"
+    assert metadata["START_TIME"] == "15h15"
+    assert metadata["HIPPODROME"] == "LONGCHAMP"
+    assert metadata["DIST"] == 2500
+    assert metadata["Q+"] is True
+
+
 def test_fetch_race_html_returns_runner_page_from_requests(monkeypatch: pytest.MonkeyPatch) -> None:
     request_html = '<table><tr><td><a href="/cheval/demo">DEMO</a></td></tr></table>'
     request_response = SimpleNamespace(text=request_html, raise_for_status=lambda: None)

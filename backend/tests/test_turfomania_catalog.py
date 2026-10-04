@@ -50,6 +50,8 @@ def test_parse_reunion_excludes_non_partants_links() -> None:
     reunion = BeautifulSoup(
         '''<div class="reunion-container"><div class="header-row"><span class="badge-text">R1</span><span class="title">Auteuil</span></div>
         <a class="card-course" href="/quinte/"><span class="badge-text">R1</span><span class="hippodrome">Quinté</span></a>
+        <a class="card-course" href="/quinte/rapport/"><span class="badge-text">R1</span><span class="hippodrome">Qatar Prix Test - 18 partants Q+</span></a>
+        <a class="card-course" href="/pronostics/rapports-test.html?idcourse=43"><span class="badge-text">R1</span><span class="hippodrome">Prix terminé</span></a>
         <a class="card-course" href="/pronostics/partants-test.html?idcourse=42"><span class="badge-text">R1</span><span class="hippodrome">Prix Test</span></a></div>''',
         "html.parser",
     ).select_one(".reunion-container")
