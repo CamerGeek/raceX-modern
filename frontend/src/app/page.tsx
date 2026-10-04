@@ -87,6 +87,7 @@ export default function Home() {
   const [selectedRace, setSelectedRace] = useState("");
   const [storedMeeting, setStoredMeeting] = useState<boolean | null>(null);
   const [forceRefresh, setForceRefresh] = useState(false);
+  const [selectionExpanded, setSelectionExpanded] = useState(true);
   const [meetingDate, setMeetingDate] = useState(today);
   const [meetings, setMeetings] = useState<Record<string, string>>({});
   const [meetingsLoading, setMeetingsLoading] = useState(true);
@@ -113,6 +114,8 @@ export default function Home() {
   const topHorse = rankedHorses[0];
   const topScore = topHorse ? numberField(topHorse, ["SCORE", "COMPOSITE_SCORE", "Composite", "Score"]) : 0;
   const topOdds = topHorse ? field(topHorse, ["COTE", "Cote", "Odds"]) : "-";
+  const selectedMeetingLabel = Object.entries(meetings).find(([, meeting]) => meeting === meetingUrl)?.[0] ?? "Selected meeting";
+  const selectedRaceLabel = races.find((race) => race.id === selectedRace)?.race_key ?? "Race report";
 
   useEffect(() => {
     let cancelled = false;
@@ -186,6 +189,7 @@ export default function Home() {
   function selectMeeting(nextUrl: string) {
     setMeetingUrl(nextUrl);
     setUrl(nextUrl);
+    setSelectionExpanded(true);
     setRaces([]);
     setSelectedRace("");
     setStoredMeeting(null);
@@ -260,6 +264,7 @@ export default function Home() {
       if (!response.ok) throw new Error(payload.detail ?? "Race analysis failed");
       setUrl(race.url);
       setAnalysis(payload as Analysis);
+      setSelectionExpanded(false);
       setReportTab("overview");
       setSimulationRows([]);
       setCombinations([]);
@@ -304,6 +309,7 @@ export default function Home() {
       setRaceType(payload.race_type);
       setTypeSource("automatic");
       setAnalysis(payload);
+      setSelectionExpanded(false);
       setReportTab("overview");
       setSimulationRows([]);
       setCombinations([]);
@@ -352,7 +358,12 @@ export default function Home() {
       </header>
 
       <section className="workspace" aria-label="Race analysis workspace">
-        <form className="control-panel" onSubmit={submit}>
+        <form className={`control-panel${analysis ? " has-analysis" : ""}${selectionExpanded ? " selection-expanded" : ""}`} onSubmit={submit}>
+          {analysis && <div className="mobile-selection-summary">
+            <div><span>ANALYZING</span><strong>{selectedMeetingLabel} · {selectedRaceLabel}</strong></div>
+            <button type="button" aria-expanded={selectionExpanded} aria-controls="race-selection-controls" onClick={() => setSelectionExpanded((expanded) => !expanded)}>{selectionExpanded ? "Done" : "Change race"}</button>
+          </div>}
+          <div className="selection-controls" id="race-selection-controls">
           <div className="form-heading"><div><div className="eyebrow">01 / SELECT A PROGRAM</div><h3>Find today&apos;s races</h3></div><span className="live-label">ZONE-TURF + TURFOMANIA</span></div>
           <label htmlFor="meeting-date">Meeting date</label>
           <input id="meeting-date" type="date" value={meetingDate} onChange={(event) => { setMeetingsLoading(true); setMeetingDate(event.target.value); }} />
@@ -402,6 +413,7 @@ export default function Home() {
             {meetingDate !== today && <p className="stored-notice">The generic Turfomania Quinté page only provides the current day’s race.</p>}
           </>}
           {error && <p className="error" role="alert">{error}</p>}
+          </div>
         </form>
 
         <section className="results-panel" aria-live="polite">
@@ -418,9 +430,12 @@ export default function Home() {
               <div className="quick-feel-card"><span>BEST STARTING POSTS</span><strong>{analysis.overview.best_starting_posts.join(" · ") || "-"}</strong></div>
             </div>}
             <div className="race-meta"><span>{analysis.source}</span><span>Model {analysis.model_version}</span><a href={url} target="_blank" rel="noreferrer">Open source race ↗</a></div>
+            <div className="report-tab-navigation">
             <nav className="report-tabs" role="tablist" aria-label="Race report sections">
               {[{ id: "overview", label: "Overview" }, { id: "model", label: "Model" }, { id: "composite", label: "Composite" }, { id: "simulation", label: "Monte Carlo" }, { id: "combinations", label: "Combinations" }, { id: "data", label: `Full data (${analysis.columns.length})` }].map((tab) => <button type="button" role="tab" className={reportTab === tab.id ? "active" : ""} aria-selected={reportTab === tab.id} key={tab.id} onClick={() => tab.id === "simulation" || tab.id === "combinations" ? void loadBettingTab(tab.id) : setReportTab(tab.id)}>{tab.label}</button>)}
             </nav>
+            <span className="report-tabs-hint" aria-hidden="true">Swipe for sections <span>→</span></span>
+            </div>
             {reportTab === "overview" && <>
             {topHorse && <div className="hero-selection">
               <div><span className="hero-kicker">TOP SELECTION</span><h3>{field(topHorse, ["CHEVAL", "Cheval", "HORSE"], "Unknown horse")}</h3><p>Highest composite signal in this field</p></div>
@@ -444,7 +459,7 @@ export default function Home() {
             </div>}
             {analysis.model_predictions && <div className="overview-grid"><article className="overview-card"><h3>Model shortlist</h3><p>Top 8 horses sorted by deep score</p>{analysis.model_predictions.status === "ready" ? <div className="post-list">{modelOverviewRows.map((horse, index) => <span key={`shortlist-${field(horse, ["NUMERO", "N°", "N"], String(index))}`}>{field(horse, ["NUMERO", "N°", "N"], String(index + 1))}</span>)}</div> : <strong className="muted-result">{analysis.model_predictions.message}</strong>}</article></div>}
             </>}
-            {reportTab === "model" && analysis.model_predictions && <div className="report-section"><div className="section-title"><span>ML</span><h3>Model shortlist</h3><p>{analysis.model_predictions.status === "ready" ? `${modelShortlistRows.length} horses · sorted by deep score` : analysis.model_predictions.status}</p></div>{analysis.model_predictions.status === "ready" ? <><p className="muted-result">Class-balanced model scores are useful for ranking, not as calibrated probabilities. Model {analysis.model_predictions.model_version ?? "version unavailable"}.</p><div className="table-wrap"><table><thead><tr><th>Rank</th><th>Horse</th><th>Place score</th><th>Deep score</th><th>Win score</th><th>Dark-horse score</th><th>Votes</th><th>Priority tier</th></tr></thead><tbody>{modelShortlistRows.map((horse, index) => <tr key={`model-${field(horse, ["NUMERO", "N°", "N"], String(index))}`}><td className="rank">{index + 1}</td><td>{field(horse, ["NUMERO", "N°", "N"], "-")} / {field(horse, ["CHEVAL", "Cheval"], "Unknown")}</td><td>{formatValue(horse.place_prob)}</td><td>{formatValue(horse.place_prob_deep)}</td><td>{formatValue(horse.p_win)}</td><td>{formatValue(horse.dark_prob)}</td><td>{formatValue(horse.votes)}</td><td>{formatValue(horse.bet_tier)}</td></tr>)}</tbody></table></div></> : <p className="muted-result">{analysis.model_predictions.message}</p>}</div>}
+            {reportTab === "model" && analysis.model_predictions && <div className="report-section"><div className="section-title"><span>ML</span><h3>Model shortlist</h3><p>{analysis.model_predictions.status === "ready" ? `${modelShortlistRows.length} horses · sorted by deep score` : analysis.model_predictions.status}</p></div>{analysis.model_predictions.status === "ready" ? <><p className="muted-result">Class-balanced model scores are useful for ranking, not as calibrated probabilities. Model {analysis.model_predictions.model_version ?? "version unavailable"}.</p><div className="table-scroll-hint" aria-hidden="true">Swipe to see all columns <span>→</span></div><div className="table-wrap"><table><thead><tr><th>Rank</th><th>Horse</th><th>Place score</th><th>Deep score</th><th>Win score</th><th>Dark-horse score</th><th>Votes</th><th>Priority tier</th></tr></thead><tbody>{modelShortlistRows.map((horse, index) => <tr key={`model-${field(horse, ["NUMERO", "N°", "N"], String(index))}`}><td className="rank">{index + 1}</td><td>{field(horse, ["NUMERO", "N°", "N"], "-")} / {field(horse, ["CHEVAL", "Cheval"], "Unknown")}</td><td>{formatValue(horse.place_prob)}</td><td>{formatValue(horse.place_prob_deep)}</td><td>{formatValue(horse.p_win)}</td><td>{formatValue(horse.dark_prob)}</td><td>{formatValue(horse.votes)}</td><td>{formatValue(horse.bet_tier)}</td></tr>)}</tbody></table></div></> : <p className="muted-result">{analysis.model_predictions.message}</p>}</div>}
             {reportTab === "composite" && <>
             <div className="report-section"><div className="section-title"><span>01</span><h3>Composite ranking</h3><p>Score and market odds at a glance</p></div><div className="ranking-grid">{(() => { const displayedHorses = rankedHorses.slice(0, 16); const maxOdds = Math.max(...displayedHorses.map((item) => numberField(item, ["COTE", "Cote", "Odds"])), 1); return displayedHorses.map((horse, index) => {
               const score = numberField(horse, ["SCORE", "COMPOSITE_SCORE", "Composite", "Score"]);
@@ -456,13 +471,13 @@ export default function Home() {
               </article>;
             }); })()}</div></div>
             </>}
-            {reportTab === "simulation" && <div className="report-section"><div className="section-title"><span>MC</span><h3>Monte Carlo simulation</h3><p>5,000 simulated race orders</p></div>{bettingLoading && <p className="muted-result">Running simulation...</p>}{bettingError && <p className="error">{bettingError}</p>}{!bettingLoading && !bettingError && <div className="table-wrap"><table><thead><tr><th>Horse</th><th>Win probability</th><th>Top-3 probability</th><th>Average rank</th></tr></thead><tbody>{simulationRows.slice(0, 16).map((horse, index) => <tr key={`sim-${index}`}><td>{field(horse, ["N°", "N"], "-")} / {field(horse, ["Cheval", "CHEVAL"], "Unknown")}</td><td>{(horse.win_probability * 100).toFixed(1)}%</td><td>{(horse.podium_probability * 100).toFixed(1)}%</td><td>{horse.average_simulated_rank.toFixed(2)}</td></tr>)}</tbody></table></div>}</div>}
+            {reportTab === "simulation" && <div className="report-section"><div className="section-title"><span>MC</span><h3>Monte Carlo simulation</h3><p>5,000 simulated race orders</p></div>{bettingLoading && <p className="muted-result">Running simulation...</p>}{bettingError && <p className="error">{bettingError}</p>}{!bettingLoading && !bettingError && <><div className="table-scroll-hint" aria-hidden="true">Swipe to see all columns <span>→</span></div><div className="table-wrap"><table><thead><tr><th>Horse</th><th>Win probability</th><th>Top-3 probability</th><th>Average rank</th></tr></thead><tbody>{simulationRows.slice(0, 16).map((horse, index) => <tr key={`sim-${index}`}><td>{field(horse, ["N°", "N"], "-")} / {field(horse, ["Cheval", "CHEVAL"], "Unknown")}</td><td>{(horse.win_probability * 100).toFixed(1)}%</td><td>{(horse.podium_probability * 100).toFixed(1)}%</td><td>{horse.average_simulated_rank.toFixed(2)}</td></tr>)}</tbody></table></div></>}</div>}
             {reportTab === "combinations" && <div className="report-section"><div className="section-title"><span>COMB</span><h3>Generated combinations</h3><p>{combinations.length} tickets / 5 horses</p></div>{bettingLoading && <p className="muted-result">Generating combinations...</p>}{bettingError && <p className="error">{bettingError}</p>}{!bettingLoading && !bettingError && <div className="combination-grid">{combinations.map((combination, index) => <div className="combination-row" key={`combo-${index}`}><strong>{String(index + 1).padStart(2, "0")}</strong>{combination.map((horse) => <span key={horse}>{horse}</span>)}</div>)}</div>}</div>}
             {reportTab === "overview" && <>
             <div className="report-section"><div className="section-title"><span>02</span><h3>Handicap mechanics</h3><p>Distance and penalty signals</p></div><div className="handicap-panel"><strong>{analysis.handicap?.distance ? `${analysis.handicap.distance}m handicap` : "No distance handicap detected"}</strong><span>{analysis.handicap ? `${analysis.handicap.penalized_count} runners carry a penalty` : "The field is compared without a distance adjustment."}</span></div></div>
             </>}
             {reportTab === "data" && <>
-            <div className="report-section"><div className="section-title"><span>03</span><h3>Full race data</h3><p>{analysis.columns.length} source and computed fields</p></div><div className="table-wrap"><table><thead><tr><th>#</th>{analysis.columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{analysis.rows.map((row, index) => <tr key={`row-${index}`}><td className="rank">{index + 1}</td>{analysis.columns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}</tr>)}</tbody></table></div></div>
+            <div className="report-section"><div className="section-title"><span>03</span><h3>Full race data</h3><p>{analysis.columns.length} source and computed fields</p></div><div className="table-scroll-hint" aria-hidden="true">Swipe to see all columns <span>→</span></div><div className="table-wrap"><table><thead><tr><th>#</th>{analysis.columns.map((column) => <th key={column}>{column}</th>)}</tr></thead><tbody>{analysis.rows.map((row, index) => <tr key={`row-${index}`}><td className="rank">{index + 1}</td>{analysis.columns.map((column) => <td key={column}>{formatValue(row[column])}</td>)}</tr>)}</tbody></table></div></div>
             </>}
           </>}
         </section>
