@@ -15,34 +15,38 @@ def test_flat_overview_uses_odds_divergence_for_upset_potential(monkeypatch) -> 
     assert overview["consistency_score"] == [{"signal": "consistent"}]
 
 
-def test_prognosis_outside_top_composite_uses_top_eight_and_normalized_numbers() -> None:
-    analyzed = pd.DataFrame(
-        [
-            {"N°": str(number), "Composite": 1 - number / 20}
-            for number in range(1, 11)
-        ]
-    )
+def test_prognosis_outside_model_tier_uses_top_half_by_deep_score() -> None:
     prognosis = [{"N°": "10.0"}, {"N°": "2"}, {"N°": "9"}]
+    predictions = {
+        "status": "ready",
+        "rows": [
+            {"NUMERO": number, "place_prob_deep": score}
+            for number, score in [(1, 0.95), (2, 0.90), (3, 0.85), (4, 0.80), (5, 0.75),
+                                  (6, 0.70), (7, 0.65), (8, 0.60), (9, 0.55), (10, 0.50)]
+        ],
+    }
 
-    assert races._prognosis_outside_top_composite(prognosis, analyzed) == [
-        {"N°": "10.0"},
-        {"N°": "9"},
-    ]
+    outside, tier_size = races._prognosis_outside_model_tier(prognosis, predictions, starter_count=10)
+
+    assert outside == [{"N°": "10.0"}, {"N°": "9"}]
+    assert tier_size == 5
 
 
-def test_prognosis_outside_top_composite_checks_all_runners_in_small_fields() -> None:
-    analyzed = pd.DataFrame(
-        [
-            {"N°": "1", "Composite": 0.9},
-            {"N°": "2", "Composite": 0.8},
-            {"N°": "3", "Composite": 0.7},
-            {"N°": "4", "Composite": 0.6},
-            {"N°": "5", "Composite": 0.5},
-        ]
+def test_prognosis_outside_model_tier_uses_starter_count_not_prediction_row_count() -> None:
+    predictions = {
+        "status": "ready",
+        "rows": [{"NUMERO": number, "place_prob_deep": 1 - number / 10} for number in range(1, 7)],
+    }
+
+    outside, tier_size = races._prognosis_outside_model_tier(
+        [{"N°": "6"}], predictions, starter_count=9
     )
 
-    assert races._prognosis_outside_top_composite([{"N°": "5"}], analyzed) == []
+    assert outside == [{"N°": "6"}]
+    assert tier_size == 5
 
 
-def test_prognosis_outside_top_composite_is_unavailable_without_composite_ranking() -> None:
-    assert races._prognosis_outside_top_composite([{"N°": "5"}], pd.DataFrame({"N°": ["5"]})) is None
+def test_prognosis_outside_model_tier_is_unavailable_without_deep_scores() -> None:
+    predictions = {"status": "ready", "rows": [{"NUMERO": 5, "place_prob_deep": None}]}
+
+    assert races._prognosis_outside_model_tier([{"N°": "5"}], predictions, 10) == (None, None)

@@ -141,10 +141,12 @@ def _analysis_response(
     )
     display_frame = _display_frame(frame, analyzed, race_type)
     prognosis_rows = _prognosis_rows(prognosis, analyzed, race_type)
-    prognosis_outside_top_composite = _prognosis_outside_top_composite(prognosis_rows, analyzed)
     sections = _legacy_sections(display_frame, analyzed, race_type, include_handicap)
     overview = _flat_overview(frame, analyzed, prognosis_rows) if race_type == "flat" else {}
     model_predictions = predict_model_race(frame, race_type, source)
+    prognosis_outside_model_tier, model_tier_size = _prognosis_outside_model_tier(
+        prognosis_rows, model_predictions, len(frame)
+    )
     return AnalysisResponse(
         race_type=race_type,
         source=source,
@@ -153,7 +155,8 @@ def _analysis_response(
         rows=dataframe_records(display_frame),
         model_version="initial-migration",
         prognosis=prognosis_rows,
-        prognosis_outside_top_composite=prognosis_outside_top_composite,
+        prognosis_outside_model_tier=prognosis_outside_model_tier,
+        model_tier_size=model_tier_size,
         signals=_analysis_signals(analyzed),
         sections=sections,
         overview=overview,
@@ -241,42 +244,54 @@ def _prognosis_rows(prognosis: pd.DataFrame, analyzed: pd.DataFrame, race_type: 
     return sorted(rows, key=lambda row: float(row.get("Composite", -1) or -1), reverse=True)
 
 
-def _prognosis_outside_top_composite(
-    prognosis: list[dict], analyzed: pd.DataFrame
-) -> list[dict] | None:
-    """Return prognosis horses outside the top eight, or all starters when fewer, by composite score."""
-    if analyzed.empty or "Composite" not in analyzed.columns:
-        return None
+def _prognosis_outside_model_tier(
+    prognosis: list[dict], model_predictions: dict[str, Any], starter_count: int
+) -> tuple[list[dict] | None, int | None]:
+    """Compare prognosis picks with the top half of starters by model deep score."""
+    if model_predictions.get("status") != "ready" or starter_count <= 0:
+        return None, None
 
+    model_rows = model_predictions.get("rows")
+    if not isinstance(model_rows, list) or not model_rows:
+        return None, None
+
+    number_columns = ("NUMERO", "N°", "N", "Numero", "N?", "NUM")
+    score_columns = ("place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score")
     number_column = next(
-        (column for column in ("N°", "N", "Numero", "N?", "NUMERO") if column in analyzed.columns),
+        (column for column in number_columns if any(column in row for row in model_rows)),
         None,
     )
-    if number_column is None:
-        return None
+    score_column = next(
+        (column for column in score_columns if any(column in row for row in model_rows)),
+        None,
+    )
+    if number_column is None or score_column is None:
+        return None, None
 
     def horse_number(value: Any) -> str:
         return "" if pd.isna(value) else str(value).strip().removesuffix(".0")
 
-    ranked = analyzed.assign(_composite_score=pd.to_numeric(analyzed["Composite"], errors="coerce"))
-    ranked = ranked.dropna(subset=["_composite_score"]).sort_values(
-        "_composite_score", ascending=False, kind="mergesort"
-    )
-    top_composite = {
-        horse_number(value)
-        for value in ranked.head(8)[number_column]
-        if horse_number(value)
-    }
-    if not top_composite:
-        return None
+    ranked_model = []
+    for row in model_rows:
+        number = horse_number(row.get(number_column))
+        score = pd.to_numeric(row.get(score_column), errors="coerce")
+        if number and pd.notna(score):
+            ranked_model.append((number, float(score)))
+    if not ranked_model:
+        return None, None
 
-    number_columns = ("N°", "N", "Numero", "N?", "NUMERO")
-    outside_top_composite = []
+    ranked_model.sort(key=lambda item: item[1], reverse=True)
+    model_tier_size = min((starter_count + 1) // 2, len(ranked_model))
+    if model_tier_size == 0:
+        return None, None
+    top_model_numbers = {number for number, _ in ranked_model[:model_tier_size]}
+
+    outside_model_tier = []
     for horse in prognosis:
         number = horse_number(next((horse[column] for column in number_columns if column in horse), None))
-        if number and number not in top_composite:
-            outside_top_composite.append(horse)
-    return outside_top_composite
+        if number and number not in top_model_numbers:
+            outside_model_tier.append(horse)
+    return outside_model_tier, model_tier_size
 
 
 def _analysis_signals(frame: pd.DataFrame) -> list[dict[str, str]]:
