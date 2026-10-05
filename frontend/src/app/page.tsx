@@ -18,7 +18,7 @@ type Analysis = {
   rows: Horse[];
   model_version: string;
   prognosis: Horse[];
-  prognosis_outside_top_three?: Horse[] | null;
+  prognosis_outside_top_composite?: Horse[] | null;
   handicap: { distance: number | null; penalized_count: number } | null;
   signals?: { label: string; value: string; detail: string }[];
   sections?: AnalysisSection[];
@@ -112,7 +112,8 @@ export default function Home() {
   const modelShortlistRows = [...(analysis?.model_predictions?.rows ?? [])]
     .sort((a, b) => deepScore(b) - deepScore(a));
   const modelOverviewRows = modelShortlistRows.slice(0, 8);
-  const prognosisOutsideTopThree = analysis?.prognosis_outside_top_three ?? null;
+  const prognosisOutsideTopComposite = analysis?.prognosis_outside_top_composite ?? null;
+  const compositeTierSize = Math.min(8, analysis?.row_count ?? 0);
   const topHorse = rankedHorses[0];
   const topScore = topHorse ? numberField(topHorse, ["SCORE", "COMPOSITE_SCORE", "Composite", "Score"]) : 0;
   const topOdds = topHorse ? field(topHorse, ["COTE", "Cote", "Odds"]) : "-";
@@ -425,16 +426,16 @@ export default function Home() {
           {scrapeResult && <div className="saved-state"><span className="starting-mark">✓</span><h3>Meeting saved</h3><p>{scrapeResult.race_count} races and {scrapeResult.runner_count} runners stored in <strong>{scrapeResult.runner_table}</strong>.</p><span>{scrapeResult.columns.length} source columns preserved</span></div>}
           {analysis && <>
             {analysis.race_details && <div className="race-details"><span>RACE DETAILS</span><p>{analysis.race_details}</p></div>}
-            <section className="prognosis-miss-signal" aria-label="Prognosis horses outside the composite top three">
+            <section className="prognosis-miss-signal" aria-label="Prognosis horses outside the highest composite scores">
               <div className="prognosis-miss-heading">
                 <span>MODEL CHECK</span>
-                <h3>Prognosis outside composite top 3</h3>
-                <p>Prognosis picks not ranked among the model&apos;s three highest composite scores.</p>
+                <h3>Prognosis outside model&apos;s top {compositeTierSize} composite scores</h3>
+                <p>Prognosis picks outside the highest composite tier for this field.</p>
               </div>
-              {prognosisOutsideTopThree === null
+              {prognosisOutsideTopComposite === null
                 ? <p className="prognosis-miss-empty">Comparison unavailable</p>
-                : prognosisOutsideTopThree.length
-                  ? <ul>{prognosisOutsideTopThree.map((horse, index) => {
+                : prognosisOutsideTopComposite.length
+                  ? <ul>{prognosisOutsideTopComposite.map((horse, index) => {
                     const number = field(horse, ["N°", "N", "Numero", "N?", "NUMERO"], String(index + 1));
                     return <li key={`${number}-${index}`}><strong>{number}</strong><span>{field(horse, ["CHEVAL", "Cheval", "HORSE"], "Horse name unavailable")}</span></li>;
                   })}</ul>
