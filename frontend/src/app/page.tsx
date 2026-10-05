@@ -18,6 +18,7 @@ type Analysis = {
   rows: Horse[];
   model_version: string;
   prognosis: Horse[];
+  prognosis_outside_top_three: Horse[] | null;
   handicap: { distance: number | null; penalized_count: number } | null;
   signals?: { label: string; value: string; detail: string }[];
   sections?: AnalysisSection[];
@@ -423,6 +424,21 @@ export default function Home() {
           {scrapeResult && <div className="saved-state"><span className="starting-mark">✓</span><h3>Meeting saved</h3><p>{scrapeResult.race_count} races and {scrapeResult.runner_count} runners stored in <strong>{scrapeResult.runner_table}</strong>.</p><span>{scrapeResult.columns.length} source columns preserved</span></div>}
           {analysis && <>
             {analysis.race_details && <div className="race-details"><span>RACE DETAILS</span><p>{analysis.race_details}</p></div>}
+            <section className="prognosis-miss-signal" aria-label="Prognosis horses outside the composite top three">
+              <div className="prognosis-miss-heading">
+                <span>MODEL CHECK</span>
+                <h3>Prognosis outside composite top 3</h3>
+                <p>Prognosis picks not ranked among the model&apos;s three highest composite scores.</p>
+              </div>
+              {analysis.prognosis_outside_top_three === null
+                ? <p className="prognosis-miss-empty">Comparison unavailable</p>
+                : analysis.prognosis_outside_top_three.length
+                  ? <ul>{analysis.prognosis_outside_top_three.map((horse, index) => {
+                    const number = field(horse, ["N°", "N", "Numero", "N?", "NUMERO"], String(index + 1));
+                    return <li key={`${number}-${index}`}><strong>{number}</strong><span>{field(horse, ["CHEVAL", "Cheval", "HORSE"], "Horse name unavailable")}</span></li>;
+                  })}</ul>
+                  : <p className="prognosis-miss-empty">None in this prognosis</p>}
+            </section>
             {analysis.race_type === "flat" && analysis.overview && <div className="quick-feel-grid">
               <div className="quick-feel-card"><span>PROGNOSIS</span><strong>{horseNumbers(analysis.overview.prognosis).join(" · ") || "-"}</strong></div>
               <div className="quick-feel-card"><span>SUMMARY</span><strong>{horseNumbers(analysis.overview.summary).join(" · ") || "-"}</strong></div>

@@ -141,6 +141,7 @@ def _analysis_response(
     )
     display_frame = _display_frame(frame, analyzed, race_type)
     prognosis_rows = _prognosis_rows(prognosis, analyzed, race_type)
+    prognosis_outside_top_three = _prognosis_outside_top_three(prognosis_rows, analyzed)
     sections = _legacy_sections(display_frame, analyzed, race_type, include_handicap)
     overview = _flat_overview(frame, analyzed, prognosis_rows) if race_type == "flat" else {}
     model_predictions = predict_model_race(frame, race_type, source)
@@ -152,6 +153,7 @@ def _analysis_response(
         rows=dataframe_records(display_frame),
         model_version="initial-migration",
         prognosis=prognosis_rows,
+        prognosis_outside_top_three=prognosis_outside_top_three,
         signals=_analysis_signals(analyzed),
         sections=sections,
         overview=overview,
@@ -237,6 +239,44 @@ def _prognosis_rows(prognosis: pd.DataFrame, analyzed: pd.DataFrame, race_type: 
     if race_type == "trot":
         return rows
     return sorted(rows, key=lambda row: float(row.get("Composite", -1) or -1), reverse=True)
+
+
+def _prognosis_outside_top_three(
+    prognosis: list[dict], analyzed: pd.DataFrame
+) -> list[dict] | None:
+    """Return prognosis horses outside the top three composite-ranked runners."""
+    if analyzed.empty or "Composite" not in analyzed.columns:
+        return None
+
+    number_column = next(
+        (column for column in ("N°", "N", "Numero", "N?", "NUMERO") if column in analyzed.columns),
+        None,
+    )
+    if number_column is None:
+        return None
+
+    def horse_number(value: Any) -> str:
+        return "" if pd.isna(value) else str(value).strip().removesuffix(".0")
+
+    ranked = analyzed.assign(_composite_score=pd.to_numeric(analyzed["Composite"], errors="coerce"))
+    ranked = ranked.dropna(subset=["_composite_score"]).sort_values(
+        "_composite_score", ascending=False, kind="mergesort"
+    )
+    top_three = {
+        horse_number(value)
+        for value in ranked.head(3)[number_column]
+        if horse_number(value)
+    }
+    if not top_three:
+        return None
+
+    number_columns = ("N°", "N", "Numero", "N?", "NUMERO")
+    outside_top_three = []
+    for horse in prognosis:
+        number = horse_number(next((horse[column] for column in number_columns if column in horse), None))
+        if number and number not in top_three:
+            outside_top_three.append(horse)
+    return outside_top_three
 
 
 def _analysis_signals(frame: pd.DataFrame) -> list[dict[str, str]]:

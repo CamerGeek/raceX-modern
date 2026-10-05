@@ -2368,19 +2368,6 @@ def sanitize_horse_list(items):
     return out
 
 
-def compute_top_model_horses(composite_df):
-    """Return horse numbers for the three highest composite scores."""
-    if composite_df is None or composite_df.empty or 'Composite' not in composite_df.columns:
-        return []
-
-    num_col = next((col for col in ['N°', 'N', 'Numero'] if col in composite_df.columns), None)
-    if num_col is None:
-        return []
-
-    top_horses = composite_df.sort_values('Composite', ascending=False, kind='mergesort').head(3)
-    return sanitize_horse_list(top_horses[num_col].tolist())
-
-
 def compute_prognosis(race_df, max_len=8):
     """
     Compute an automated prognosis list (up to max_len) of horse numbers ('N°') based on:
@@ -5119,7 +5106,6 @@ class RaceScraperApp(QMainWindow):
         self.exclusive_label = QLabel("")
         self.trending_label = QLabel("")
         self.prognosis_only_label = QLabel("")
-        self.prognosis_outside_top_three_label = QLabel("")
         self.summary_prognosis_label = QLabel("")
         self.favorable_cordes_label = QLabel("")
 
@@ -5658,8 +5644,6 @@ class RaceScraperApp(QMainWindow):
         # Note: Not added to UI - only for internal use by generate_bets()
         print("[DEBUG] RaceScraperApp: Created self.bets_table for bet generation")
 
-        s_layout.addStretch(2)
-
         analysis_tabs.addTab(self.summary_widget, "📋 Synthese")
 
         # --- Statistiques Course tab (two-column layout with statistics and analyses) ---
@@ -5790,23 +5774,6 @@ class RaceScraperApp(QMainWindow):
         self.prognosis_only_label_detailed.setWordWrap(True)
         po_layout.addWidget(self.prognosis_only_label_detailed)
         right_col_layout.addWidget(self.prognosis_only_widget_detailed)
-
-        # Prognosis horses outside the model's top three
-        self.prognosis_outside_top_three_widget_detailed = QWidget()
-        self.prognosis_outside_top_three_widget_detailed.setStyleSheet("background-color:#fde2e2;border:1px solid #f5c6cb;border-radius:4px;")
-        self.prognosis_outside_top_three_widget_detailed.setFixedHeight(50)
-        pot3_layout = QHBoxLayout(self.prognosis_outside_top_three_widget_detailed)
-        pot3_layout.setContentsMargins(6, 6, 6, 6)
-        pot3_label_title = QLabel("🔎 Prono hors top 3:")
-        pot3_label_title.setStyleSheet("color:#721c24;font-weight:bold;")
-        pot3_layout.addWidget(pot3_label_title)
-        self.prognosis_outside_top_three_label_detailed = QLabel("")
-        self.prognosis_outside_top_three_label_detailed.setStyleSheet("color:#721c24;font-size:14px;")
-        self.prognosis_outside_top_three_label_detailed.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.prognosis_outside_top_three_label_detailed.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        self.prognosis_outside_top_three_label_detailed.setWordWrap(True)
-        pot3_layout.addWidget(self.prognosis_outside_top_three_label_detailed)
-        right_col_layout.addWidget(self.prognosis_outside_top_three_widget_detailed)
 
         # Summary+Prognosis intersection display
         self.summary_prognosis_widget_detailed = QWidget()
@@ -9091,16 +9058,6 @@ class RaceScraperApp(QMainWindow):
                     if hasattr(self, 'prognosis_only_label_detailed'):
                         self.prognosis_only_label_detailed.setText('')
 
-            # Prognosis horses not represented among the model's top three
-            top_model_horses = compute_top_model_horses(composite_df)
-            prognosis_outside_top_three = (
-                [h for h in prog if h not in top_model_horses] if top_model_horses else []
-            )
-            top_three_miss_text = '  '.join(prognosis_outside_top_three)
-            self.prognosis_outside_top_three_label.setText(top_three_miss_text)
-            if hasattr(self, 'prognosis_outside_top_three_label_detailed'):
-                self.prognosis_outside_top_three_label_detailed.setText(top_three_miss_text)
-
             # summary+prognosis intersection (horses found in both)
             summary_prognosis_intersection = [h for h in prog if h in summary]
             if hasattr(self, 'summary_prognosis_label'):
@@ -10434,7 +10391,6 @@ class RaceScraperApp(QMainWindow):
             trending_text = self.trending_label.text().strip() if hasattr(self, 'trending_label') else ''
             favorable_cordes_text = self.favorable_cordes_label.text().strip() if hasattr(self, 'favorable_cordes_label') else ''
             prognosis_only_text = self.prognosis_only_label.text().strip() if hasattr(self, 'prognosis_only_label') else ''
-            prognosis_outside_top_three_text = self.prognosis_outside_top_three_label.text().strip() if hasattr(self, 'prognosis_outside_top_three_label') else ''
             summary_prognosis_text = self.summary_prognosis_label.text().strip() if hasattr(self, 'summary_prognosis_label') else ''
 
             # Get race metadata from filtered data
@@ -10536,7 +10492,6 @@ class RaceScraperApp(QMainWindow):
                 ("[TARGET] Intersection Synthese+Prono Flash", summary_prognosis_text),
                 ("Cordes Favorables", favorable_cordes_text),
                 ("Dans le Prono Uniquement", prognosis_only_text),
-                ("Prono hors top 3 du modèle", prognosis_outside_top_three_text),
                 ("Exclusif (Synthese seulement)", exclusive_text),
                 ("Populaires (Baisse de Cotes)", trending_text)
             ]
@@ -10761,7 +10716,6 @@ class RaceScraperApp(QMainWindow):
             trending_text = self.trending_label.text().strip() if hasattr(self, 'trending_label') else ''
             favorable_cordes_text = self.favorable_cordes_label.text().strip() if hasattr(self, 'favorable_cordes_label') else ''
             prognosis_only_text = self.prognosis_only_label.text().strip() if hasattr(self, 'prognosis_only_label') else ''
-            prognosis_outside_top_three_text = self.prognosis_outside_top_three_label.text().strip() if hasattr(self, 'prognosis_outside_top_three_label') else ''
             summary_prognosis_text = self.summary_prognosis_label.text().strip() if hasattr(self, 'summary_prognosis_label') else ''
             
             sections = [
@@ -10770,7 +10724,6 @@ class RaceScraperApp(QMainWindow):
                 ("[TARGET] Intersection Synthese+Prono Flash", summary_prognosis_text),
                 ("Cordes Favorables", favorable_cordes_text),
                 ("Dans le Prono Uniquement", prognosis_only_text),
-                ("Prono hors top 3 du modèle", prognosis_outside_top_three_text),
                 ("Exclusif (Synthese seulement)", exclusive_text),
                 ("Populaires (Baisse de Cotes)", trending_text)
             ]
@@ -10932,7 +10885,6 @@ class RaceScraperApp(QMainWindow):
             trending_text = self.trending_label.text().strip() if hasattr(self, 'trending_label') else ''
             favorable_cordes_text = self.favorable_cordes_label.text().strip() if hasattr(self, 'favorable_cordes_label') else ''
             prognosis_only_text = self.prognosis_only_label.text().strip() if hasattr(self, 'prognosis_only_label') else ''
-            prognosis_outside_top_three_text = self.prognosis_outside_top_three_label.text().strip() if hasattr(self, 'prognosis_outside_top_three_label') else ''
             summary_prognosis_text = self.summary_prognosis_label.text().strip() if hasattr(self, 'summary_prognosis_label') else ''
             
             sections = [
@@ -10941,7 +10893,6 @@ class RaceScraperApp(QMainWindow):
                 ("Intersection Synthese+Prono Flash", summary_prognosis_text),
                 ("Cordes Favorables", favorable_cordes_text),
                 ("Dans le Prono Uniquement", prognosis_only_text),
-                ("Prono hors top 3 du modèle", prognosis_outside_top_three_text),
                 ("Exclusif (Synthese seulement)", exclusive_text),
                 ("Populaires (Baisse de Cotes)", trending_text)
             ]
@@ -11176,7 +11127,6 @@ class RaceScraperApp(QMainWindow):
             trending_text = self.trending_label.text().strip() if hasattr(self, 'trending_label') else ''
             favorable_cordes_text = self.favorable_cordes_label.text().strip() if hasattr(self, 'favorable_cordes_label') else ''
             prognosis_only_text = self.prognosis_only_label.text().strip() if hasattr(self, 'prognosis_only_label') else ''
-            prognosis_outside_top_three_text = self.prognosis_outside_top_three_label.text().strip() if hasattr(self, 'prognosis_outside_top_three_label') else ''
             summary_prognosis_text = self.summary_prognosis_label.text().strip() if hasattr(self, 'summary_prognosis_label') else ''
             
             # Generate composite score table
@@ -11241,7 +11191,6 @@ class RaceScraperApp(QMainWindow):
                 ("Intersection", summary_prognosis_text),
                 ("Synthèse Only", exclusive_text),
                 ("Prono Only", prognosis_only_text),
-                ("Prono hors top 3 du modèle", prognosis_outside_top_three_text),
                 ("Populaires", trending_text),
                 ("Cordes Fav.", favorable_cordes_text),
             ]
