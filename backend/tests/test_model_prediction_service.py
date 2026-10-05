@@ -30,14 +30,48 @@ def test_predict_race_returns_model_scores(monkeypatch) -> None:
     }
 
 
+def test_predict_race_returns_trot_model_scores(monkeypatch) -> None:
+    class TrotPredictor:
+        meta = {"created": "2026-10-05"}
+
+        def predict_race(self, frame):
+            assert len(frame) == 1
+            return {
+                "bet_list": [7],
+                "table": pd.DataFrame([{"NUMERO": 7, "place_prob": 0.66, "place_prob_deep": float("nan")}]),
+            }
+
+    monkeypatch.setattr(
+        model_prediction_service,
+        "_get_predictor",
+        lambda: (_ for _ in ()).throw(AssertionError("flat predictor should not load")),
+    )
+    monkeypatch.setattr(model_prediction_service, "_get_trot_predictor", lambda: TrotPredictor())
+
+    result = model_prediction_service.predict_race(pd.DataFrame([{"N°": "7"}]), "trot", "turfomania")
+
+    assert result == {
+        "status": "ready",
+        "model_version": "2026-10-05",
+        "bet_list": [7],
+        "rows": [{"NUMERO": 7, "place_prob": 0.66, "place_prob_deep": None}],
+        "message": None,
+    }
+
+
 def test_predict_race_skips_unsupported_race_type(monkeypatch) -> None:
     monkeypatch.setattr(
         model_prediction_service,
         "_get_predictor",
         lambda: (_ for _ in ()).throw(AssertionError("predictor should not load")),
     )
+    monkeypatch.setattr(
+        model_prediction_service,
+        "_get_trot_predictor",
+        lambda: (_ for _ in ()).throw(AssertionError("trot predictor should not load")),
+    )
 
-    result = model_prediction_service.predict_race(pd.DataFrame(), "trot", "turfomania")
+    result = model_prediction_service.predict_race(pd.DataFrame(), "unknown", "turfomania")
 
     assert result["status"] == "unsupported"
     assert result["bet_list"] == []
