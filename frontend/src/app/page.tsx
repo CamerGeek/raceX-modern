@@ -18,7 +18,7 @@ type Analysis = {
   rows: Horse[];
   model_version: string;
   prognosis: Horse[];
-  prognosis_outside_top_three: Horse[] | null;
+  prognosis_outside_top_three?: Horse[] | null;
   handicap: { distance: number | null; penalized_count: number } | null;
   signals?: { label: string; value: string; detail: string }[];
   sections?: AnalysisSection[];
@@ -112,6 +112,7 @@ export default function Home() {
   const modelShortlistRows = [...(analysis?.model_predictions?.rows ?? [])]
     .sort((a, b) => deepScore(b) - deepScore(a));
   const modelOverviewRows = modelShortlistRows.slice(0, 8);
+  const prognosisOutsideTopThree = analysis?.prognosis_outside_top_three ?? null;
   const topHorse = rankedHorses[0];
   const topScore = topHorse ? numberField(topHorse, ["SCORE", "COMPOSITE_SCORE", "Composite", "Score"]) : 0;
   const topOdds = topHorse ? field(topHorse, ["COTE", "Cote", "Odds"]) : "-";
@@ -430,10 +431,10 @@ export default function Home() {
                 <h3>Prognosis outside composite top 3</h3>
                 <p>Prognosis picks not ranked among the model&apos;s three highest composite scores.</p>
               </div>
-              {analysis.prognosis_outside_top_three === null
+              {prognosisOutsideTopThree === null
                 ? <p className="prognosis-miss-empty">Comparison unavailable</p>
-                : analysis.prognosis_outside_top_three.length
-                  ? <ul>{analysis.prognosis_outside_top_three.map((horse, index) => {
+                : prognosisOutsideTopThree.length
+                  ? <ul>{prognosisOutsideTopThree.map((horse, index) => {
                     const number = field(horse, ["N°", "N", "Numero", "N?", "NUMERO"], String(index + 1));
                     return <li key={`${number}-${index}`}><strong>{number}</strong><span>{field(horse, ["CHEVAL", "Cheval", "HORSE"], "Horse name unavailable")}</span></li>;
                   })}</ul>
