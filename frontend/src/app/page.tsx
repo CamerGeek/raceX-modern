@@ -80,6 +80,61 @@ function sectionRows(analysis: Analysis, title: string) {
   return analysis.sections?.find((section) => section.title === title)?.rows ?? [];
 }
 
+function modelCheckFromVisibleRankings(analysis: Analysis): Horse[] | null {
+  const modelRows = analysis.model_predictions?.rows ?? [];
+  if (analysis.model_predictions?.status !== "ready" || !modelRows.length || !analysis.rows.length) return null;
+
+  const numberFrom = (row: Horse) => {
+    const value = field(row, ["N°", "N", "Numero", "NUMERO", "N?", "NUM"], "");
+    return value.trim().replace(/\.0$/, "");
+  };
+  const scoreFrom = (row: Horse, names: string[]) => {
+    const raw = field(row, names, "").trim().replace(",", ".");
+    if (!raw) return null;
+    const score = Number(raw);
+    return Number.isFinite(score) ? score : null;
+  };
+  const deepRows = modelRows
+    .map((row) => ({ row, number: numberFrom(row), score: scoreFrom(row, ["place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score"]) }))
+    .filter((item): item is { row: Horse; number: string; score: number } => Boolean(item.number) && item.score !== null)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, Math.min(8, analysis.row_count));
+
+  const compositeByNumber = new Map<string, { row: Horse; score: number }>();
+  for (const row of [...analysis.rows, ...analysis.prognosis]) {
+    const number = numberFrom(row);
+    const score = scoreFrom(row, ["Composite", "COMPOSITE_SCORE", "SCORE", "CS_norm", "Score"]);
+    if (number && score !== null) compositeByNumber.set(number, { row, score });
+  }
+  const compositeTop = [...compositeByNumber.entries()]
+    .sort((left, right) => right[1].score - left[1].score)
+    .slice(0, Math.min(8, analysis.row_count));
+  if (!deepRows.length || !compositeTop.length) return null;
+
+  const candidates = new Map<string, Horse>();
+  const memberships = new Map<string, Set<string>>();
+  const add = (number: string, row: Horse, source: string) => {
+    candidates.set(number, { ...(candidates.get(number) ?? {}), ...row });
+    const sources = memberships.get(number) ?? new Set<string>();
+    sources.add(source);
+    memberships.set(number, sources);
+  };
+  for (const row of analysis.prognosis) {
+    const number = numberFrom(row);
+    if (number) add(number, row, "Prognosis");
+  }
+  for (const { row, number } of deepRows) add(number, row, "Deep score top 8");
+  for (const [number, { row }] of compositeTop) add(number, row, "Composite top 8");
+
+  const sources = ["Prognosis", "Deep score top 8", "Composite top 8"];
+  return [...candidates.entries()]
+    .filter(([number]) => (memberships.get(number)?.size ?? 0) < sources.length)
+    .map(([number, row]) => ({
+      ...row,
+      missing_from: sources.filter((source) => !memberships.get(number)?.has(source)).join(", "),
+    }));
+}
+
 export default function Home() {
   const today = new Date().toISOString().slice(0, 10);
   const [url, setUrl] = useState("");
@@ -112,7 +167,9 @@ export default function Home() {
   const modelShortlistRows = [...(analysis?.model_predictions?.rows ?? [])]
     .sort((a, b) => deepScore(b) - deepScore(a));
   const modelOverviewRows = modelShortlistRows.slice(0, 8);
-  const modelCheck = analysis?.model_check ?? null;
+  const modelCheck = analysis
+    ? analysis.model_check ?? modelCheckFromVisibleRankings(analysis)
+    : null;
   const topHorse = rankedHorses[0];
   const topScore = topHorse ? numberField(topHorse, ["SCORE", "COMPOSITE_SCORE", "Composite", "Score"]) : 0;
   const topOdds = topHorse ? field(topHorse, ["COTE", "Cote", "Odds"]) : "-";

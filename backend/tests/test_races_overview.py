@@ -67,3 +67,23 @@ def test_model_check_is_unavailable_without_deep_scores() -> None:
     assert races._model_check_disagreements(
         [{"N°": "5"}], composite, predictions, 10
     ) is None
+
+
+def test_model_check_accepts_displayed_composite_score_alias() -> None:
+    predictions = {
+        "status": "ready",
+        "rows": [
+            {"NUMERO": 1, "place_prob_deep": 0.9},
+            {"NUMERO": 2, "place_prob_deep": 0.8},
+        ],
+    }
+    displayed_rows = pd.DataFrame([
+        {"NUMERO": 1, "COMPOSITE_SCORE": 0.9},
+        {"NUMERO": 2, "COMPOSITE_SCORE": 0.8},
+    ])
+
+    result = races._model_check_disagreements(
+        [{"NUMERO": 1}, {"NUMERO": 2}], displayed_rows, predictions, 2
+    )
+
+    assert result == []

@@ -145,7 +145,7 @@ def _analysis_response(
     overview = _flat_overview(frame, analyzed, prognosis_rows) if race_type == "flat" else {}
     model_predictions = predict_model_race(frame, race_type, source)
     model_check = _model_check_disagreements(
-        prognosis_rows, analyzed, model_predictions, len(frame)
+        prognosis_rows, display_frame, model_predictions, len(frame)
     )
     return AnalysisResponse(
         race_type=race_type,
@@ -279,7 +279,12 @@ def _model_check_disagreements(
     )
     if model_number_column is None or deep_score_column is None or composite_number_column is None:
         return None
-    if "Composite" not in composite.columns:
+    composite_score_column = next(
+        (column for column in ("Composite", "COMPOSITE_SCORE", "SCORE", "CS_norm", "Score")
+         if column in composite.columns),
+        None,
+    )
+    if composite_score_column is None:
         return None
 
     ranked_deep: list[tuple[str, float, dict]] = []
@@ -291,7 +296,7 @@ def _model_check_disagreements(
     ranked_composite: list[tuple[str, float, dict]] = []
     for _, row in composite.iterrows():
         number = horse_number(row.get(composite_number_column))
-        score = pd.to_numeric(row.get("Composite"), errors="coerce")
+        score = pd.to_numeric(row.get(composite_score_column), errors="coerce")
         if number and pd.notna(score):
             ranked_composite.append((number, float(score), row.to_dict()))
     if not ranked_deep or not ranked_composite:
