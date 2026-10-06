@@ -493,7 +493,7 @@ export default function Home() {
                 : modelCheck.length
                   ? <ul>{modelCheck.map((horse, index) => {
                     const number = field(horse, ["N°", "N", "Numero", "N?", "NUMERO"], String(index + 1));
-                    return <li key={`${number}-${index}`}><strong>{number}</strong><span>{field(horse, ["CHEVAL", "Cheval", "HORSE"], "Horse name unavailable")}</span><small>Missing from: {field(horse, ["missing_from"], "ranking")}</small></li>;
+                    return <li key={`${number}-${index}`}><strong>{number}</strong></li>;
                   })}</ul>
                   : <p className="prognosis-miss-empty">None in this prognosis</p>}
             </section>
