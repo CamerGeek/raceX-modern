@@ -144,8 +144,8 @@ def _analysis_response(
     sections = _legacy_sections(display_frame, analyzed, race_type, include_handicap)
     overview = _flat_overview(frame, analyzed, prognosis_rows) if race_type == "flat" else {}
     model_predictions = predict_model_race(frame, race_type, source)
-    prognosis_outside_model_tier, model_tier_size = _prognosis_outside_model_tier(
-        prognosis_rows, model_predictions, len(frame)
+    model_check = _model_check_disagreements(
+        prognosis_rows, analyzed, model_predictions, len(frame)
     )
     return AnalysisResponse(
         race_type=race_type,
@@ -155,8 +155,7 @@ def _analysis_response(
         rows=dataframe_records(display_frame),
         model_version="initial-migration",
         prognosis=prognosis_rows,
-        prognosis_outside_model_tier=prognosis_outside_model_tier,
-        model_tier_size=model_tier_size,
+        model_check=model_check,
         signals=_analysis_signals(analyzed),
         sections=sections,
         overview=overview,
@@ -244,54 +243,100 @@ def _prognosis_rows(prognosis: pd.DataFrame, analyzed: pd.DataFrame, race_type: 
     return sorted(rows, key=lambda row: float(row.get("Composite", -1) or -1), reverse=True)
 
 
-def _prognosis_outside_model_tier(
-    prognosis: list[dict], model_predictions: dict[str, Any], starter_count: int
-) -> tuple[list[dict] | None, int | None]:
-    """Compare prognosis picks with the top half of starters by model deep score."""
-    if model_predictions.get("status") != "ready" or starter_count <= 0:
-        return None, None
+def _model_check_disagreements(
+    prognosis: list[dict],
+    composite: pd.DataFrame,
+    model_predictions: dict[str, Any],
+    starter_count: int,
+) -> list[dict] | None:
+    """Return horses not shared by prognosis and the deep-score/composite top eights."""
+    if model_predictions.get("status") != "ready" or starter_count <= 0 or composite.empty:
+        return None
 
     model_rows = model_predictions.get("rows")
     if not isinstance(model_rows, list) or not model_rows:
-        return None, None
+        return None
 
     number_columns = ("NUMERO", "N°", "N", "Numero", "N?", "NUM")
-    score_columns = ("place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score")
-    number_column = next(
+
+    def horse_number(value: Any) -> str:
+        if pd.isna(value):
+            return ""
+        return str(value).strip().removesuffix(".0")
+
+    model_number_column = next(
         (column for column in number_columns if any(column in row for row in model_rows)),
         None,
     )
-    score_column = next(
-        (column for column in score_columns if any(column in row for row in model_rows)),
+    deep_score_column = next(
+        (column for column in ("place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score")
+         if any(column in row for row in model_rows)),
         None,
     )
-    if number_column is None or score_column is None:
-        return None, None
+    composite_number_column = next(
+        (column for column in number_columns if column in composite.columns),
+        None,
+    )
+    if model_number_column is None or deep_score_column is None or composite_number_column is None:
+        return None
+    if "Composite" not in composite.columns:
+        return None
 
-    def horse_number(value: Any) -> str:
-        return "" if pd.isna(value) else str(value).strip().removesuffix(".0")
-
-    ranked_model = []
+    ranked_deep: list[tuple[str, float, dict]] = []
     for row in model_rows:
-        number = horse_number(row.get(number_column))
-        score = pd.to_numeric(row.get(score_column), errors="coerce")
+        number = horse_number(row.get(model_number_column))
+        score = pd.to_numeric(row.get(deep_score_column), errors="coerce")
         if number and pd.notna(score):
-            ranked_model.append((number, float(score)))
-    if not ranked_model:
-        return None, None
+            ranked_deep.append((number, float(score), row))
+    ranked_composite: list[tuple[str, float, dict]] = []
+    for _, row in composite.iterrows():
+        number = horse_number(row.get(composite_number_column))
+        score = pd.to_numeric(row.get("Composite"), errors="coerce")
+        if number and pd.notna(score):
+            ranked_composite.append((number, float(score), row.to_dict()))
+    if not ranked_deep or not ranked_composite:
+        return None
 
-    ranked_model.sort(key=lambda item: item[1], reverse=True)
-    model_tier_size = min((starter_count + 1) // 2, len(ranked_model))
-    if model_tier_size == 0:
-        return None, None
-    top_model_numbers = {number for number, _ in ranked_model[:model_tier_size]}
+    tier_size = min(8, starter_count)
+    top_deep = sorted(ranked_deep, key=lambda item: item[1], reverse=True)[:tier_size]
+    top_composite = sorted(ranked_composite, key=lambda item: item[1], reverse=True)[:tier_size]
+    candidates: dict[str, dict] = {}
+    memberships: dict[str, set[str]] = {}
 
-    outside_model_tier = []
+    def add_candidates(rows: list[tuple[str, dict]], source: str) -> None:
+        for number, row in rows:
+            candidates.setdefault(number, row)
+            memberships.setdefault(number, set()).add(source)
+
+    add_candidates(
+        [
+            (number, horse)
+            for horse in prognosis
+            if (number := horse_number(
+                next((horse[column] for column in number_columns if column in horse), None)
+            ))
+        ],
+        "Prognosis",
+    )
+    add_candidates([(number, row) for number, _, row in top_deep], "Deep score top 8")
+    add_candidates([(number, row) for number, _, row in top_composite], "Composite top 8")
+
     for horse in prognosis:
         number = horse_number(next((horse[column] for column in number_columns if column in horse), None))
-        if number and number not in top_model_numbers:
-            outside_model_tier.append(horse)
-    return outside_model_tier, model_tier_size
+        if number in candidates:
+            candidates[number] = {**candidates[number], **horse}
+
+    all_sources = ("Prognosis", "Deep score top 8", "Composite top 8")
+    return [
+        {
+            **candidates[number],
+            "missing_from": ", ".join(
+                source for source in all_sources if source not in memberships[number]
+            ),
+        }
+        for number in candidates
+        if len(memberships[number]) < len(all_sources)
+    ]
 
 
 def _analysis_signals(frame: pd.DataFrame) -> list[dict[str, str]]:

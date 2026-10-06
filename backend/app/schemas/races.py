@@ -52,8 +52,7 @@ class AnalysisResponse(RaceResponse):
 
     model_version: str
     prognosis: list[dict[str, Any]]
-    prognosis_outside_model_tier: list[dict[str, Any]] | None = None
-    model_tier_size: int | None = None
+    model_check: list[dict[str, Any]] | None = None
     signals: list[dict[str, str]] = []
     sections: list[dict[str, Any]] = []
     overview: dict[str, Any] = {}

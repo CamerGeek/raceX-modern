@@ -15,7 +15,7 @@ def test_flat_overview_uses_odds_divergence_for_upset_potential(monkeypatch) -> 
     assert overview["consistency_score"] == [{"signal": "consistent"}]
 
 
-def test_prognosis_outside_model_tier_uses_top_half_by_deep_score() -> None:
+def test_model_check_lists_prognosis_horses_missing_from_either_top_eight() -> None:
     prognosis = [{"N°": "10.0"}, {"N°": "2"}, {"N°": "9"}]
     predictions = {
         "status": "ready",
@@ -25,28 +25,45 @@ def test_prognosis_outside_model_tier_uses_top_half_by_deep_score() -> None:
                                   (6, 0.70), (7, 0.65), (8, 0.60), (9, 0.55), (10, 0.50)]
         ],
     }
+    composite = pd.DataFrame([
+        {"N°": number, "Composite": score}
+        for number, score in [(1, 0.95), (2, 0.90), (3, 0.85), (4, 0.80), (5, 0.75),
+                              (6, 0.70), (7, 0.65), (9, 0.60), (8, 0.55), (10, 0.50)]
+    ])
 
-    outside, tier_size = races._prognosis_outside_model_tier(prognosis, predictions, starter_count=10)
+    result = races._model_check_disagreements(prognosis, composite, predictions, starter_count=10)
 
-    assert outside == [{"N°": "10.0"}, {"N°": "9"}]
-    assert tier_size == 5
+    result_by_number = {row["NUMERO"] if "NUMERO" in row else row["N°"]: row for row in result}
+    assert set(result_by_number) == {1, 3, 4, 5, 6, 7, 8, "9", "10.0"}
+    assert result_by_number[1]["missing_from"] == "Prognosis"
+    assert result_by_number[8]["missing_from"] == "Prognosis, Composite top 8"
+    assert result_by_number["9"]["missing_from"] == "Deep score top 8"
+    assert result_by_number["10.0"]["missing_from"] == "Deep score top 8, Composite top 8"
 
 
-def test_prognosis_outside_model_tier_uses_starter_count_not_prediction_row_count() -> None:
+def test_model_check_limits_rankings_to_eight_or_fewer_starters() -> None:
     predictions = {
         "status": "ready",
         "rows": [{"NUMERO": number, "place_prob_deep": 1 - number / 10} for number in range(1, 7)],
     }
+    composite = pd.DataFrame([
+        {"N°": number, "Composite": 1 - number / 10} for number in range(1, 7)
+    ])
 
-    outside, tier_size = races._prognosis_outside_model_tier(
-        [{"N°": "6"}], predictions, starter_count=9
+    result = races._model_check_disagreements(
+        [{"N°": str(number)} for number in range(1, 7)],
+        composite,
+        predictions,
+        starter_count=6,
     )
 
-    assert outside == [{"N°": "6"}]
-    assert tier_size == 5
+    assert result == []
 
 
-def test_prognosis_outside_model_tier_is_unavailable_without_deep_scores() -> None:
+def test_model_check_is_unavailable_without_deep_scores() -> None:
     predictions = {"status": "ready", "rows": [{"NUMERO": 5, "place_prob_deep": None}]}
+    composite = pd.DataFrame([{"N°": 5, "Composite": 0.8}])
 
-    assert races._prognosis_outside_model_tier([{"N°": "5"}], predictions, 10) == (None, None)
+    assert races._model_check_disagreements(
+        [{"N°": "5"}], composite, predictions, 10
+    ) is None

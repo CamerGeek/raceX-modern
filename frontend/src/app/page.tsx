@@ -18,8 +18,7 @@ type Analysis = {
   rows: Horse[];
   model_version: string;
   prognosis: Horse[];
-  prognosis_outside_model_tier?: Horse[] | null;
-  model_tier_size?: number | null;
+  model_check?: Horse[] | null;
   handicap: { distance: number | null; penalized_count: number } | null;
   signals?: { label: string; value: string; detail: string }[];
   sections?: AnalysisSection[];
@@ -113,8 +112,7 @@ export default function Home() {
   const modelShortlistRows = [...(analysis?.model_predictions?.rows ?? [])]
     .sort((a, b) => deepScore(b) - deepScore(a));
   const modelOverviewRows = modelShortlistRows.slice(0, 8);
-  const prognosisOutsideModelTier = analysis?.prognosis_outside_model_tier ?? null;
-  const modelTierSize = analysis?.model_tier_size ?? null;
+  const modelCheck = analysis?.model_check ?? null;
   const topHorse = rankedHorses[0];
   const topScore = topHorse ? numberField(topHorse, ["SCORE", "COMPOSITE_SCORE", "Composite", "Score"]) : 0;
   const topOdds = topHorse ? field(topHorse, ["COTE", "Cote", "Odds"]) : "-";
@@ -427,18 +425,18 @@ export default function Home() {
           {scrapeResult && <div className="saved-state"><span className="starting-mark">✓</span><h3>Meeting saved</h3><p>{scrapeResult.race_count} races and {scrapeResult.runner_count} runners stored in <strong>{scrapeResult.runner_table}</strong>.</p><span>{scrapeResult.columns.length} source columns preserved</span></div>}
           {analysis && <>
             {analysis.race_details && <div className="race-details"><span>RACE DETAILS</span><p>{analysis.race_details}</p></div>}
-            <section className="prognosis-miss-signal" aria-label="Prognosis horses outside the model's top half by deep score">
+            <section className="prognosis-miss-signal" aria-label="Horses not shared by prognosis, deep-score top eight, and composite top eight">
               <div className="prognosis-miss-heading">
                 <span>MODEL CHECK</span>
-                <h3>Prognosis outside model&apos;s top half by deep score</h3>
-                <p>{modelTierSize === null ? "Deep-score ranking unavailable." : `Outside the model's highest ${modelTierSize} deep scores.`}</p>
+                <h3>Horses not shared across Prognosis, deep-score, and composite</h3>
+                <p>Deep-score and composite rankings include up to the top 8 starters.</p>
               </div>
-              {prognosisOutsideModelTier === null
-                ? <p className="prognosis-miss-empty">Comparison unavailable</p>
-                : prognosisOutsideModelTier.length
-                  ? <ul>{prognosisOutsideModelTier.map((horse, index) => {
+              {modelCheck === null
+                ? <p className="prognosis-miss-empty">Comparison unavailable: deep-score or composite ranking is missing.</p>
+                : modelCheck.length
+                  ? <ul>{modelCheck.map((horse, index) => {
                     const number = field(horse, ["N°", "N", "Numero", "N?", "NUMERO"], String(index + 1));
-                    return <li key={`${number}-${index}`}><strong>{number}</strong><span>{field(horse, ["CHEVAL", "Cheval", "HORSE"], "Horse name unavailable")}</span></li>;
+                    return <li key={`${number}-${index}`}><strong>{number}</strong><span>{field(horse, ["CHEVAL", "Cheval", "HORSE"], "Horse name unavailable")}</span><small>Missing from: {field(horse, ["missing_from"], "ranking")}</small></li>;
                   })}</ul>
                   : <p className="prognosis-miss-empty">None in this prognosis</p>}
             </section>
