@@ -105,6 +105,7 @@ class TrotPredictor:
         self.rank_classes = [int(c) for c in self.meta["models"]["rank"]["classes"]]
 
         self.deep = None
+        self.deep_scaler = None
         deep_meta_path = os.path.join(models_dir, "trot_deep_meta.json")
         if use_deep and os.path.exists(deep_meta_path):
             try:
@@ -116,12 +117,16 @@ class TrotPredictor:
                 else:
                     from tensorflow import keras
 
+                    import joblib
+                    self.deep_scaler = joblib.load(
+                        os.path.join(models_dir, dmeta["scaler_file"]))
                     self.deep = keras.models.load_model(
                         os.path.join(models_dir, dmeta["model_file"]))
             except Exception as e:
                 print(f"warning: could not load deep model ({e}); "
                       "continuing without it", file=sys.stderr)
                 self.deep = None
+                self.deep_scaler = None
 
     # ------------------------------------------------------------------ #
     # feature preparation                                                #
@@ -273,8 +278,9 @@ class TrotPredictor:
         out["p_win"] = rp[:, classes.index(1)]
         out["rank_pred"] = [classes[i] for i in rp.argmax(axis=1)]
         if self.deep is not None:
+            Xs = self.deep_scaler.transform(X_deep.values.astype(np.float32))
             out["place_prob_deep"] = np.asarray(
-                self.deep.predict(X_deep.values, verbose=0)).ravel()
+                self.deep.predict(Xs, verbose=0)).ravel()
         else:
             out["place_prob_deep"] = np.nan
         out["place_prob_avg"] = out[["place_prob", "place_prob_deep"]].mean(axis=1)
