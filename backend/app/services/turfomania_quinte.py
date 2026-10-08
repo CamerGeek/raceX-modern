@@ -12,13 +12,59 @@ from turfomania_race import scrape_turfomania_race
 QUINTE_URL = "https://www.turfomania.fr/quinte/"
 
 
-def scrape_turfomania_quinte(meeting: dict[str, Any]) -> pd.DataFrame:
+def scrape_turfomania_quinte(
+    meeting: dict[str, Any],
+    frame: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     """Scrape today's Quinté runners after verifying the selected meeting."""
     if meeting.get("source") != "turfomania":
         raise ValueError("Selected meeting is not a Turfomania meeting")
 
-    meeting_date = date.fromisoformat(str(meeting["meeting_date"]))
+    return _validate_quinte_frame(
+        meeting,
+        frame if frame is not None else scrape_turfomania_race(QUINTE_URL, None),
+    )
+
+
+def find_turfomania_quinte_meeting(
+    meetings: list[dict[str, Any]],
+) -> tuple[dict[str, Any], pd.DataFrame]:
+    """Scrape the current Quinté once and match it to today's stored meeting."""
+    if not meetings:
+        raise ValueError("No Turfomania meetings are available for today's Quinté")
+
     frame = scrape_turfomania_race(QUINTE_URL, None)
+    if frame.empty:
+        raise ValueError("Turfomania Quinté page returned no runners")
+
+    race_date_text = str(frame["RACE_DATE"].iloc[0] or "")
+    try:
+        race_date = datetime.strptime(race_date_text, "%d/%m/%Y").date()
+    except ValueError as exc:
+        raise ValueError(
+            f"Could not determine the Quinté race date from Turfomania: {race_date_text!r}"
+        ) from exc
+    race_track = str(frame["HIPPODROME"].iloc[0] or "")
+    meeting = next(
+        (
+            item
+            for item in meetings
+            if item.get("meeting_date") == race_date.isoformat()
+            and _same_track(race_track, str(item.get("name") or ""))
+        ),
+        None,
+    )
+    if not meeting:
+        raise ValueError(
+            f"No Turfomania meeting found for the Quinté at {race_track or 'an unknown track'} "
+            f"on {race_date.isoformat()}"
+        )
+    return meeting, _validate_quinte_frame(meeting, frame)
+
+
+def _validate_quinte_frame(meeting: dict[str, Any], source_frame: pd.DataFrame) -> pd.DataFrame:
+    meeting_date = date.fromisoformat(str(meeting["meeting_date"]))
+    frame = source_frame
     if frame.empty:
         raise ValueError("Turfomania Quinté page returned no runners")
 

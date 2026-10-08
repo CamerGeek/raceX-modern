@@ -50,6 +50,12 @@ class SupabaseClientWrapper:
         result = self.client.table(table).insert(payload).execute()
         return result.data[0] if result.data else {}
 
+    def upsert_many(self, table: str, rows: list[dict[str, Any]], *, on_conflict: str) -> list[dict[str, Any]]:
+        if not rows:
+            return []
+        result = self.client.table(table).upsert(rows, on_conflict=on_conflict).execute()
+        return result.data or []
+
     def update(self, table: str, *, id_value: str, payload: dict[str, Any]) -> dict[str, Any]:
         result = self.client.table(table).update(payload).eq("id", id_value).execute()
         return result.data[0] if result.data else {}
@@ -61,4 +67,3 @@ class SupabaseClientWrapper:
         else:
             result = self.client.table(table).upsert(request).execute()
         return result.data[0] if result.data else {}
-

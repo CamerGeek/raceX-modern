@@ -15,3 +15,16 @@ services:
         sync: false
       - key: SUPABASE_KEY
         sync: false
+  - type: cron
+    name: racex-quinte-odds-poller
+    runtime: docker
+    rootDir: backend
+    schedule: "*/30 * * * *"
+    dockerCommand: python -m app.tasks.poll_quinte_odds
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false

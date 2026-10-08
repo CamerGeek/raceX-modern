@@ -1,5 +1,6 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
@@ -10,6 +11,7 @@ from app.schemas.races import (
     BettingRequest,
     RaceResponse,
     ScrapeRequest,
+    TodayQuinteAnalysisRequest,
     TurfomaniaQuinteAnalysisRequest,
     TurfomaniaQuinteAnalysisResponse,
 )
@@ -17,11 +19,17 @@ from app.services.betting_service import generate_combinations, simulate_race
 from app.services.analysis_service import analyze_race
 from app.services.model_prediction_service import predict_race as predict_model_race
 from app.services.meeting_persistence import persist_scraped_meeting
+from app.services.quinte_odds_service import get_today_quinte_odds_history
 from app.services.scraping_service import detect_race_type, scrape_race
 from app.services.serialization import dataframe_records
 from app.services.supabase_client import SupabaseClientWrapper
 from app.services.turfomania_download import parse_turfomania_meeting_url
-from app.services.turfomania_quinte import scrape_turfomania_quinte, turfomania_quinte_race_type
+from app.services.turfomania_catalog import persist_turfomania_reunions, scrape_turfomania_reunions
+from app.services.turfomania_quinte import (
+    find_turfomania_quinte_meeting,
+    scrape_turfomania_quinte,
+    turfomania_quinte_race_type,
+)
 from race_scraper_app import (
     analyze_class_ic,
     analyze_fitness_if,
@@ -40,6 +48,7 @@ from favorable_cordes import compute_favorable_corde_horses
 router = APIRouter(prefix="/races", tags=["races"])
 
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
+HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v1"
 
 
 def _saved_frame(client: SupabaseClientWrapper, race_id: str) -> tuple[pd.DataFrame, dict]:
@@ -191,6 +200,11 @@ def analyze_turfomania_quinte(
         )
         if not persisted["races"]:
             raise ValueError("No Quinté race was persisted")
+        race_id = persisted["races"][0]["id"]
+        if request.include_handicap and request.max_horses == 8:
+            cached = _cached_homepage_quinte_analysis(client, race_id)
+            if cached:
+                return cached
         response = _analysis_response(
             frame,
             race_type=race_type,
@@ -198,13 +212,168 @@ def analyze_turfomania_quinte(
             include_handicap=request.include_handicap,
             max_horses=request.max_horses,
         )
-        return TurfomaniaQuinteAnalysisResponse(**response.model_dump(), race_id=persisted["races"][0]["id"])
+        result = TurfomaniaQuinteAnalysisResponse(**response.model_dump(), race_id=race_id)
+        if request.include_handicap and request.max_horses == 8:
+            _store_homepage_quinte_analysis(client, result)
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Turfomania Quinté analysis failed: {exc}") from exc
+
+
+@router.post(
+    "/turfomania/quinte/today/analyze",
+    response_model=TurfomaniaQuinteAnalysisResponse,
+)
+def analyze_today_turfomania_quinte(
+    request: TodayQuinteAnalysisRequest,
+) -> TurfomaniaQuinteAnalysisResponse:
+    client = SupabaseClientWrapper()
+    meeting_date = request.meeting_date or date.today()
+    try:
+        meetings = client.list(
+            "meetings",
+            filters=[
+                ("source", "eq", "turfomania"),
+                ("meeting_date", "eq", meeting_date.isoformat()),
+            ],
+            limit=100,
+        )
+        if not meetings:
+            reunions = scrape_turfomania_reunions()
+            persist_turfomania_reunions(
+                reunions,
+                meeting_date=meeting_date,
+                client=client,
+            )
+            meetings = client.list(
+                "meetings",
+                filters=[
+                    ("source", "eq", "turfomania"),
+                    ("meeting_date", "eq", meeting_date.isoformat()),
+                ],
+                limit=100,
+            )
+        if not meetings:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No Turfomania meetings found for {meeting_date.isoformat()}",
+            )
+
+        for meeting in meetings:
+            for race in client.list(
+                "races",
+                filters=[("meeting_id", "eq", meeting["id"])],
+                limit=500,
+            ):
+                summary = race.get("summary") or {}
+                if race.get("source") == "turfomania" and summary.get("q_plus"):
+                    cached = _cached_homepage_quinte_analysis(client, race["id"])
+                    if cached:
+                        return cached
+
+        meeting, frame = find_turfomania_quinte_meeting(meetings)
+        race_type = turfomania_quinte_race_type(frame)
+        persisted = persist_scraped_meeting(
+            frame,
+            meeting_date=meeting_date,
+            meeting_name=meeting.get("name"),
+            meeting_url=None,
+            race_type=race_type,
+            source="turfomania",
+            client=client,
+            meeting=meeting,
+        )
+        if not persisted["races"]:
+            raise ValueError("No Quinté race was persisted")
+
+        race_id = persisted["races"][0]["id"]
+        cached = _cached_homepage_quinte_analysis(client, race_id)
+        if cached:
+            return cached
+
+        response = _analysis_response(
+            frame,
+            race_type=race_type,
+            source="turfomania",
+            include_handicap=True,
+            max_horses=8,
+        )
+        result = TurfomaniaQuinteAnalysisResponse(
+            **response.model_dump(),
+            race_id=race_id,
+        )
+        _store_homepage_quinte_analysis(client, result)
+        return result
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Today's Turfomania Quinté analysis failed: {exc}",
+        ) from exc
+
+
+@router.get("/turfomania/quinte/today/odds")
+def today_turfomania_quinte_odds(
+    meeting_date: date | None = Query(default=None, alias="date"),
+) -> dict[str, Any]:
+    try:
+        return get_today_quinte_odds_history(
+            meeting_date=meeting_date or datetime.now(ZoneInfo("Europe/Paris")).date(),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Today's Quinté odds history could not be loaded: {exc}",
+        ) from exc
+
+
+def _cached_homepage_quinte_analysis(
+    client: SupabaseClientWrapper,
+    race_id: str,
+) -> TurfomaniaQuinteAnalysisResponse | None:
+    cached_run = client.select_one(
+        "analysis_runs",
+        filters=[("race_id", "eq", race_id)],
+        order_by=("created_at", "desc"),
+    )
+    if not cached_run:
+        return None
+    summary = cached_run.get("summary") or {}
+    if summary.get("homepage_cache_version") != HOMEPAGE_QUINTE_CACHE_VERSION:
+        return None
+    cached_response = summary.get("homepage_analysis")
+    if not isinstance(cached_response, dict):
+        return None
+    return TurfomaniaQuinteAnalysisResponse.model_validate(cached_response)
+
+
+def _store_homepage_quinte_analysis(
+    client: SupabaseClientWrapper,
+    response: TurfomaniaQuinteAnalysisResponse,
+) -> None:
+    if not response.race_id:
+        raise ValueError("Cannot cache a Quinté analysis without a race ID")
+    client.insert(
+        "analysis_runs",
+        {
+            "race_id": response.race_id,
+            "model_version": response.model_version,
+            "summary": {
+                "homepage_cache_version": HOMEPAGE_QUINTE_CACHE_VERSION,
+                "homepage_analysis": response.model_dump(mode="json"),
+            },
+            "prognosis": response.prognosis,
+            "handicap": response.handicap or {},
+            "raw_rows": response.rows,
+        },
+    )
 
 
 @router.post("/simulate")

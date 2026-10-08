@@ -23,6 +23,7 @@ Do not commit the `service_role` key or place it in the Next.js frontend. It byp
    - `races`
    - `race_runners`
    - `analysis_runs`
+   - `quinte_odds_snapshots`
    - `jobs`
    - `profiles`
 5. Confirm the `latest_analysis` view exists under **Database > Views**.
@@ -106,6 +107,8 @@ The Render service is defined in [`render.yaml`](render.yaml). Create or update 
 | `SUPABASE_KEY` | the Supabase `service_role` key |
 
 Set `SUPABASE_URL` and `SUPABASE_KEY` as secret values in Render. Do not put either value in `render.yaml`.
+
+The blueprint also defines a `racex-quinte-odds-poller` Cron Job. It uses the same Supabase secrets and runs `python -m app.tasks.poll_quinte_odds` every 30 minutes. Ensure your Render plan supports Cron Jobs and sync the updated blueprint. The task records the current Quinté+ runners' odds in `quinte_odds_snapshots` and stops collecting after the scheduled start time.
 
 After deployment, verify:
 

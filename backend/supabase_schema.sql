@@ -319,6 +319,17 @@ create table if not exists public.analysis_runs (
     created_at timestamptz not null default now()
 );
 
+create table if not exists public.quinte_odds_snapshots (
+    id uuid primary key default gen_random_uuid(),
+    race_id uuid not null references public.races(id) on delete cascade,
+    captured_at timestamptz not null,
+    "N°" text not null,
+    "CHEVAL" text,
+    odds numeric(10, 2) not null check (odds > 0),
+    created_at timestamptz not null default now(),
+    unique (race_id, captured_at, "N°")
+);
+
 create table if not exists public.jobs (
     id uuid primary key default gen_random_uuid(),
     type text not null,
@@ -374,6 +385,7 @@ create unique index if not exists uq_races_meeting_race_key on public.races(meet
 create index if not exists idx_race_runners_race_id on public.race_runners(race_id);
 create index if not exists idx_race_runners_horse_name on public.race_runners("CHEVAL");
 create index if not exists idx_analysis_runs_race_id on public.analysis_runs(race_id);
+create index if not exists idx_quinte_odds_race_captured on public.quinte_odds_snapshots(race_id, captured_at);
 create index if not exists idx_jobs_status on public.jobs(status);
 
 create or replace function public.set_updated_at()

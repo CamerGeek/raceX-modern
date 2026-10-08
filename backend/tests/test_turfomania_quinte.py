@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import pandas as pd
 import pytest
 
@@ -88,6 +90,9 @@ def test_quinte_analysis_endpoint_persists_and_returns_race_id(monkeypatch: pyte
         def select_one(self, *_args: object, **_kwargs: object) -> dict:
             return MEETING
 
+        def insert(self, *_args: object, **_kwargs: object) -> dict:
+            return {}
+
     client = Client()
     frame = _frame()
     monkeypatch.setattr(races_api, "SupabaseClientWrapper", lambda: client)
@@ -119,3 +124,71 @@ def test_quinte_analysis_endpoint_persists_and_returns_race_id(monkeypatch: pyte
 
     assert result.race_id == "race-quinte"
     assert result.source == "turfomania"
+
+
+def test_today_quinte_analysis_reuses_cached_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    meeting = {**MEETING, "meeting_date": "2026-10-03"}
+
+    class Client:
+        def __init__(self) -> None:
+            self.races: list[dict] = []
+            self.analysis_runs: list[dict] = []
+
+        def list(self, table: str, *, filters: list[tuple[str, str, object]], **_: object) -> list[dict]:
+            if table == "meetings":
+                return [meeting]
+            if table == "races":
+                return self.races
+            raise AssertionError(f"unexpected list table: {table}")
+
+        def select_one(self, table: str, *, filters: list[tuple[str, str, object]], **_: object) -> dict | None:
+            if table != "analysis_runs":
+                raise AssertionError(f"unexpected select table: {table}")
+            race_id = next(value for column, _, value in filters if column == "race_id")
+            return next((run for run in reversed(self.analysis_runs) if run["race_id"] == race_id), None)
+
+        def insert(self, table: str, payload: dict) -> dict:
+            if table == "analysis_runs":
+                self.analysis_runs.append(payload)
+                return payload
+            raise AssertionError(f"unexpected insert table: {table}")
+
+    client = Client()
+    monkeypatch.setattr(races_api, "SupabaseClientWrapper", lambda: client)
+    monkeypatch.setattr(
+        races_api,
+        "find_turfomania_quinte_meeting",
+        lambda _meetings: (meeting, _frame()),
+    )
+
+    def persist(*_args: object, **_kwargs: object) -> dict:
+        race = {"id": "race-today", "source": "turfomania", "summary": {"q_plus": True}}
+        client.races = [race]
+        return {"races": [{"id": race["id"]}]}
+
+    monkeypatch.setattr(races_api, "persist_scraped_meeting", persist)
+    analysis_calls = 0
+
+    def analyze(*_args: object, **_kwargs: object) -> AnalysisResponse:
+        nonlocal analysis_calls
+        analysis_calls += 1
+        return AnalysisResponse(
+            race_type="flat",
+            source="turfomania",
+            row_count=1,
+            columns=["N°", "CHEVAL", "Composite"],
+            rows=[{"N°": "1", "CHEVAL": "TEST HORSE", "Composite": 0.9}],
+            model_version="initial-migration",
+            prognosis=[],
+        )
+
+    monkeypatch.setattr(races_api, "_analysis_response", analyze)
+    request = races_api.TodayQuinteAnalysisRequest(date="2026-10-03")
+
+    first = races_api.analyze_today_turfomania_quinte(request)
+    second = races_api.analyze_today_turfomania_quinte(request)
+
+    assert first.race_id == "race-today"
+    assert second.model_dump() == first.model_dump()
+    assert analysis_calls == 1
+    assert len(client.analysis_runs) == 1

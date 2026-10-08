@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -19,6 +20,10 @@ class TurfomaniaQuinteAnalysisRequest(BaseModel):
     meeting_id: str = Field(min_length=1)
     include_handicap: bool = True
     max_horses: int = Field(default=8, ge=1, le=30)
+
+
+class TodayQuinteAnalysisRequest(BaseModel):
+    meeting_date: date | None = Field(default=None, alias="date")
 
 
 class BettingRequest(BaseModel):
