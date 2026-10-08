@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 type SiteNavigationProps = {
-  currentPage: "home" | "analysis";
+  currentPage: "home" | "analysis" | "subscribers";
 };
 
 export default function SiteNavigation({ currentPage }: SiteNavigationProps) {
@@ -12,6 +12,9 @@ export default function SiteNavigation({ currentPage }: SiteNavigationProps) {
       </Link>
       <Link href="/admin" aria-current={currentPage === "analysis" ? "page" : undefined}>
         Analyse des courses
+      </Link>
+      <Link href="/subscribers" aria-current={currentPage === "subscribers" ? "page" : undefined}>
+        Espace abonnés
       </Link>
     </nav>
   );

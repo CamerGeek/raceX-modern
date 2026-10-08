@@ -5,6 +5,91 @@
 body { margin: 0; background: radial-gradient(circle at 85% 8%, #dce8d5 0, transparent 27rem), var(--paper); color: var(--ink); font-family: Georgia, 'Times New Roman', serif; }
 button, input { font: inherit; }
 .shell { max-width: 1180px; margin: 0 auto; padding: 4.5rem 2rem 5rem; }
+.subscriber-shell { max-width: 1240px; padding-top: 2rem; }
+.subscriber-header { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; margin: 0 0 1.25rem; }
+.subscriber-eyebrow { margin: 0 0 .45rem; color: var(--orange); font: 700 .68rem/1.3 ui-sans-serif, system-ui, sans-serif; letter-spacing: .14em; }
+.subscriber-header h1 { margin: 0; color: var(--deep); font-size: clamp(1.8rem, 4vw, 2.7rem); font-weight: 500; letter-spacing: -.035em; }
+.subscriber-date { margin: .45rem 0 0; color: var(--muted); font: .86rem ui-sans-serif, system-ui, sans-serif; text-transform: capitalize; }
+.subscriber-header-actions { display: flex; align-items: center; gap: .75rem; }
+.subscriber-updated { color: var(--muted); font: .7rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-refresh { min-height: 2.5rem; padding: .55rem .9rem; border: 1px solid var(--green); border-radius: .45rem; background: var(--green); color: #fff; cursor: pointer; font: 700 .75rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-refresh:disabled { opacity: .65; cursor: wait; }
+.subscriber-state { margin: 1rem 0; padding: 1.2rem; border: 1px solid var(--line); border-radius: .65rem; background: var(--panel); color: var(--muted); font: .9rem/1.5 ui-sans-serif, system-ui, sans-serif; }
+.subscriber-error { display: flex; align-items: center; justify-content: space-between; gap: 1rem; color: #a43c2c; }
+.subscriber-error p { margin: 0; }
+.subscriber-race-summary { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .65rem; margin-bottom: 1rem; }
+.subscriber-race-summary div { display: grid; align-content: center; gap: .45rem; min-height: 5.1rem; padding: .85rem 1rem; border: 1px solid var(--line); border-radius: .6rem; background: rgba(251, 250, 245, .8); }
+.subscriber-race-summary span, .subscriber-featured-stats span { color: var(--muted); font: 700 .61rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .09em; }
+.subscriber-race-summary strong { color: var(--deep); font: 700 .9rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-featured { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(14rem, .7fr); gap: 1.5rem; margin-bottom: 1rem; padding: clamp(1.2rem, 3vw, 2rem); }
+.subscriber-featured-copy .public-kicker { margin: 0 0 .45rem; }
+.subscriber-featured h2, .subscriber-section-heading h2 { margin: 0; color: var(--deep); font-size: clamp(1.35rem, 3vw, 1.8rem); font-weight: 500; }
+.subscriber-featured-horse { margin: 1rem 0 .45rem; color: var(--orange); font: 700 1.1rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-featured-horse strong { color: var(--deep); }
+.subscriber-rationale { max-width: 42rem; margin: 0; color: var(--ink); font: .9rem/1.65 ui-sans-serif, system-ui, sans-serif; }
+.subscriber-caveat { margin: .8rem 0 0; color: var(--muted); font: .7rem/1.5 ui-sans-serif, system-ui, sans-serif; }
+.subscriber-featured-stats { display: grid; align-content: center; gap: .6rem; }
+.subscriber-featured-stats div { display: flex; justify-content: space-between; align-items: baseline; gap: .8rem; padding: .65rem .75rem; border-radius: .45rem; background: #f3f0e8; }
+.subscriber-featured-stats strong { color: var(--green); font: 700 1rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-contenders { margin-bottom: 1rem; padding: clamp(1rem, 2.5vw, 1.5rem); }
+.subscriber-section-heading { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.subscriber-section-heading .public-kicker { margin: 0 0 .4rem; }
+.subscriber-section-heading > div > p:last-child { margin: .4rem 0 0; color: var(--muted); font: .75rem/1.5 ui-sans-serif, system-ui, sans-serif; }
+.subscriber-detail-link { flex: 0 0 auto; color: var(--green); font: 700 .75rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-contender-list { display: grid; gap: .45rem; margin: 0; padding: 0; list-style: none; }
+.subscriber-contender-list li { display: grid; grid-template-columns: 2rem 2.7rem minmax(8rem, 1fr) repeat(3, minmax(5rem, .55fr)); align-items: center; gap: .8rem; min-height: 4.1rem; padding: .55rem .75rem; border: 1px solid #e5e5dc; border-radius: .45rem; background: #fffefa; font-family: ui-sans-serif, system-ui, sans-serif; }
+.subscriber-rank { color: var(--muted); font-size: .72rem; font-weight: 700; }
+.subscriber-horse-number { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: .45rem; background: #edf5ee; color: var(--green); font-size: 1rem; font-weight: 800; }
+.subscriber-horse-name { overflow: hidden; color: var(--deep); font-size: .87rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.subscriber-score, .subscriber-horse-odds, .subscriber-horse-form { display: grid; gap: .25rem; }
+.subscriber-score small, .subscriber-horse-odds small, .subscriber-horse-form small { color: var(--muted); font-size: .55rem; font-weight: 700; letter-spacing: .08em; }
+.subscriber-score strong, .subscriber-horse-odds strong, .subscriber-horse-form strong { overflow: hidden; color: var(--ink); font-size: .75rem; text-overflow: ellipsis; white-space: nowrap; }
+.subscriber-details { margin-bottom: 1rem; padding: 1rem 1.2rem; }
+.subscriber-details summary { color: var(--deep); cursor: pointer; font: 700 .9rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-race-details { color: var(--muted); font: .8rem/1.5 ui-sans-serif, system-ui, sans-serif; }
+.subscriber-signals { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .55rem; margin: 1rem 0; }
+.subscriber-signals article { padding: .75rem; border: 1px solid var(--line); border-radius: .45rem; background: #fffefa; }
+.subscriber-signals span { display: block; color: var(--muted); font: 700 .58rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .08em; }
+.subscriber-signals strong { display: block; margin-top: .35rem; color: var(--green); font: 700 .9rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-signals p { margin: .3rem 0 0; color: var(--muted); font: .68rem/1.4 ui-sans-serif, system-ui, sans-serif; }
+.subscriber-methodology { display: grid; gap: .4rem; margin: 1rem 0 0; padding-left: 1.2rem; color: var(--muted); font: .75rem/1.5 ui-sans-serif, system-ui, sans-serif; }
+.subscriber-discipline { margin-bottom: 1rem; }
+.subscriber-discipline > .subscriber-section-heading { margin: 0 0 .8rem; }
+.subscriber-discipline-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+.subscriber-discipline-card { min-width: 0; padding: 1rem; border: 1px solid var(--line); border-radius: .65rem; background: var(--panel); box-shadow: 0 8px 22px rgba(16, 59, 50, .05); }
+.subscriber-discipline-card h3 { margin: 0; color: var(--deep); font: 700 .95rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-discipline-card > p { margin: .35rem 0 .75rem; color: var(--muted); font: .7rem/1.45 ui-sans-serif, system-ui, sans-serif; }
+.subscriber-discipline-card ol { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
+.subscriber-discipline-card li { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center; gap: .5rem; padding: .45rem .5rem; border-radius: .35rem; background: #fffefa; font: .72rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-discipline-card li > strong { display: grid; place-items: center; min-width: 1.7rem; min-height: 1.7rem; border-radius: .3rem; background: #edf5ee; color: var(--green); }
+.subscriber-discipline-card li > span { overflow: hidden; color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
+.subscriber-discipline-card li > b { color: var(--green); font-size: .7rem; text-align: right; }
+.subscriber-posts-list { display: flex; flex-wrap: wrap; gap: .4rem; }
+.subscriber-posts-list span { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border: 1px solid rgba(29, 89, 75, .25); border-radius: .4rem; background: #edf5ee; color: var(--green); font: 800 .85rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-discipline-note { margin: .6rem 0 0; color: var(--muted); font: .7rem/1.45 ui-sans-serif, system-ui, sans-serif; }
+.subscriber-shell > .site-navigation { margin: 0 0 1.25rem; }
+@media (max-width: 760px) {
+  .subscriber-header { align-items: start; flex-direction: column; }
+  .subscriber-header-actions { width: 100%; justify-content: space-between; }
+  .subscriber-race-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .subscriber-featured { grid-template-columns: 1fr; }
+  .subscriber-section-heading { align-items: start; flex-direction: column; }
+  .subscriber-discipline-grid { grid-template-columns: 1fr; }
+  .subscriber-contender-list li { grid-template-columns: 1.6rem 2.5rem minmax(0, 1fr) repeat(3, minmax(3.7rem, .55fr)); gap: .45rem; padding-inline: .5rem; }
+}
+@media (max-width: 520px) {
+  .subscriber-shell { padding: 1rem .75rem 3rem; }
+  .subscriber-shell > .site-navigation { justify-content: flex-start; margin-bottom: 1rem; }
+  .subscriber-header-actions { align-items: start; flex-direction: column; }
+  .subscriber-race-summary { gap: .45rem; }
+  .subscriber-race-summary div { min-height: 4.4rem; padding: .65rem; }
+  .subscriber-race-summary strong { font-size: .78rem; }
+  .subscriber-contender-list li { grid-template-columns: 1.5rem 2.4rem minmax(0, 1fr) 4.25rem; }
+  .subscriber-horse-name { grid-column: 3 / 5; }
+  .subscriber-score { grid-column: 1 / 3; }
+  .subscriber-horse-odds { grid-column: 3; }
+  .subscriber-horse-form { grid-column: 4; }
+}
 .public-home { width: min(100% - 2rem, 1240px); margin: 0 auto; padding: 1.5rem 0 3rem; }
 .public-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
 .site-navigation { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .35rem; font: 700 .76rem/1.2 ui-sans-serif, system-ui, sans-serif; }
