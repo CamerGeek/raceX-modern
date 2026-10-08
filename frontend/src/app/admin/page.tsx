@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
+import SiteNavigation from "../site-navigation";
 
 type Horse = Record<string, string | number | boolean | null>;
 type AnalysisSection = { title: string; columns: string[]; rows: Horse[] };
@@ -404,6 +405,7 @@ export default function AdminPage() {
 
   return (
     <main className="shell">
+      <SiteNavigation currentPage="analysis" />
       <header className="masthead">
         <div className="brand-line">
           <Image src="/racex-logo.png" alt="RaceX logo" width={540} height={180} priority className="brand-logo" />

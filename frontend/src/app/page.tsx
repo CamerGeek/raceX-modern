@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import QuinteTopEight from "./quinte-top-eight";
 import QuinteOddsChart from "./quinte-odds-chart";
+import SiteNavigation from "./site-navigation";
 
 const quinteWidgetDocument = `<!doctype html>
 <html lang="fr">
@@ -169,6 +170,7 @@ export default function Home() {
             className="public-logo"
           />
         </Link>
+        <SiteNavigation currentPage="home" />
         <span className="public-edition">COURSES DU JOUR</span>
       </header>
 

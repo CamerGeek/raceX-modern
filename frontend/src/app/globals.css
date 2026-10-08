@@ -7,6 +7,11 @@ button, input { font: inherit; }
 .shell { max-width: 1180px; margin: 0 auto; padding: 4.5rem 2rem 5rem; }
 .public-home { width: min(100% - 2rem, 1240px); margin: 0 auto; padding: 1.5rem 0 3rem; }
 .public-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
+.site-navigation { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .35rem; font: 700 .76rem/1.2 ui-sans-serif, system-ui, sans-serif; }
+.site-navigation a { display: inline-flex; align-items: center; min-height: 2.5rem; padding: .55rem .8rem; border: 1px solid transparent; border-radius: 999px; color: var(--green); text-decoration: none; transition: background-color .15s ease, border-color .15s ease; }
+.site-navigation a:hover { border-color: var(--line); background: rgba(255, 255, 255, .55); }
+.site-navigation a[aria-current="page"] { border-color: rgba(29, 89, 75, .24); background: #edf5ee; color: var(--deep); }
+.shell > .site-navigation { justify-content: flex-end; margin: -2.5rem 0 1.5rem; }
 .public-brand { display: inline-flex; align-items: center; }
 .public-logo { display: block; width: 7rem; height: 2.5rem; object-fit: contain; object-position: left center; }
 .public-edition, .public-kicker { color: var(--green); font: 700 .68rem/1.3 ui-sans-serif, system-ui, sans-serif; letter-spacing: .14em; }
@@ -223,6 +228,10 @@ th, td { border-bottom: 1px solid var(--line); padding: .85rem .4rem; white-spac
 .rank { color: var(--orange); font-weight: 700; width: 4rem; }
 @media (max-width: 760px) { .shell { padding: 2.5rem 1rem; } .workspace { grid-template-columns: 1fr; } .masthead { margin-bottom: 2rem; } .control-panel, .results-panel { padding: 1.3rem; } .control-row { align-items: start; flex-direction: column; } .status-dot { display: none; } .hero-selection { flex-direction: column; gap: 1rem; } .hero-stats { justify-content: space-between; text-align: left; } .metric-strip { grid-template-columns: 1fr; } .quick-feel-grid { grid-template-columns: 1fr 1fr; } .prognosis-miss-signal { grid-template-columns: 1fr; } .overview-grid { grid-template-columns: 1fr; } .ranking-grid { grid-template-columns: 1fr; } .section-title { align-items: start; flex-wrap: wrap; } .section-title p { width: 100%; margin-left: 1.4rem; } .handicap-panel { flex-direction: column; } .handicap-panel span { text-align: left; } .race-meta a { margin-left: 0; width: 100%; } .report-tabs button { padding-inline: .65rem; font-size: .62rem; } }
 @media (max-width: 760px) {
+  .public-header { flex-wrap: wrap; }
+  .site-navigation { order: 3; width: 100%; justify-content: flex-start; }
+  .public-edition { margin-left: auto; }
+  .shell > .site-navigation { justify-content: center; margin: -1.25rem 0 1rem; }
   .masthead { grid-template-columns: 7rem minmax(0, 1fr); gap: 1rem; padding: 1rem; }
   .brand-logo { width: 6.25rem; height: 4rem; }
   .status-dot { display: inline-block; font-size: .5rem; padding: .38rem .48rem; letter-spacing: .08em; }
