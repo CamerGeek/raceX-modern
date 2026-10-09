@@ -165,7 +165,7 @@ function AccountPageContent() {
             <div className="account-renewal">
               <h3>{profile.role === "subscriber" ? "Renouveler votre accès" : "Passer à l’abonnement"}</h3>
               <p>
-                Payez les 5 000 FCFA sur Chariow. Chaque paiement confirmé ajoute un mois d’accès RaceX. Le paiement est traité de façon sécurisée par Chariow.
+                Payez les 10 000 FCFA sur Chariow. Chaque paiement confirmé ajoute un mois d’accès RaceX. Le paiement est traité de façon sécurisée par Chariow.
               </p>
               <button className="subscriber-refresh account-chariow-button" type="button" onClick={() => void startCheckout()} disabled={checkoutBusy}>
                 {checkoutBusy ? "Redirection vers Chariow…" : profile.role === "subscriber" ? "Renouveler sur Chariow" : "Payer sur Chariow"}
@@ -181,7 +181,7 @@ function AccountPageContent() {
               {error && <p className="account-error" role="alert">{error}</p>}
               <div className="account-whatsapp-links">
                 {whatsappAccounts.map((contact) => (
-                  <a key={contact.number} href={`https://wa.me/${contact.number}?text=${encodeURIComponent("Bonjour, j’ai une question concernant le paiement ou l’activation de mon abonnement RaceX à 5 000 FCFA.")}`} target="_blank" rel="noreferrer">
+                  <a key={contact.number} href={`https://wa.me/${contact.number}?text=${encodeURIComponent("Bonjour, j’ai une question concernant le paiement ou l’activation de mon abonnement RaceX à 10 000 FCFA.")}`} target="_blank" rel="noreferrer">
                     Contacter sur WhatsApp · {contact.label}
                   </a>
                 ))}
