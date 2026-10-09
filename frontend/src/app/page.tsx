@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import QuinteTopEight from "./quinte-top-eight";
 import SiteNavigation from "./site-navigation";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 const quinteWidgetDocument = `<!doctype html>
 <html lang="fr">

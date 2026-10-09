@@ -154,6 +154,23 @@ button, input { font: inherit; }
 .public-footer { padding: 1rem .25rem; color: var(--muted); text-align: center; font: .75rem/1.5 ui-sans-serif, system-ui, sans-serif; }
 .public-footer p { margin: 0; }
 .public-footer a { color: var(--green); }
+.site-footer { padding: 1rem 1.25rem 1.5rem; color: var(--muted); text-align: center; font: .72rem/1.5 ui-sans-serif, system-ui, sans-serif; }
+.site-footer p { margin: 0; }
+.site-footer a { color: var(--green); }
+.legal-page { max-width: 900px; padding-top: 2rem; }
+.legal-page > .site-navigation { margin-bottom: 1.25rem; }
+.legal-card { padding: clamp(1.25rem, 4vw, 2.5rem); }
+.legal-card h1 { margin: 0; color: var(--deep); font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 500; }
+.legal-card h2 { margin: 2rem 0 .5rem; color: var(--deep); font-size: 1.2rem; font-weight: 600; }
+.legal-card p, .legal-card li { color: var(--ink); font: .9rem/1.7 ui-sans-serif, system-ui, sans-serif; }
+.legal-card ul { padding-left: 1.3rem; }
+.legal-card a { color: var(--green); }
+.legal-updated { color: var(--muted) !important; font-size: .75rem !important; }
+.not-found-page { max-width: 760px; margin: 0 auto; padding: clamp(4rem, 12vw, 8rem) 1.25rem; text-align: center; }
+.not-found-page .public-kicker { margin: 0 0 .75rem; }
+.not-found-page h1 { margin: 0; color: var(--deep); font-size: clamp(2rem, 6vw, 3.5rem); font-weight: 500; }
+.not-found-page p { color: var(--muted); font: .95rem/1.6 ui-sans-serif, system-ui, sans-serif; }
+.not-found-page a { display: inline-flex; align-items: center; min-height: 2.75rem; margin-top: .75rem; padding: .6rem 1rem; border-radius: .45rem; background: var(--green); color: white; font: 700 .8rem ui-sans-serif, system-ui, sans-serif; text-decoration: none; }
 .free-analysis { margin-bottom: 1rem; padding: 1.25rem; }
 .free-analysis-heading { display: flex; align-items: start; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--line); }
 .free-analysis-heading .public-kicker { margin: 0 0 .4rem; }
