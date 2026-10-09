@@ -77,6 +77,8 @@ button, input { font: inherit; }
 .account-renewal { margin: 1.2rem 0; padding: 1rem; border-left: 3px solid var(--orange); background: #f7f3e9; }
 .account-renewal h3 { margin: 0; color: var(--deep); font: 700 1rem ui-sans-serif, system-ui, sans-serif; }
 .account-renewal p { color: var(--muted); font: .78rem/1.55 ui-sans-serif, system-ui, sans-serif; }
+.account-chariow-button { margin-top: .35rem; }
+.account-payment-pending { color: var(--muted); font: .78rem/1.55 ui-sans-serif, system-ui, sans-serif; }
 .account-whatsapp-links { display: flex; flex-wrap: wrap; gap: .5rem; }
 .account-whatsapp-links a { padding: .6rem .7rem; border-radius: .4rem; background: #1d7c54; color: white; font: 700 .7rem ui-sans-serif, system-ui, sans-serif; text-decoration: none; }
 .account-signout { padding: .55rem .8rem; border: 1px solid var(--line); border-radius: .4rem; background: transparent; color: var(--muted); cursor: pointer; font: 700 .72rem ui-sans-serif, system-ui, sans-serif; }

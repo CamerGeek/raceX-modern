@@ -67,3 +67,6 @@ class SupabaseClientWrapper:
         else:
             result = self.client.table(table).upsert(request).execute()
         return result.data[0] if result.data else {}
+
+    def rpc(self, function: str, parameters: dict[str, Any]) -> Any:
+        return self.client.rpc(function, parameters).execute().data

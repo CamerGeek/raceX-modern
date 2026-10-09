@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../auth-context";
 import SiteNavigation from "../site-navigation";
 
@@ -9,6 +9,16 @@ const whatsappAccounts = [
   { label: "Moov Burkina", number: "22660354400" },
   { label: "Orange", number: "22674911538" },
 ];
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+function isCheckoutResponse(value: unknown): value is { checkout_url: string } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "checkout_url" in value &&
+    typeof value.checkout_url === "string"
+  );
+}
 
 function formatDate(value: string | null) {
   if (!value) return "—";
@@ -19,7 +29,7 @@ function formatDate(value: string | null) {
 }
 
 function AccountPageContent() {
-  const { configured, loading, profile, profileError, session, signIn, signOut, signUp } = useAuth();
+  const { apiFetch, configured, loading, profile, profileError, refreshProfile, session, signIn, signOut, signUp } = useAuth();
   const [mode, setMode] = useState<"login" | "signup">("signup");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -27,6 +37,39 @@ function AccountPageContent() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [paymentReturn, setPaymentReturn] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("payment") !== "complete") return;
+    setPaymentReturn(true);
+    setMessage("Retour de Chariow détecté. RaceX vérifie la confirmation du paiement avant d’activer votre abonnement.");
+    void refreshProfile();
+  }, [refreshProfile]);
+
+  async function startCheckout() {
+    setCheckoutBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await apiFetch(`${apiUrl}/api/v1/auth/chariow/checkout`, { method: "POST" });
+      const result: unknown = await response.json();
+      if (!response.ok) {
+        const detail =
+          typeof result === "object" && result !== null && "detail" in result && typeof result.detail === "string"
+            ? result.detail
+            : "Impossible de démarrer le paiement Chariow.";
+        throw new Error(detail);
+      }
+      if (!isCheckoutResponse(result) || !result.checkout_url.startsWith("https://")) {
+        throw new Error("Chariow n’a pas renvoyé de lien de paiement valide.");
+      }
+      window.location.assign(result.checkout_url);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Impossible de démarrer le paiement Chariow.");
+      setCheckoutBusy(false);
+    }
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,7 +102,7 @@ function AccountPageContent() {
         <div>
           <p className="subscriber-eyebrow">RACEX · COMPTE</p>
           <h1>Votre accès RaceX</h1>
-          <p className="subscriber-date">Démo gratuite de 7 jours · abonnement manuel à 5 000 FCFA par mois</p>
+          <p className="subscriber-date">Démo gratuite de 7 jours · paiement à renouveler chaque mois</p>
         </div>
       </header>
 
@@ -118,13 +161,27 @@ function AccountPageContent() {
             {profile.role === "demo" && <div><span>DÉMO VALABLE JUSQU’AU</span><strong>{formatDate(profile.demo_expires_at)}</strong></div>}
             {profile.role === "subscriber" && <div><span>ABONNEMENT VALABLE JUSQU’AU</span><strong>{formatDate(profile.subscriber_expires_at)}</strong></div>}
           </div>
-          {profile.role === "simple" && (
+          {profile.role !== "admin" && (
             <div className="account-renewal">
-              <h3>Passer à l’abonnement</h3>
-              <p>Après votre démo, contactez l’administrateur pour convenir du moyen de transfert. L’abonnement est activé manuellement après confirmation du paiement de 5 000 FCFA pour un mois.</p>
+              <h3>{profile.role === "subscriber" ? "Renouveler votre accès" : "Passer à l’abonnement"}</h3>
+              <p>
+                Payez les 5 000 FCFA sur Chariow. Chaque paiement confirmé ajoute un mois d’accès RaceX. Le paiement est traité de façon sécurisée par Chariow.
+              </p>
+              <button className="subscriber-refresh account-chariow-button" type="button" onClick={() => void startCheckout()} disabled={checkoutBusy}>
+                {checkoutBusy ? "Redirection vers Chariow…" : profile.role === "subscriber" ? "Renouveler sur Chariow" : "Payer sur Chariow"}
+              </button>
+              {paymentReturn && profile.role !== "subscriber" && (
+                <p className="account-payment-pending" role="status">
+                  Votre retour ne confirme pas le paiement. Si vous venez de payer, patientez quelques instants puis actualisez votre compte.
+                </p>
+              )}
+              {paymentReturn && profile.role === "subscriber" && (
+                <p className="account-message" role="status">Votre accès abonné est actif jusqu’au {formatDate(profile.subscriber_expires_at)}.</p>
+              )}
+              {error && <p className="account-error" role="alert">{error}</p>}
               <div className="account-whatsapp-links">
                 {whatsappAccounts.map((contact) => (
-                  <a key={contact.number} href={`https://wa.me/${contact.number}?text=${encodeURIComponent("Bonjour, je souhaite activer ou renouveler mon abonnement RaceX à 5 000 FCFA.")}`} target="_blank" rel="noreferrer">
+                  <a key={contact.number} href={`https://wa.me/${contact.number}?text=${encodeURIComponent("Bonjour, j’ai une question concernant le paiement ou l’activation de mon abonnement RaceX à 5 000 FCFA.")}`} target="_blank" rel="noreferrer">
                     Contacter sur WhatsApp · {contact.label}
                   </a>
                 ))}
@@ -141,7 +198,7 @@ function AccountPageContent() {
         </section>
       )}
 
-      <p className="account-basic-note">L’accueil public reste consultable sans compte. Aucun paiement n’est collecté dans l’application.</p>
+      <p className="account-basic-note">L’accueil public reste consultable sans compte. Les paiements sont traités sur Chariow.</p>
       <p><Link href="/">Retour à l’accueil</Link></p>
     </main>
   );

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.meetings import router as meetings_router
 from app.api.auth import router as auth_router
+from app.api.chariow import router as chariow_router
 from app.api.races import router as races_router
 from app.api.supabase_races import router as supabase_races_router
 from app.api.turfomania import router as turfomania_router
@@ -35,6 +36,7 @@ def health() -> dict[str, str]:
 
 app.include_router(meetings_router, prefix=settings.api_prefix)
 app.include_router(auth_router, prefix=settings.api_prefix)
+app.include_router(chariow_router, prefix=settings.api_prefix)
 app.include_router(races_router, prefix=settings.api_prefix)
 app.include_router(supabase_races_router, prefix=settings.api_prefix)
 app.include_router(turfomania_router, prefix=settings.api_prefix)

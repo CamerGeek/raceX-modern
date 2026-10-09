@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.services.auth_service import current_profile, require_admin
+from app.services.chariow import ChariowCheckoutError, create_checkout
 from app.services.supabase_client import SupabaseClientWrapper
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -27,6 +28,22 @@ def _add_month(value: datetime) -> datetime:
 @router.get("/profile")
 def profile(current_user: dict[str, Any] = Depends(current_profile)) -> dict[str, Any]:
     return current_user
+
+
+@router.post("/chariow/checkout")
+def chariow_checkout(
+    current_user: dict[str, Any] = Depends(current_profile),
+) -> dict[str, str]:
+    if current_user["role"] == "admin":
+        raise HTTPException(status_code=403, detail="Admin accounts cannot purchase a subscription")
+    try:
+        checkout_url = create_checkout(
+            user_id=current_user["id"],
+            email=current_user["email"],
+        )
+    except ChariowCheckoutError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"checkout_url": checkout_url}
 
 
 @router.get("/admin/users")

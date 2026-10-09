@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     model_version: str = "initial-migration"
     supabase_url: str = ""
     supabase_key: str = ""
+    chariow_api_key: str = ""
+    chariow_pulse_secret: str = ""
+    chariow_product_id: str = "prd_0hfy60zq"
+    chariow_return_url: str = "http://localhost:3000/account?payment=complete"
 
     model_config = SettingsConfigDict(
         env_file=".env",

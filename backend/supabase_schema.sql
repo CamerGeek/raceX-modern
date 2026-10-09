@@ -458,6 +458,58 @@ create index if not exists idx_user_profiles_role on public.user_profiles(role);
 alter table public.user_profiles enable row level security;
 revoke all on public.user_profiles from anon, authenticated;
 
+-- Chariow payment fulfillment: track sale and delivery IDs and grant access
+-- atomically so retries or replays cannot extend the same sale twice.
+create table if not exists public.chariow_processed_sales (
+    sale_id text primary key,
+    delivery_id text not null unique,
+    user_id uuid not null references public.user_profiles(id) on delete cascade,
+    processed_at timestamptz not null default now()
+);
+
+alter table public.chariow_processed_sales enable row level security;
+revoke all on public.chariow_processed_sales from anon, authenticated;
+
+create or replace function public.apply_chariow_sale(
+    p_delivery_id text,
+    p_sale_id text,
+    p_user_id uuid
+)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    insert into public.chariow_processed_sales (sale_id, delivery_id, user_id)
+    values (p_sale_id, p_delivery_id, p_user_id)
+    on conflict do nothing;
+
+    if not found then
+        return 'duplicate';
+    end if;
+
+    update public.user_profiles
+    set role = 'subscriber',
+        subscriber_expires_at = greatest(
+            coalesce(subscriber_expires_at, now()),
+            now()
+        ) + interval '1 month',
+        updated_at = now()
+    where id = p_user_id
+      and role <> 'admin';
+
+    if not found then
+        raise exception 'RaceX subscription profile does not exist or is an admin';
+    end if;
+
+    return 'activated';
+end;
+$$;
+
+revoke all on function public.apply_chariow_sale(text, text, uuid) from public;
+grant execute on function public.apply_chariow_sale(text, text, uuid) to service_role;
+
 update public.user_profiles as profile
 set phone = auth_user.raw_user_meta_data ->> 'phone'
 from auth.users as auth_user
