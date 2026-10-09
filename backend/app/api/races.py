@@ -18,7 +18,7 @@ from app.schemas.races import (
 from app.services.betting_service import generate_combinations, simulate_race
 from app.services.analysis_service import analyze_race
 from app.services.model_prediction_service import predict_race as predict_model_race
-from app.services.meeting_persistence import persist_scraped_meeting
+from app.services.meeting_persistence import FLAT_TABLE, TROT_TABLE, persist_scraped_meeting
 from app.services.quinte_odds_service import get_today_quinte_odds_history
 from app.services.scraping_service import detect_race_type, scrape_race
 from app.services.serialization import dataframe_records
@@ -49,7 +49,7 @@ from favorable_cordes import compute_favorable_corde_horses
 router = APIRouter(prefix="/races", tags=["races"])
 
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
-HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v1"
+HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v2"
 
 
 def _saved_frame(client: SupabaseClientWrapper, race_id: str) -> tuple[pd.DataFrame, dict]:
@@ -69,7 +69,32 @@ def _display_frame(source: pd.DataFrame, analyzed: pd.DataFrame, race_type: str)
     if not source.empty and not analyzed.empty:
         computed_columns = [column for column in analyzed.columns if column not in source.columns]
         if computed_columns:
-            display = source.join(analyzed[computed_columns], how="left")
+            number_column = next(
+                (
+                    column
+                    for column in ("N°", "N", "Numero", "NUMERO", "NUM")
+                    if column in source.columns and column in analyzed.columns
+                ),
+                None,
+            )
+            if number_column:
+                def horse_number_key(value: Any) -> str:
+                    if pd.isna(value):
+                        return ""
+                    return str(value).strip().removesuffix(".0")
+
+                computed_by_number: dict[str, dict[str, Any]] = {}
+                for _, row in analyzed[[number_column, *computed_columns]].iterrows():
+                    number = horse_number_key(row[number_column])
+                    if number:
+                        computed_by_number[number] = row[computed_columns].to_dict()
+                display = source.copy()
+                for column in computed_columns:
+                    display[column] = source[number_column].map(
+                        lambda value: computed_by_number.get(horse_number_key(value), {}).get(column)
+                    )
+            else:
+                display = source.join(analyzed[computed_columns], how="left")
     if race_type == "trot":
         display = display.drop(columns=TROT_DISPLAY_EXCLUDED_COLUMNS, errors="ignore")
     return display
@@ -204,7 +229,7 @@ def analyze_turfomania_quinte(
             raise ValueError("No Quinté race was persisted")
         race_id = persisted["races"][0]["id"]
         if request.include_handicap and request.max_horses == 8:
-            cached = _cached_homepage_quinte_analysis(client, race_id)
+            cached = _cached_homepage_quinte_analysis(client, race_id, race_type)
             if cached:
                 return cached
         response = _analysis_response(
@@ -317,9 +342,20 @@ def _analyze_today_turfomania_quinte(
             ):
                 summary = race.get("summary") or {}
                 if race.get("source") == "turfomania" and summary.get("q_plus"):
-                    cached = _cached_homepage_quinte_analysis(client, race["id"])
+                    cached = _cached_homepage_quinte_analysis(
+                        client,
+                        race["id"],
+                        race.get("race_type"),
+                    )
                     if cached:
                         return cached
+                    refreshed = _reanalyze_stale_homepage_quinte(
+                        client,
+                        race["id"],
+                        race.get("race_type"),
+                    )
+                    if refreshed:
+                        return refreshed
 
         meeting, frame = find_turfomania_quinte_meeting(meetings)
         race_type = turfomania_quinte_race_type(frame)
@@ -337,7 +373,7 @@ def _analyze_today_turfomania_quinte(
             raise ValueError("No Quinté race was persisted")
 
         race_id = persisted["races"][0]["id"]
-        cached = _cached_homepage_quinte_analysis(client, race_id)
+        cached = _cached_homepage_quinte_analysis(client, race_id, race_type)
         if cached:
             return cached
 
@@ -383,6 +419,7 @@ def today_turfomania_quinte_odds(
 def _cached_homepage_quinte_analysis(
     client: SupabaseClientWrapper,
     race_id: str,
+    race_type: str,
 ) -> TurfomaniaQuinteAnalysisResponse | None:
     cached_run = client.select_one(
         "analysis_runs",
@@ -394,10 +431,96 @@ def _cached_homepage_quinte_analysis(
     summary = cached_run.get("summary") or {}
     if summary.get("homepage_cache_version") != HOMEPAGE_QUINTE_CACHE_VERSION:
         return None
+    runner_table = FLAT_TABLE if race_type == "flat" else TROT_TABLE if race_type == "trot" else None
+    if runner_table is None:
+        return None
+    latest_runner = client.select_one(
+        runner_table,
+        filters=[("race_id", "eq", race_id)],
+        order_by=("updated_at", "desc"),
+    )
+    if not _homepage_cache_is_fresh(cached_run, latest_runner):
+        return None
     cached_response = summary.get("homepage_analysis")
     if not isinstance(cached_response, dict):
         return None
     return TurfomaniaQuinteAnalysisResponse.model_validate(cached_response)
+
+
+def _homepage_cache_is_fresh(
+    cached_run: dict[str, Any],
+    latest_runner: dict[str, Any] | None,
+) -> bool:
+    cached_at = _parse_cache_timestamp(cached_run.get("created_at"))
+    runner_updated_at = _parse_cache_timestamp((latest_runner or {}).get("updated_at"))
+    return cached_at is not None and runner_updated_at is not None and cached_at >= runner_updated_at
+
+
+def _reanalyze_stale_homepage_quinte(
+    client: SupabaseClientWrapper,
+    race_id: str,
+    race_type: str,
+) -> TurfomaniaQuinteAnalysisResponse | None:
+    runner_table = FLAT_TABLE if race_type == "flat" else TROT_TABLE if race_type == "trot" else None
+    if runner_table is None:
+        return None
+    cached_run = client.select_one(
+        "analysis_runs",
+        filters=[("race_id", "eq", race_id)],
+        order_by=("created_at", "desc"),
+    )
+    if not cached_run:
+        return None
+    summary = cached_run.get("summary") or {}
+    if not isinstance(summary.get("homepage_analysis"), dict):
+        return None
+    latest_runner = client.select_one(
+        runner_table,
+        filters=[("race_id", "eq", race_id)],
+        order_by=("updated_at", "desc"),
+    )
+    cache_is_current = summary.get("homepage_cache_version") == HOMEPAGE_QUINTE_CACHE_VERSION
+    if cache_is_current and _homepage_cache_is_fresh(cached_run, latest_runner):
+        return None
+    runners = client.list(
+        runner_table,
+        filters=[("race_id", "eq", race_id)],
+        limit=500,
+        order_by=("runner_number", "asc"),
+    )
+    if not runners:
+        return None
+    rows: list[dict[str, Any]] = []
+    for runner in runners:
+        raw_data = runner.get("raw_data")
+        row = dict(raw_data) if isinstance(raw_data, dict) else {}
+        if runner.get("runner_number") is not None:
+            row["N°"] = runner["runner_number"]
+        rows.append(row)
+    frame = pd.DataFrame(rows)
+    response = _analysis_response(
+        frame,
+        race_type=race_type,
+        source="turfomania",
+        include_handicap=True,
+        max_horses=8,
+    )
+    refreshed = TurfomaniaQuinteAnalysisResponse(
+        **response.model_dump(),
+        race_id=race_id,
+    )
+    _store_homepage_quinte_analysis(client, refreshed)
+    return refreshed
+
+
+def _parse_cache_timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=ZoneInfo("UTC"))
 
 
 def _store_homepage_quinte_analysis(

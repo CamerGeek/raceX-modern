@@ -142,15 +142,18 @@ def test_today_quinte_analysis_reuses_cached_response(monkeypatch: pytest.Monkey
             raise AssertionError(f"unexpected list table: {table}")
 
         def select_one(self, table: str, *, filters: list[tuple[str, str, object]], **_: object) -> dict | None:
-            if table != "analysis_runs":
-                raise AssertionError(f"unexpected select table: {table}")
             race_id = next(value for column, _, value in filters if column == "race_id")
-            return next((run for run in reversed(self.analysis_runs) if run["race_id"] == race_id), None)
+            if table == "analysis_runs":
+                return next((run for run in reversed(self.analysis_runs) if run["race_id"] == race_id), None)
+            if table == "flat_race_runners":
+                return {"updated_at": "2026-10-03T10:00:00+00:00"}
+            raise AssertionError(f"unexpected select table: {table}")
 
         def insert(self, table: str, payload: dict) -> dict:
             if table == "analysis_runs":
-                self.analysis_runs.append(payload)
-                return payload
+                run = {**payload, "created_at": "2026-10-03T10:00:00+00:00"}
+                self.analysis_runs.append(run)
+                return run
             raise AssertionError(f"unexpected insert table: {table}")
 
     client = Client()
@@ -162,7 +165,12 @@ def test_today_quinte_analysis_reuses_cached_response(monkeypatch: pytest.Monkey
     )
 
     def persist(*_args: object, **_kwargs: object) -> dict:
-        race = {"id": "race-today", "source": "turfomania", "summary": {"q_plus": True}}
+        race = {
+            "id": "race-today",
+            "source": "turfomania",
+            "race_type": "flat",
+            "summary": {"q_plus": True},
+        }
         client.races = [race]
         return {"races": [{"id": race["id"]}]}
 
