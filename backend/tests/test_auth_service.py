@@ -49,6 +49,8 @@ def test_active_expiry_comparison_is_timezone_aware() -> None:
 
 
 def test_current_profile_includes_saved_phone(monkeypatch) -> None:
+    request_arguments = {}
+
     class AuthResponse:
         status_code = 200
 
@@ -67,19 +69,65 @@ def test_current_profile_includes_saved_phone(monkeypatch) -> None:
                 "demo_expires_at": "2099-01-01T00:00:00Z",
             }
 
+    def auth_request(url, *, headers, **kwargs):
+        request_arguments.update(url=url, headers=headers, **kwargs)
+        return AuthResponse()
+
+    monkeypatch.setattr(
+        auth_service,
+        "get_settings",
+        lambda: SimpleNamespace(supabase_url=" https://example.supabase.co/ ", supabase_key=" test-key\n"),
+    )
+    monkeypatch.setattr(auth_service.requests, "get", auth_request)
+    monkeypatch.setattr(auth_service, "SupabaseClientWrapper", ProfileClient)
+
+    profile = auth_service.current_profile(
+        HTTPAuthorizationCredentials(scheme="Bearer", credentials="\r\ntest-token\n")
+    )
+
+    assert profile["phone"] == "+226 70 00 00 00"
+    assert request_arguments["url"] == "https://example.supabase.co/auth/v1/user"
+    assert request_arguments["headers"]["apikey"] == "test-key"
+    assert request_arguments["headers"]["Authorization"] == "Bearer test-token"
+
+
+def test_current_profile_rejects_invalid_supabase_api_key_header(monkeypatch, caplog) -> None:
+    monkeypatch.setattr(
+        auth_service,
+        "get_settings",
+        lambda: SimpleNamespace(supabase_url="https://example.supabase.co", supabase_key="test\nkey"),
+    )
+
+    with caplog.at_level("ERROR", logger=auth_service.__name__):
+        with pytest.raises(HTTPException) as error:
+            auth_service.current_profile(
+                HTTPAuthorizationCredentials(scheme="Bearer", credentials="test-token")
+            )
+
+    assert error.value.status_code == 503
+    assert error.value.detail == "Authentication service is misconfigured"
+    assert "invalid control characters" in caplog.text
+
+
+def test_current_profile_rejects_embedded_control_characters_in_access_token(monkeypatch) -> None:
     monkeypatch.setattr(
         auth_service,
         "get_settings",
         lambda: SimpleNamespace(supabase_url="https://example.supabase.co", supabase_key="test-key"),
     )
-    monkeypatch.setattr(auth_service.requests, "get", lambda *args, **kwargs: AuthResponse())
-    monkeypatch.setattr(auth_service, "SupabaseClientWrapper", ProfileClient)
-
-    profile = auth_service.current_profile(
-        HTTPAuthorizationCredentials(scheme="Bearer", credentials="test-token")
+    monkeypatch.setattr(
+        auth_service.requests,
+        "get",
+        lambda *_args, **_kwargs: pytest.fail("invalid token must not be sent"),
     )
 
-    assert profile["phone"] == "+226 70 00 00 00"
+    with pytest.raises(HTTPException) as error:
+        auth_service.current_profile(
+            HTTPAuthorizationCredentials(scheme="Bearer", credentials="test\ntoken")
+        )
+
+    assert error.value.status_code == 401
+    assert error.value.detail == "Invalid access token"
 
 
 def test_current_profile_logs_supabase_profile_query_failure(monkeypatch, caplog) -> None:

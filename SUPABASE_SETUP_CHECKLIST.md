@@ -170,6 +170,9 @@ The Render service is defined in [`render.yaml`](render.yaml). Create or update 
 | `SUPABASE_KEY` | the Supabase `service_role` key |
 
 Set `SUPABASE_URL` and `SUPABASE_KEY` as secret values in Render. Do not put either value in `render.yaml`.
+Enter `SUPABASE_KEY` as one uninterrupted line, without surrounding quotes or
+newlines. The API trims surrounding whitespace and rejects control characters
+so an incorrectly pasted key is reported as a configuration error.
 
 The blueprint also defines a `racex-quinte-odds-poller` Cron Job. It uses the same Supabase secrets and runs `python -m app.tasks.poll_quinte_odds` every 30 minutes. Ensure your Render plan supports Cron Jobs and sync the updated blueprint. The task records the current Quinté+ runners' odds in `quinte_odds_snapshots` and stops collecting after the scheduled start time.
 

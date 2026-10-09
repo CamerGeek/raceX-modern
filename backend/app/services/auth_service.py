@@ -50,12 +50,20 @@ def current_profile(
     settings = get_settings()
     if not settings.supabase_url or not settings.supabase_key:
         raise HTTPException(status_code=503, detail="Authentication service is not configured")
+    supabase_url = settings.supabase_url.strip().rstrip("/")
+    supabase_key = settings.supabase_key.strip()
+    access_token = credentials.credentials.strip()
+    if any(ord(character) < 32 or ord(character) == 127 for character in supabase_key):
+        logger.error("Supabase API key contains invalid control characters")
+        raise HTTPException(status_code=503, detail="Authentication service is misconfigured")
+    if any(ord(character) < 32 or ord(character) == 127 for character in access_token):
+        raise HTTPException(status_code=401, detail="Invalid access token")
     try:
         response = requests.get(
-            f"{settings.supabase_url.rstrip('/')}/auth/v1/user",
+            f"{supabase_url}/auth/v1/user",
             headers={
-                "apikey": settings.supabase_key,
-                "Authorization": f"Bearer {credentials.credentials}",
+                "apikey": supabase_key,
+                "Authorization": f"Bearer {access_token}",
             },
             timeout=10,
         )
