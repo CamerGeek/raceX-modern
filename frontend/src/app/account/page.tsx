@@ -38,7 +38,7 @@ function AccountPageContent() {
         const hasSession = await signUp(email, password, phone);
         setMessage(hasSession
           ? "Votre compte est créé. Votre accès démo de 7 jours est activé."
-          : "Compte créé. Consultez votre e-mail pour confirmer l’adresse et activer votre accès.");
+          : "Compte créé. Consultez l’e-mail de confirmation : le lien vous ramènera sur cette page pour terminer la connexion.");
       } else {
         await signIn(email, password);
         setMessage("Connexion réussie. Chargement de votre niveau d’accès…");

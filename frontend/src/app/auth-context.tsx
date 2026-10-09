@@ -107,7 +107,10 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
     const { data, error } = await client.auth.signUp({
       email,
       password,
-      options: { data: { phone: phone.trim() } },
+      options: {
+        data: { phone: phone.trim() },
+        emailRedirectTo: `${window.location.origin}/account`,
+      },
     });
     if (error) throw error;
     return Boolean(data.session);

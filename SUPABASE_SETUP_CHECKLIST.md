@@ -80,6 +80,25 @@ The public browser key is safe to expose when Row Level Security is enabled.
 Never use the `service_role` key in the frontend. The backend continues to use
 `SUPABASE_KEY` as its secret service-role key.
 
+## 4. Supabase authentication URLs and email confirmation
+
+In **Authentication > URL Configuration** in Supabase:
+
+1. Set **Site URL** to the deployed frontend origin, for example
+   `https://<your-vercel-project>.vercel.app` (no `/account` suffix).
+2. Add each frontend origin's confirmation destination to **Redirect URLs**:
+   - `http://localhost:3000/account` for local signup.
+   - `https://<your-vercel-project>.vercel.app/account` for production signup.
+3. Keep email confirmation enabled if users should verify their address. RaceX
+   passes the current browser origin's `/account` URL during signup, and
+   Supabase must allow that exact redirect URL.
+4. In **Authentication > Email Templates**, ensure the confirmation link uses
+   Supabase's `{{ .ConfirmationURL }}` variable.
+
+If confirmation opens an unavailable address, check the actual `Site URL` and
+the exact URL shown in **Redirect URLs**, save the settings, then request a new
+confirmation email by signing up again with the intended email address.
+
 ## 5. Configure roles and first administrator
 
 The schema creates a `user_profiles` row with role `demo` and a seven-day
