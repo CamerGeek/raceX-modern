@@ -21,10 +21,15 @@ type AuthContextValue = {
   profile: AccountProfile | null;
   profileError: string;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, phone: string) => Promise<boolean>;
+  signUp: (email: string, password: string, phone: string) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
   apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   refreshProfile: () => Promise<void>;
+};
+
+export type SignUpResult = {
+  hasSession: boolean;
+  identityCreated: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -113,7 +118,10 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
       },
     });
     if (error) throw error;
-    return Boolean(data.session);
+    return {
+      hasSession: Boolean(data.session),
+      identityCreated: Boolean(data.user?.identities?.length),
+    };
   }, [client]);
 
   const signOut = useCallback(async () => {

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
@@ -11,6 +12,7 @@ from app.core.config import get_settings
 from app.services.supabase_client import SupabaseClientWrapper
 
 
+logger = logging.getLogger(__name__)
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -81,8 +83,10 @@ def current_profile(
     except HTTPException:
         raise
     except requests.RequestException as exc:
+        logger.warning("Supabase Auth user lookup failed: %s", exc)
         raise HTTPException(status_code=503, detail="Authentication service is temporarily unavailable") from exc
     except Exception as exc:
+        logger.exception("Could not load RaceX account profile")
         raise HTTPException(status_code=503, detail="Could not load account profile") from exc
 
 

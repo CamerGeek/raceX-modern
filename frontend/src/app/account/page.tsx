@@ -35,10 +35,12 @@ function AccountPageContent() {
     setError("");
     try {
       if (mode === "signup") {
-        const hasSession = await signUp(email, password, phone);
-        setMessage(hasSession
+        const result = await signUp(email, password, phone);
+        setMessage(result.hasSession
           ? "Votre compte est créé. Votre accès démo de 7 jours est activé."
-          : "Compte créé. Consultez l’e-mail de confirmation : le lien vous ramènera sur cette page pour terminer la connexion.");
+          : result.identityCreated
+            ? "Votre demande d’inscription a été acceptée. Si la confirmation par e-mail est activée, consultez votre boîte de réception et vos courriers indésirables."
+            : "Supabase n’a pas confirmé la création d’un nouveau compte. Si vous avez déjà un compte, essayez de vous connecter ou réinitialisez le mot de passe. Sinon, vérifiez que l’inscription par e-mail est activée dans Supabase.");
       } else {
         await signIn(email, password);
         setMessage("Connexion réussie. Chargement de votre niveau d’accès…");

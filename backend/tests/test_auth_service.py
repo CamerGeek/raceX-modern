@@ -1,6 +1,9 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
+import pytest
+from fastapi import HTTPException
+
 from app.api.auth import _add_month, _is_active
 from app.services import auth_service
 from app.services.auth_service import effective_role
@@ -77,3 +80,35 @@ def test_current_profile_includes_saved_phone(monkeypatch) -> None:
     )
 
     assert profile["phone"] == "+226 70 00 00 00"
+
+
+def test_current_profile_logs_supabase_profile_query_failure(monkeypatch, caplog) -> None:
+    class AuthResponse:
+        status_code = 200
+
+        @staticmethod
+        def json() -> dict[str, str]:
+            return {"id": "user-id", "email": "user@example.com"}
+
+    class BrokenProfileClient:
+        @staticmethod
+        def select_one(*args, **kwargs):
+            raise RuntimeError("profile table is unavailable")
+
+    monkeypatch.setattr(
+        auth_service,
+        "get_settings",
+        lambda: SimpleNamespace(supabase_url="https://example.supabase.co", supabase_key="test-key"),
+    )
+    monkeypatch.setattr(auth_service.requests, "get", lambda *args, **kwargs: AuthResponse())
+    monkeypatch.setattr(auth_service, "SupabaseClientWrapper", BrokenProfileClient)
+
+    with caplog.at_level("ERROR", logger=auth_service.__name__):
+        with pytest.raises(HTTPException) as error:
+            auth_service.current_profile(
+                HTTPAuthorizationCredentials(scheme="Bearer", credentials="test-token")
+            )
+
+    assert error.value.status_code == 503
+    assert error.value.detail == "Could not load account profile"
+    assert "profile table is unavailable" in caplog.text
