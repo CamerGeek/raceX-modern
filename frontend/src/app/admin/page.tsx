@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { FormEvent, useEffect, useState } from "react";
 import SiteNavigation from "../site-navigation";
+import AccessGate from "../access-gate";
+import { useAuth } from "../auth-context";
 
 type Horse = Record<string, string | number | boolean | null>;
 type AnalysisSection = { title: string; columns: string[]; rows: Horse[] };
@@ -42,8 +44,8 @@ type RaceOption = { id: string; race_key: string; url: string; race_type?: "flat
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-async function fetchMeetings(date: string) {
-  const response = await fetch(`${apiUrl}/api/v1/meetings?date=${date}&refresh=true`);
+async function fetchMeetings(date: string, apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {
+  const response = await apiFetch(`${apiUrl}/api/v1/meetings?date=${date}&refresh=true`);
   if (!response.ok) throw new Error("Unable to load meetings");
   return response.json() as Promise<{ meetings: Record<string, string> }>;
 }
@@ -136,7 +138,8 @@ function modelCheckFromVisibleRankings(analysis: Analysis): Horse[] | null {
     }));
 }
 
-export default function AdminPage() {
+function AdminPageContent() {
+  const { apiFetch } = useAuth();
   const today = new Date().toISOString().slice(0, 10);
   const [url, setUrl] = useState("");
   const [meetingUrl, setMeetingUrl] = useState("");
@@ -179,7 +182,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetchMeetings(meetingDate)
+    fetchMeetings(meetingDate, apiFetch)
       .then((payload) => {
         if (!cancelled) setMeetings(payload.meetings ?? {});
       })
@@ -193,13 +196,13 @@ export default function AdminPage() {
         if (!cancelled) setMeetingsLoading(false);
       });
     return () => { cancelled = true; };
-  }, [meetingDate]);
+  }, [apiFetch, meetingDate]);
 
   async function loadMeetings() {
     setMeetingsLoading(true);
     setError("");
     try {
-      const payload = await fetchMeetings(meetingDate);
+      const payload = await fetchMeetings(meetingDate, apiFetch);
       setMeetings(payload.meetings ?? {});
     } catch (requestError) {
       setMeetings({});
@@ -213,7 +216,7 @@ export default function AdminPage() {
     setCatalogLoading(true);
     setError("");
     try {
-      const response = await fetch(`${apiUrl}/api/v1/turfomania/reunions`, {
+      const response = await apiFetch(`${apiUrl}/api/v1/turfomania/reunions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: meetingDate }),
@@ -233,7 +236,7 @@ export default function AdminPage() {
     const isTurfomaniaRaceUrl = meetingUrl.startsWith("turfomania://") && url !== meetingUrl;
     if (isTurfomaniaRaceUrl) return;
     let cancelled = false;
-    fetch(`${apiUrl}/api/v1/races/detect-type?url=${encodeURIComponent(url)}`)
+    apiFetch(`${apiUrl}/api/v1/races/detect-type?url=${encodeURIComponent(url)}`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Race type detection failed");
         return response.json() as Promise<{ race_type: "flat" | "trot" }>;
@@ -244,7 +247,7 @@ export default function AdminPage() {
       .catch(() => { if (!cancelled) setTypeSource("manual"); })
       .finally(() => { if (!cancelled) setDetectingType(false); });
     return () => { cancelled = true; };
-  }, [url, showManualUrl, meetingUrl]);
+  }, [apiFetch, url, showManualUrl, meetingUrl]);
 
   function selectMeeting(nextUrl: string) {
     setMeetingUrl(nextUrl);
@@ -260,7 +263,7 @@ export default function AdminPage() {
     setShowManualUrl(false);
     setTypeSource("automatic");
     if (nextUrl) {
-      fetch(`${apiUrl}/api/v1/meetings/stored?meeting_url=${encodeURIComponent(nextUrl)}&date=${encodeURIComponent(meetingDate)}`)
+      apiFetch(`${apiUrl}/api/v1/meetings/stored?meeting_url=${encodeURIComponent(nextUrl)}&date=${encodeURIComponent(meetingDate)}`)
         .then(async (response) => {
           if (!response.ok) throw new Error("Stored meeting check failed");
           return response.json() as Promise<{ exists: boolean; races: RaceOption[] }>;
@@ -283,7 +286,7 @@ export default function AdminPage() {
     try {
       const effectiveUrl = meetingUrl || url;
       const source = effectiveUrl.startsWith("turfomania://") ? "turfomania" : "zone-turf";
-      const response = await fetch(`${apiUrl}/api/v1/meetings/scrape`, {
+      const response = await apiFetch(`${apiUrl}/api/v1/meetings/scrape`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -315,7 +318,7 @@ export default function AdminPage() {
     setScrapeResult(null);
     try {
       const source = meetingUrl.startsWith("turfomania://") ? "turfomania" : "zone-turf";
-      const response = await fetch(`${apiUrl}/api/v1/races/analyze`, {
+      const response = await apiFetch(`${apiUrl}/api/v1/races/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: race.url, race_id: race.id, race_type: race.race_type ?? raceType, source, include_handicap: includeHandicap, max_horses: 8 }),
@@ -343,7 +346,7 @@ export default function AdminPage() {
     setAnalysis(null);
     setScrapeResult(null);
     try {
-      const response = await fetch(`${apiUrl}/api/v1/races/turfomania/quinte/analyze`, {
+      const response = await apiFetch(`${apiUrl}/api/v1/races/turfomania/quinte/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -391,7 +394,7 @@ export default function AdminPage() {
       const body = tab === "simulation"
         ? { race_id: race.id, race_type: race.race_type ?? raceType, simulations: 5000 }
         : { race_id: race.id, race_type: race.race_type ?? raceType, combination_size: 5, max_combinations: 50, mandatory: [], excluded: [] };
-      const response = await fetch(`${apiUrl}/api/v1/races/${endpoint}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const response = await apiFetch(`${apiUrl}/api/v1/races/${endpoint}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail ?? `${tab} failed`);
       if (tab === "simulation") setSimulationRows(payload.rows ?? []);
@@ -560,4 +563,8 @@ export default function AdminPage() {
       </section>
     </main>
   );
+}
+
+export default function AdminPage() {
+  return <AccessGate allowedRoles={["admin"]}><AdminPageContent /></AccessGate>;
 }

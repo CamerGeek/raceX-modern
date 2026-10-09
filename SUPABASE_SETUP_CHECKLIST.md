@@ -18,14 +18,17 @@ Do not commit the `service_role` key or place it in the Next.js frontend. It byp
 1. Open **SQL Editor** in the Supabase dashboard.
 2. Create a new query.
 3. Paste and run [`backend/supabase_schema.sql`](backend/supabase_schema.sql).
+   If the schema was already installed, run the updated file again to add phone
+   storage and update the signup trigger; the profile phone-column change is
+   safe to re-run.
 4. Open **Table Editor** and confirm these tables exist:
    - `meetings`
    - `races`
    - `race_runners`
    - `analysis_runs`
    - `quinte_odds_snapshots`
+   - `user_profiles`
    - `jobs`
-   - `profiles`
 5. Confirm the `latest_analysis` view exists under **Database > Views**.
 
 ## 3. Optional sample data
@@ -67,11 +70,52 @@ The local frontend environment is:
 
 ```dotenv
 NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<publishable-or-anon-key>
 ```
 
 Save it as `frontend/.env.local`.
 
-## 5. Verify locally
+The public browser key is safe to expose when Row Level Security is enabled.
+Never use the `service_role` key in the frontend. The backend continues to use
+`SUPABASE_KEY` as its secret service-role key.
+
+## 5. Configure roles and first administrator
+
+The schema creates a `user_profiles` row with role `demo` and a seven-day
+expiry and saves the phone number entered during signup. Existing Supabase Auth
+users are backfilled as `simple` so this migration does not grant old accounts
+a trial automatically.
+Expired demo and subscriber access resolves to `simple`; anonymous visitors
+remain able to use the public homepage. Protected API endpoints validate the
+Supabase access token and check the profile role server-side.
+
+To bootstrap the first administrator:
+
+1. Create an account through the RaceX `/account` page.
+2. Confirm the email if Supabase email confirmation is enabled.
+3. Run this in Supabase SQL Editor, substituting that account's email:
+
+```sql
+update public.user_profiles
+set role = 'admin', demo_expires_at = null, subscriber_expires_at = null
+where lower(email) = lower('admin@example.com');
+```
+
+4. Sign out and back in so RaceX reloads the administrator role.
+
+RaceX does not create a shared default administrator login or password. Promote
+an account you control using the SQL above; never use shared credentials in
+production.
+
+From **Gestion des comptes**, administrators can activate or extend a
+subscriber account after confirming a 5,000 FCFA manual transfer. Each action
+adds one calendar month to a current subscription, or starts one month
+immediately if the prior access has expired. No payment is collected or
+automatically verified by RaceX. Demo-expired users see WhatsApp contacts for
+Moov Burkina (`+226 60 35 44 00`) and Orange (`+226 74 91 15 38`).
+
+## 6. Verify locally
 
 Check the health endpoint:
 
@@ -95,7 +139,7 @@ Invoke-RestMethod http://localhost:8000/api/v1/supabase-races/<race-id>
 
 The response should contain `race` and `latest_analysis`.
 
-## 6. Configure Render
+## 7. Configure Render
 
 The Render service is defined in [`render.yaml`](render.yaml). Create or update the `racex-api` web service with:
 
@@ -116,17 +160,19 @@ After deployment, verify:
 Invoke-RestMethod https://<your-render-service>.onrender.com/health
 ```
 
-## 7. Configure Vercel
+## 8. Configure Vercel
 
 Create the Vercel project from the `frontend` directory and set this environment variable:
 
 | Variable | Preview value | Production value |
 | --- | --- | --- |
 | `NEXT_PUBLIC_API_URL` | `https://<your-render-service>.onrender.com` | `https://<your-render-service>.onrender.com` |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://<project-ref>.supabase.co` | `https://<project-ref>.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase publishable/anon key | Supabase publishable/anon key |
 
 Redeploy after adding or changing this variable because Next.js reads `NEXT_PUBLIC_*` values during the build.
 
-## 8. Final browser check
+## 9. Final browser check
 
 1. Open the deployed Vercel URL.
 2. Submit a valid Zone-Turf race URL.

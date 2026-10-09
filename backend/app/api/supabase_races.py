@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.services.supabase_client import SupabaseClientWrapper
+from app.services.auth_service import require_admin
 
 router = APIRouter(prefix="/supabase-races", tags=["supabase-races"])
 
@@ -23,7 +24,7 @@ class RaceWriteRequest(BaseModel):
 
 
 @router.post("", status_code=201)
-def write_race_to_supabase(request: RaceWriteRequest) -> dict[str, Any]:
+def write_race_to_supabase(request: RaceWriteRequest, _: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
     client = SupabaseClientWrapper()
     try:
         existing = client.select_one(
@@ -79,7 +80,7 @@ class AnalysisWriteRequest(BaseModel):
 
 
 @router.post("/analysis", status_code=201)
-def write_analysis_to_supabase(request: AnalysisWriteRequest) -> dict[str, Any]:
+def write_analysis_to_supabase(request: AnalysisWriteRequest, _: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
     client = SupabaseClientWrapper()
     try:
         created = client.insert(
@@ -99,7 +100,7 @@ def write_analysis_to_supabase(request: AnalysisWriteRequest) -> dict[str, Any]:
 
 
 @router.get("/{race_id}")
-def get_race_and_latest_analysis(race_id: str) -> dict[str, Any]:
+def get_race_and_latest_analysis(race_id: str, _: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
     client = SupabaseClientWrapper()
     try:
         race = client.select_one("races", filters=[("id", "eq", race_id)])

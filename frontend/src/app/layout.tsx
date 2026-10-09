@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import PwaRegister from "./pwa-register";
+import { AuthProvider } from "./auth-context";
 
 export const metadata: Metadata = {
   title: "RaceX Analysis Desk",
@@ -30,6 +31,6 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en"><body><PwaRegister />{children}</body></html>
+    <html lang="fr"><body><AuthProvider><PwaRegister />{children}</AuthProvider></body></html>
   );
 }

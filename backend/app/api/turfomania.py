@@ -1,10 +1,11 @@
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.services.turfomania_catalog import persist_turfomania_reunions, scrape_turfomania_reunions
+from app.services.auth_service import require_admin
 
 router = APIRouter(prefix="/turfomania", tags=["turfomania"])
 
@@ -14,7 +15,7 @@ class TurfomaniaCatalogRequest(BaseModel):
 
 
 @router.post("/reunions")
-def catalog_reunions(request: TurfomaniaCatalogRequest | None = None) -> dict[str, Any]:
+def catalog_reunions(request: TurfomaniaCatalogRequest | None = None, _: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
     """Scrape today's turfomania.fr réunion cards and store them as pending races."""
     try:
         reunions = scrape_turfomania_reunions()

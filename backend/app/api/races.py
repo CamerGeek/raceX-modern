@@ -3,7 +3,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.schemas.races import (
     AnalysisRequest,
@@ -23,6 +23,7 @@ from app.services.quinte_odds_service import get_today_quinte_odds_history
 from app.services.scraping_service import detect_race_type, scrape_race
 from app.services.serialization import dataframe_records
 from app.services.supabase_client import SupabaseClientWrapper
+from app.services.auth_service import require_admin, require_subscriber_features
 from app.services.turfomania_download import parse_turfomania_meeting_url
 from app.services.turfomania_catalog import persist_turfomania_reunions, scrape_turfomania_reunions
 from app.services.turfomania_quinte import (
@@ -75,7 +76,7 @@ def _display_frame(source: pd.DataFrame, analyzed: pd.DataFrame, race_type: str)
 
 
 @router.get("/detect-type")
-def detect_type(url: str = Query(min_length=1)) -> dict[str, str]:
+def detect_type(url: str = Query(min_length=1), _: dict[str, Any] = Depends(require_admin)) -> dict[str, str]:
     try:
         turfomania_id = parse_turfomania_meeting_url(url)
         if turfomania_id:
@@ -95,7 +96,7 @@ def _turfomania_race_type(meeting_id: str) -> str | None:
 
 
 @router.post("/scrape", response_model=RaceResponse)
-def scrape(request: ScrapeRequest) -> RaceResponse:
+def scrape(request: ScrapeRequest, _: dict[str, Any] = Depends(require_admin)) -> RaceResponse:
     try:
         frame = scrape_race(request.url, request.race_type, request.source)
     except Exception as exc:
@@ -110,7 +111,7 @@ def scrape(request: ScrapeRequest) -> RaceResponse:
 
 
 @router.post("/analyze", response_model=AnalysisResponse)
-def analyze(request: AnalysisRequest) -> AnalysisResponse:
+def analyze(request: AnalysisRequest, _: dict[str, Any] = Depends(require_admin)) -> AnalysisResponse:
     try:
         race_type = request.race_type
         source = request.source
@@ -177,6 +178,7 @@ def _analysis_response(
 @router.post("/turfomania/quinte/analyze", response_model=TurfomaniaQuinteAnalysisResponse)
 def analyze_turfomania_quinte(
     request: TurfomaniaQuinteAnalysisRequest,
+    _: dict[str, Any] = Depends(require_admin),
 ) -> TurfomaniaQuinteAnalysisResponse:
     client = SupabaseClientWrapper()
     meeting = client.select_one("meetings", filters=[("id", "eq", request.meeting_id)])
@@ -229,6 +231,50 @@ def analyze_turfomania_quinte(
     response_model=TurfomaniaQuinteAnalysisResponse,
 )
 def analyze_today_turfomania_quinte(
+    request: TodayQuinteAnalysisRequest,
+    _: dict[str, Any] = Depends(require_subscriber_features),
+) -> TurfomaniaQuinteAnalysisResponse:
+    return _analyze_today_turfomania_quinte(request)
+
+
+@router.post("/turfomania/quinte/today/public")
+def public_today_turfomania_quinte(request: TodayQuinteAnalysisRequest) -> dict[str, Any]:
+    analysis = _analyze_today_turfomania_quinte(request)
+
+    def numeric_score(value: Any, fallback: float = -1.0) -> float:
+        try:
+            score = float(value)
+        except (TypeError, ValueError):
+            return fallback
+        return score if pd.notna(score) else fallback
+
+    ranked = sorted(
+        analysis.rows,
+        key=lambda row: numeric_score(row.get("Composite")),
+        reverse=True,
+    )[:8]
+
+    def number_from(row: dict[str, Any]) -> str:
+        for key in ("N°", "N", "Numero", "NUMERO", "NUM"):
+            value = row.get(key)
+            if value is not None and str(value).strip():
+                return str(value).strip().removesuffix(".0")
+        return ""
+
+    public_rows: list[dict[str, Any]] = []
+    for horse in ranked:
+        number = number_from(horse)
+        if number:
+            public_rows.append({"N°": number, "Composite": horse.get("Composite")})
+
+    return {
+        "race_type": analysis.race_type,
+        "row_count": analysis.row_count,
+        "rows": public_rows,
+    }
+
+
+def _analyze_today_turfomania_quinte(
     request: TodayQuinteAnalysisRequest,
 ) -> TurfomaniaQuinteAnalysisResponse:
     client = SupabaseClientWrapper()
@@ -377,7 +423,7 @@ def _store_homepage_quinte_analysis(
 
 
 @router.post("/simulate")
-def simulate(request: BettingRequest) -> dict[str, Any]:
+def simulate(request: BettingRequest, _: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
     try:
         frame, race = _saved_frame(SupabaseClientWrapper(), request.race_id)
         return {"race_id": request.race_id, "race_type": race["race_type"], "simulations": request.simulations, "rows": simulate_race(frame, race["race_type"], request.simulations)}
@@ -388,7 +434,7 @@ def simulate(request: BettingRequest) -> dict[str, Any]:
 
 
 @router.post("/combinations")
-def combinations(request: BettingRequest) -> dict[str, Any]:
+def combinations(request: BettingRequest, _: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
     try:
         frame, race = _saved_frame(SupabaseClientWrapper(), request.race_id)
         combos = generate_combinations(frame, race["race_type"], request.combination_size, request.max_combinations, request.mandatory, request.excluded)

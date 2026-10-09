@@ -1,13 +1,14 @@
 from datetime import date
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.schemas.meetings import MeetingResponse
 from app.services.meeting_persistence import persist_scraped_meeting
 from app.services.scraping_service import detect_race_type, get_meetings, scrape_race
 from app.services.supabase_client import SupabaseClientWrapper
+from app.services.auth_service import require_admin
 from app.services.turfomania_download import (
     STORED_STATUSES,
     download_turfomania_meeting,
@@ -59,7 +60,7 @@ def _stored_turfomania_meeting(meeting_id: str) -> dict[str, Any] | None:
 
 
 @router.get("/stored")
-def stored_meeting(meeting_url: str = Query(min_length=1), meeting_date: date = Query(alias="date")) -> dict[str, Any]:
+def stored_meeting(meeting_url: str = Query(min_length=1), meeting_date: date = Query(alias="date"), _: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
     try:
         turfomania_id = parse_turfomania_meeting_url(meeting_url)
         if turfomania_id:
@@ -75,6 +76,7 @@ def stored_meeting(meeting_url: str = Query(min_length=1), meeting_date: date = 
 def list_meetings(
     meeting_date: date = Query(default_factory=date.today, alias="date"),
     refresh: bool = False,
+    _: dict[str, Any] = Depends(require_admin),
 ) -> MeetingResponse:
     return MeetingResponse(date=meeting_date.isoformat(), meetings=get_meetings(meeting_date, force_refresh=refresh))
 
@@ -89,7 +91,7 @@ class MeetingScrapeRequest(BaseModel):
 
 
 @router.post("/scrape")
-def scrape_meeting(request: MeetingScrapeRequest) -> dict[str, Any]:
+def scrape_meeting(request: MeetingScrapeRequest, _: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
     try:
         turfomania_id = parse_turfomania_meeting_url(request.meeting_url)
         if turfomania_id or request.source == "turfomania":

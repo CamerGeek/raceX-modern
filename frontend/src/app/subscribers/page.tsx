@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import QuinteOddsChart from "../quinte-odds-chart";
+import QuinteRecommendations, { type QuinteModelPredictions } from "../quinte-recommendations";
 import SiteNavigation from "../site-navigation";
+import AccessGate from "../access-gate";
+import { useAuth } from "../auth-context";
 
 type Horse = Record<string, string | number | boolean | null>;
 type AnalysisSignal = { label: string; value: string; detail: string };
@@ -31,7 +34,7 @@ type Analysis = {
   sections: AnalysisSection[];
   overview: FlatOverview;
   handicap: { distance: number | null; penalized_count: number } | null;
-  model_predictions: { status: string; message: string | null } | null;
+  model_predictions: QuinteModelPredictions | null;
 };
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -258,6 +261,7 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
 }
 
 function SubscriberDashboard() {
+  const { apiFetch } = useAuth();
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -265,7 +269,7 @@ function SubscriberDashboard() {
 
   const loadAnalysis = useCallback(async () => {
     try {
-      const response = await fetch(`${apiUrl}/api/v1/races/turfomania/quinte/today/analyze`, {
+      const response = await apiFetch(`${apiUrl}/api/v1/races/turfomania/quinte/today/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: todayInParis() }),
@@ -286,7 +290,7 @@ function SubscriberDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [apiFetch]);
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void loadAnalysis(), 0);
@@ -379,6 +383,11 @@ function SubscriberDashboard() {
 
           <DisciplineHighlights analysis={analysis} />
 
+          <QuinteRecommendations
+            prognosis={analysis.prognosis}
+            modelPredictions={analysis.model_predictions}
+          />
+
           <section className="subscriber-contenders public-widget" aria-labelledby="subscriber-contenders-title">
             <div className="subscriber-section-heading">
               <div>
@@ -436,5 +445,5 @@ function SubscriberDashboard() {
 }
 
 export default function SubscribersPage() {
-  return <SubscriberDashboard />;
+  return <AccessGate allowedRoles={["demo", "subscriber", "admin"]}><SubscriberDashboard /></AccessGate>;
 }

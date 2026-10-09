@@ -5,12 +5,9 @@ import { useEffect, useState } from "react";
 type Horse = Record<string, string | number | boolean | null>;
 
 type QuinteAnalysis = {
-  race_id: string;
   race_type: "flat" | "trot";
   row_count: number;
   rows: Horse[];
-  race_details: string;
-  model_version: string;
 };
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -20,15 +17,17 @@ const numberFields = ["N°", "N", "Numero", "NUMERO", "NUM"];
 let todayAnalysisRequest: Promise<QuinteAnalysis> | null = null;
 
 function localDate() {
-  const today = new Date();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
-  return `${today.getFullYear()}-${month}-${day}`;
+  return new Intl.DateTimeFormat("fr-CA", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 }
 
 function requestTodayAnalysis() {
   if (!todayAnalysisRequest) {
-    todayAnalysisRequest = fetch(`${apiUrl}/api/v1/races/turfomania/quinte/today/analyze`, {
+    todayAnalysisRequest = fetch(`${apiUrl}/api/v1/races/turfomania/quinte/today/public`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ date: localDate() }),
