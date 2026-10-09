@@ -18,6 +18,13 @@ class PromoteSubscriberRequest(BaseModel):
     user_id: str = Field(min_length=1)
 
 
+class ChariowCheckoutRequest(BaseModel):
+    first_name: str = Field(min_length=1, max_length=50)
+    last_name: str = Field(min_length=1, max_length=50)
+    phone_number: str = Field(pattern=r"^[0-9]{5,15}$")
+    phone_country_code: str = Field(pattern=r"^[A-Z]{2}$")
+
+
 def _add_month(value: datetime) -> datetime:
     month = value.month % 12 + 1
     year = value.year + (1 if value.month == 12 else 0)
@@ -32,6 +39,7 @@ def profile(current_user: dict[str, Any] = Depends(current_profile)) -> dict[str
 
 @router.post("/chariow/checkout")
 def chariow_checkout(
+    request: ChariowCheckoutRequest,
     current_user: dict[str, Any] = Depends(current_profile),
 ) -> dict[str, str]:
     if current_user["role"] == "admin":
@@ -40,6 +48,10 @@ def chariow_checkout(
         checkout_url = create_checkout(
             user_id=current_user["id"],
             email=current_user["email"],
+            first_name=request.first_name.strip(),
+            last_name=request.last_name.strip(),
+            phone_number=request.phone_number,
+            phone_country_code=request.phone_country_code,
         )
     except ChariowCheckoutError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

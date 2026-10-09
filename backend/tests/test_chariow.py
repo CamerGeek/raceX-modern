@@ -193,6 +193,10 @@ def test_create_checkout_includes_account_metadata_and_return_url(monkeypatch) -
     checkout_url = chariow_service.create_checkout(
         user_id="71bffbf1-46f4-4646-98fc-f92ea687f915",
         email="buyer@example.com",
+        first_name="Awa",
+        last_name="Traore",
+        phone_number="70123456",
+        phone_country_code="BF",
     )
 
     assert checkout_url == "https://payment.chariow.com/checkout/123"
@@ -201,6 +205,9 @@ def test_create_checkout_includes_account_metadata_and_return_url(monkeypatch) -
     assert request["json"] == {
         "product_id": "prd_0hfy60zq",
         "email": "buyer@example.com",
+        "first_name": "Awa",
+        "last_name": "Traore",
+        "phone": {"number": "70123456", "country_code": "BF"},
         "custom_metadata": {"racex_user_id": "71bffbf1-46f4-4646-98fc-f92ea687f915"},
         "redirect_url": "https://racex.example/account?payment=complete",
     }
@@ -232,4 +239,52 @@ def test_create_checkout_rejects_non_https_checkout_url(monkeypatch) -> None:
     monkeypatch.setattr(chariow_service.requests, "post", lambda *args, **kwargs: FakeResponse())
 
     with pytest.raises(chariow_service.ChariowCheckoutError):
-        chariow_service.create_checkout(user_id="user-123", email="buyer@example.com")
+        chariow_service.create_checkout(
+            user_id="user-123",
+            email="buyer@example.com",
+            first_name="Awa",
+            last_name="Traore",
+            phone_number="70123456",
+            phone_country_code="BF",
+        )
+
+
+def test_checkout_validation_error_reports_field_names_without_values(monkeypatch, caplog) -> None:
+    class FakeResponse:
+        ok = False
+        status_code = 422
+
+        @staticmethod
+        def json():
+            return {
+                "errors": {
+                    "first_name": ["The first name field is required."],
+                    "phone.number": ["The phone number is invalid."],
+                }
+            }
+
+    monkeypatch.setattr(
+        chariow_service,
+        "get_settings",
+        lambda: SimpleNamespace(
+            chariow_api_key="test-api-key",
+            chariow_product_id="prd_0hfy60zq",
+            chariow_return_url="https://racex.example/account?payment=complete",
+        ),
+    )
+    monkeypatch.setattr(chariow_service.requests, "post", lambda *args, **kwargs: FakeResponse())
+
+    with pytest.raises(chariow_service.ChariowCheckoutError) as error:
+        chariow_service.create_checkout(
+            user_id="user-123",
+            email="buyer@example.com",
+            first_name="Awa",
+            last_name="Traore",
+            phone_number="70123456",
+            phone_country_code="BF",
+        )
+
+    assert str(error.value) == "Chariow rejected checkout fields: first_name, phone.number"
+    assert "buyer@example.com" not in caplog.text
+    assert "Awa" not in caplog.text
+    assert "70123456" not in caplog.text

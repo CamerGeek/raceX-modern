@@ -39,6 +39,10 @@ function AccountPageContent() {
   const [error, setError] = useState("");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [paymentReturn, setPaymentReturn] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState("BF");
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("payment") !== "complete") return;
@@ -47,12 +51,22 @@ function AccountPageContent() {
     void refreshProfile();
   }, [refreshProfile]);
 
-  async function startCheckout() {
+  async function startCheckout(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setCheckoutBusy(true);
     setError("");
     setMessage("");
     try {
-      const response = await apiFetch(`${apiUrl}/api/v1/auth/chariow/checkout`, { method: "POST" });
+      const response = await apiFetch(`${apiUrl}/api/v1/auth/chariow/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          phone_number: phoneNumber,
+          phone_country_code: phoneCountryCode.trim().toUpperCase(),
+        }),
+      });
       const result: unknown = await response.json();
       if (!response.ok) {
         const detail =
@@ -167,9 +181,19 @@ function AccountPageContent() {
               <p>
                 Payez les 10 000 FCFA sur Chariow. Chaque paiement confirmé ajoute un mois d’accès RaceX. Le paiement est traité de façon sécurisée par Chariow.
               </p>
-              <button className="subscriber-refresh account-chariow-button" type="button" onClick={() => void startCheckout()} disabled={checkoutBusy}>
-                {checkoutBusy ? "Redirection vers Chariow…" : profile.role === "subscriber" ? "Renouveler sur Chariow" : "Payer sur Chariow"}
-              </button>
+              <form className="account-form account-checkout-form" onSubmit={startCheckout}>
+                <label htmlFor="checkout-first-name">Prénom</label>
+                <input id="checkout-first-name" autoComplete="given-name" maxLength={50} required value={firstName} onChange={(event) => setFirstName(event.target.value)} />
+                <label htmlFor="checkout-last-name">Nom</label>
+                <input id="checkout-last-name" autoComplete="family-name" maxLength={50} required value={lastName} onChange={(event) => setLastName(event.target.value)} />
+                <label htmlFor="checkout-phone-number">Numéro de téléphone (chiffres uniquement)</label>
+                <input id="checkout-phone-number" type="tel" autoComplete="tel-national" inputMode="numeric" pattern="[0-9]{5,15}" title="Saisissez 5 à 15 chiffres, sans indicatif pays." required value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} />
+                <label htmlFor="checkout-phone-country">Code pays ISO (2 lettres)</label>
+                <input id="checkout-phone-country" autoComplete="country" minLength={2} maxLength={2} pattern="[A-Za-z]{2}" title="Par exemple BF pour le Burkina Faso." required value={phoneCountryCode} onChange={(event) => setPhoneCountryCode(event.target.value.toUpperCase())} />
+                <button className="subscriber-refresh account-chariow-button" type="submit" disabled={checkoutBusy}>
+                  {checkoutBusy ? "Redirection vers Chariow…" : profile.role === "subscriber" ? "Renouveler sur Chariow" : "Payer sur Chariow"}
+                </button>
+              </form>
               {paymentReturn && profile.role !== "subscriber" && (
                 <p className="account-payment-pending" role="status">
                   Votre retour ne confirme pas le paiement. Si vous venez de payer, patientez quelques instants puis actualisez votre compte.
