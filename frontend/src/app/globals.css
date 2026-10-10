@@ -3,7 +3,7 @@
 :root { --ink: #18221f; --muted: #65736d; --paper: #f3f0e8; --panel: #fbfaf5; --line: #d7d8ca; --green: #1d594b; --deep: #103b32; --orange: #c96f3b; --yellow: #f2b84b; --cyan: #2ac7ff; --cyan-soft: rgba(42, 199, 255, 0.12); --card-wash: linear-gradient(135deg, #f7fbfd 0%, #edf7f1 100%); --card-line: rgba(25, 112, 127, 0.16); }
 * { box-sizing: border-box; }
 body { margin: 0; background: radial-gradient(circle at 85% 8%, #dce8d5 0, transparent 27rem), var(--paper); color: var(--ink); font-family: Georgia, 'Times New Roman', serif; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 .shell { max-width: 1180px; margin: 0 auto; padding: 4.5rem 2rem 5rem; }
 .subscriber-shell { max-width: 1240px; padding-top: 2rem; }
 .subscriber-header { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; margin: 0 0 1.25rem; }
@@ -65,7 +65,11 @@ button, input { font: inherit; }
 .account-card-copy { color: var(--muted); font: .82rem/1.5 ui-sans-serif, system-ui, sans-serif; }
 .account-form { display: grid; gap: .55rem; margin-top: 1.2rem; font: .8rem ui-sans-serif, system-ui, sans-serif; }
 .account-form label { margin-top: .35rem; color: var(--deep); font-weight: 700; }
-.account-form input { width: 100%; min-height: 2.8rem; padding: .65rem .75rem; border: 1px solid var(--line); border-radius: .4rem; background: #fffefa; color: var(--ink); }
+.account-form input, .account-form select { width: 100%; min-height: 2.8rem; padding: .65rem .75rem; border: 1px solid var(--line); border-radius: .4rem; background: #fffefa; color: var(--ink); }
+.account-phone-fields { display: grid; grid-template-columns: minmax(12rem, 1.1fr) minmax(0, 1fr); gap: .55rem; }
+.account-phone-fields > div { display: grid; align-content: start; gap: .55rem; }
+.account-phone-fields label { margin-top: .35rem; color: var(--deep); font-weight: 700; }
+.account-phone-fields select, .account-phone-fields input { min-width: 0; }
 .account-form .subscriber-refresh { justify-self: start; margin-top: .45rem; }
 .account-help, .account-basic-note { margin: 0; color: var(--muted); font: .68rem/1.5 ui-sans-serif, system-ui, sans-serif; }
 .account-message { color: var(--green); font: .8rem/1.5 ui-sans-serif, system-ui, sans-serif; }
@@ -108,6 +112,7 @@ button, input { font: inherit; }
 .subscriber-discipline-note { margin: .6rem 0 0; color: var(--muted); font: .7rem/1.45 ui-sans-serif, system-ui, sans-serif; }
 .subscriber-shell > .site-navigation { margin: 0 0 1.25rem; }
 @media (max-width: 760px) {
+  .account-phone-fields { grid-template-columns: 1fr; }
   .subscriber-header { align-items: start; flex-direction: column; }
   .subscriber-header-actions { width: 100%; justify-content: space-between; }
   .subscriber-race-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -166,6 +171,11 @@ button, input { font: inherit; }
 .legal-card ul { padding-left: 1.3rem; }
 .legal-card a { color: var(--green); }
 .legal-updated { color: var(--muted) !important; font-size: .75rem !important; }
+.faq-list { display: grid; gap: .65rem; margin: 1.5rem 0; }
+.faq-item { padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .5rem; background: #fffefa; }
+.faq-item summary { color: var(--deep); cursor: pointer; font: 700 .9rem/1.5 ui-sans-serif, system-ui, sans-serif; }
+.faq-item p { margin: .65rem 0 0; }
+.about-links { margin-top: 1.5rem; }
 .not-found-page { max-width: 760px; margin: 0 auto; padding: clamp(4rem, 12vw, 8rem) 1.25rem; text-align: center; }
 .not-found-page .public-kicker { margin: 0 0 .75rem; }
 .not-found-page h1 { margin: 0; color: var(--deep); font-size: clamp(2rem, 6vw, 3.5rem); font-weight: 500; }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useAuth } from "./auth-context";
 
 type SiteNavigationProps = {
-  currentPage: "home" | "analysis" | "subscribers" | "account" | "user-admin";
+  currentPage: "home" | "about" | "faq" | "analysis" | "subscribers" | "account" | "user-admin";
 };
 
 export default function SiteNavigation({ currentPage }: SiteNavigationProps) {
@@ -16,6 +16,12 @@ export default function SiteNavigation({ currentPage }: SiteNavigationProps) {
     <nav className="site-navigation" aria-label="Navigation principale">
       <Link href="/" aria-current={currentPage === "home" ? "page" : undefined}>
         Quinté du jour
+      </Link>
+      <Link href="/about" aria-current={currentPage === "about" ? "page" : undefined}>
+        À propos
+      </Link>
+      <Link href="/faq" aria-current={currentPage === "faq" ? "page" : undefined}>
+        FAQ
       </Link>
       {canViewSubscribers && (
         <Link href="/subscribers" aria-current={currentPage === "subscribers" ? "page" : undefined}>

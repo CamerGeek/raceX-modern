@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import type { CountryCode } from "libphonenumber-js";
 import { useAuth } from "../auth-context";
 import SiteNavigation from "../site-navigation";
+import { parseValidPhoneNumber, PhoneField, usePhonePreferences } from "../phone-field";
 
 const whatsappAccounts = [
   { label: "Moov Burkina", number: "22660354400" },
@@ -30,6 +32,7 @@ function formatDate(value: string | null) {
 
 function AccountPageContent() {
   const { apiFetch, configured, loading, profile, profileError, refreshProfile, session, signIn, signOut, signUp } = useAuth();
+  const phonePreferences = usePhonePreferences();
   const [mode, setMode] = useState<"login" | "signup">("signup");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -42,7 +45,9 @@ function AccountPageContent() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [phoneCountryCode, setPhoneCountryCode] = useState("BF");
+  const [phoneCountryOverride, setPhoneCountryOverride] = useState<CountryCode | null>(null);
+  const phoneCountry = phoneCountryOverride ?? phonePreferences.country;
+  const phoneLocale = phonePreferences.locale;
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("payment") !== "complete") return;
@@ -53,6 +58,11 @@ function AccountPageContent() {
 
   async function startCheckout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const parsedPhone = parseValidPhoneNumber(phoneNumber, phoneCountry);
+    if (!parsedPhone) {
+      setError("Saisissez un numéro de téléphone valide pour le pays sélectionné.");
+      return;
+    }
     setCheckoutBusy(true);
     setError("");
     setMessage("");
@@ -63,8 +73,8 @@ function AccountPageContent() {
         body: JSON.stringify({
           first_name: firstName.trim(),
           last_name: lastName.trim(),
-          phone_number: phoneNumber,
-          phone_country_code: phoneCountryCode.trim().toUpperCase(),
+          phone_number: parsedPhone.nationalNumber,
+          phone_country_code: parsedPhone.countryCode,
         }),
       });
       const result: unknown = await response.json();
@@ -87,12 +97,17 @@ function AccountPageContent() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const parsedPhone = mode === "signup" ? parseValidPhoneNumber(phone, phoneCountry) : null;
+    if (mode === "signup" && !parsedPhone) {
+      setError("Saisissez un numéro de téléphone valide pour le pays sélectionné.");
+      return;
+    }
     setBusy(true);
     setMessage("");
     setError("");
     try {
       if (mode === "signup") {
-        const result = await signUp(email, password, phone);
+        const result = await signUp(email, password, parsedPhone?.internationalNumber ?? "");
         setMessage(result.hasSession
           ? "Votre compte est créé. Votre accès démo de 7 jours est activé."
           : result.identityCreated
@@ -149,8 +164,15 @@ function AccountPageContent() {
             <input id="account-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
             {mode === "signup" && (
               <>
-                <label htmlFor="account-phone">Numéro de téléphone</label>
-                <input id="account-phone" type="tel" autoComplete="tel" pattern="[+0-9(). -]{7,25}" title="Saisissez un numéro de téléphone valide." required value={phone} onChange={(event) => setPhone(event.target.value)} />
+                <PhoneField
+                  country={phoneCountry}
+                  idPrefix="account-phone"
+                  label="Numéro de téléphone"
+                  locale={phoneLocale}
+                  number={phone}
+                  onCountryChange={setPhoneCountryOverride}
+                  onNumberChange={setPhone}
+                />
               </>
             )}
             <label htmlFor="account-password">Mot de passe</label>
@@ -186,10 +208,16 @@ function AccountPageContent() {
                 <input id="checkout-first-name" autoComplete="given-name" maxLength={50} required value={firstName} onChange={(event) => setFirstName(event.target.value)} />
                 <label htmlFor="checkout-last-name">Nom</label>
                 <input id="checkout-last-name" autoComplete="family-name" maxLength={50} required value={lastName} onChange={(event) => setLastName(event.target.value)} />
-                <label htmlFor="checkout-phone-number">Numéro de téléphone (chiffres uniquement)</label>
-                <input id="checkout-phone-number" type="tel" autoComplete="tel-national" inputMode="numeric" pattern="[0-9]{5,15}" title="Saisissez 5 à 15 chiffres, sans indicatif pays." required value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} />
-                <label htmlFor="checkout-phone-country">Code pays ISO (2 lettres)</label>
-                <input id="checkout-phone-country" autoComplete="country" minLength={2} maxLength={2} pattern="[A-Za-z]{2}" title="Par exemple BF pour le Burkina Faso." required value={phoneCountryCode} onChange={(event) => setPhoneCountryCode(event.target.value.toUpperCase())} />
+                <PhoneField
+                  country={phoneCountry}
+                  idPrefix="checkout-phone"
+                  label="Numéro de téléphone"
+                  locale={phoneLocale}
+                  number={phoneNumber}
+                  onCountryChange={setPhoneCountryOverride}
+                  onNumberChange={setPhoneNumber}
+                />
+                <p className="account-help">Vous pouvez saisir le numéro au format local ou international.</p>
                 <button className="subscriber-refresh account-chariow-button" type="submit" disabled={checkoutBusy}>
                   {checkoutBusy ? "Redirection vers Chariow…" : profile.role === "subscriber" ? "Renouveler sur Chariow" : "Payer sur Chariow"}
                 </button>
