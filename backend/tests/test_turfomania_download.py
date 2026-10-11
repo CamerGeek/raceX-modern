@@ -64,6 +64,26 @@ def test_parse_quinte_title_block_metadata() -> None:
     assert metadata["Q+"] is True
 
 
+def test_parse_quinte_ignores_group_classification_when_extracting_track() -> None:
+    soup = BeautifulSoup(
+        '''<title>Quinté+ - Auteuil</title>
+        <div class="table-head-bloc-title">
+        <div class="rc_big">R1C4<span class="specialQuinte">Spécial Quinté+</span></div>
+        <div class="h2">Prix d'Auteuil (GROUPE III)</div>
+        <div class="date">Dimanche 11 Octobre 2026 - 15h15</div>
+        <div class="detail">Haies - 3600 mètres</div>
+        <span title="Quinté+">Q+</span></div>''',
+        "html.parser",
+    )
+
+    metadata = turfomania_race.parse_race_metadata(
+        soup,
+        "https://www.turfomania.fr/quinte/",
+    )
+
+    assert metadata["HIPPODROME"] == "Auteuil"
+
+
 def test_fetch_race_html_returns_runner_page_from_requests(monkeypatch: pytest.MonkeyPatch) -> None:
     request_html = '<table><tr><td><a href="/cheval/demo">DEMO</a></td></tr></table>'
     request_response = SimpleNamespace(text=request_html, raise_for_status=lambda: None)
