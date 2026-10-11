@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import QuinteOddsChart from "../quinte-odds-chart";
 import QuinteRecommendations, { type QuinteModelPredictions } from "../quinte-recommendations";
@@ -395,7 +394,6 @@ function SubscriberDashboard() {
                 <h2 id="subscriber-contenders-title">Les 8 principaux chevaux</h2>
                 <p>Triés par score composite décroissant. Les cotes sont indicatives et peuvent évoluer.</p>
               </div>
-              <Link href="/admin" className="subscriber-detail-link">Ouvrir l’analyse détaillée</Link>
             </div>
             {contenders.length > 0 ? (
               <ol className="subscriber-contender-list">

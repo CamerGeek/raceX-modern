@@ -50,11 +50,35 @@ function AccountPageContent() {
   const phoneLocale = phonePreferences.locale;
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("payment") !== "complete") return;
-    setPaymentReturn(true);
-    setMessage("Retour de Chariow détecté. RaceX vérifie la confirmation du paiement avant d’activer votre abonnement.");
-    void refreshProfile();
+    const timer = window.setTimeout(() => {
+      if (new URLSearchParams(window.location.search).get("payment") !== "complete") return;
+      setPaymentReturn(true);
+      setMessage("Retour de Chariow détecté. RaceX vérifie la confirmation du paiement avant d’activer votre abonnement.");
+      void refreshProfile();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [refreshProfile]);
+
+  useEffect(() => {
+    if (!paymentReturn || profile?.role === "subscriber") return;
+
+    let active = true;
+    let attempts = 0;
+    let timer: number;
+    const refreshUntilActivated = async () => {
+      await refreshProfile();
+      attempts += 1;
+      if (active && attempts < 20) {
+        timer = window.setTimeout(refreshUntilActivated, 3000);
+      }
+    };
+
+    timer = window.setTimeout(refreshUntilActivated, 3000);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [paymentReturn, profile?.role, refreshProfile]);
 
   async function startCheckout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -224,7 +248,7 @@ function AccountPageContent() {
               </form>
               {paymentReturn && profile.role !== "subscriber" && (
                 <p className="account-payment-pending" role="status">
-                  Votre retour ne confirme pas le paiement. Si vous venez de payer, patientez quelques instants puis actualisez votre compte.
+                  RaceX vérifie la confirmation du paiement et actualise automatiquement votre accès pendant une minute. Si votre abonnement n’apparaît pas ensuite, actualisez votre compte.
                 </p>
               )}
               {paymentReturn && profile.role === "subscriber" && (
