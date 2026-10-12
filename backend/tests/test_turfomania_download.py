@@ -84,6 +84,26 @@ def test_parse_quinte_ignores_group_classification_when_extracting_track() -> No
     assert metadata["HIPPODROME"] == "Auteuil"
 
 
+def test_parse_quinte_preserves_track_name_without_hyphen_in_page_title() -> None:
+    soup = BeautifulSoup(
+        '''<title>Quinté+ - Marseille Borely</title>
+        <div class="table-head-bloc-title">
+        <div class="rc_big">R1C1<span class="specialQuinte">Spécial Quinté+</span></div>
+        <div class="h2">Prix de Marseille (GROUPE III)</div>
+        <div class="date">Lundi 12 Octobre 2026 - 13h55</div>
+        <div class="detail">Plat - 2000 mètres</div>
+        <span title="Quinté+">Q+</span></div>''',
+        "html.parser",
+    )
+
+    metadata = turfomania_race.parse_race_metadata(
+        soup,
+        "https://www.turfomania.fr/quinte/",
+    )
+
+    assert metadata["HIPPODROME"] == "Marseille Borely"
+
+
 def test_fetch_race_html_returns_runner_page_from_requests(monkeypatch: pytest.MonkeyPatch) -> None:
     request_html = '<table><tr><td><a href="/cheval/demo">DEMO</a></td></tr></table>'
     request_response = SimpleNamespace(text=request_html, raise_for_status=lambda: None)

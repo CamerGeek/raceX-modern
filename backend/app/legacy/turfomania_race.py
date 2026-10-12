@@ -79,7 +79,11 @@ def parse_race_metadata(soup: BeautifulSoup, url: str) -> dict[str, Any]:
         descriptif = _clean(old_detail.get_text(" ")) if old_detail else ""
     header2 = _clean(h2.get_text()) if h2 else ""
     venue_candidates = re.findall(r"\(([^()]+)\)", descriptif)
-    venue_candidates.extend(title.get_text().split("-")[-1:] if title else [])
+    venue_candidates.extend(
+        re.split(r"\s+[-–—]\s+", _clean(title.get_text()))[-1:]
+        if title
+        else []
+    )
     hippodrome = next(
         (venue for candidate in venue_candidates if (venue := _clean(candidate)) and not re.fullmatch(
             r"GROUPE\s+(?:I{1,3}|[1-3])", venue, re.IGNORECASE
