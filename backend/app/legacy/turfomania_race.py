@@ -78,7 +78,7 @@ def parse_race_metadata(soup: BeautifulSoup, url: str) -> dict[str, Any]:
         old_detail = soup.find("div", class_="detailCourseCaract")
         descriptif = _clean(old_detail.get_text(" ")) if old_detail else ""
     header2 = _clean(h2.get_text()) if h2 else ""
-    venue_candidates = re.findall(r"\(([^()]+)\)", descriptif)
+    venue_candidates = list(reversed(re.findall(r"\(([^()]+)\)", descriptif)))
     venue_candidates.extend(
         re.split(r"\s+[-–—]\s+", _clean(title.get_text()))[-1:]
         if title
