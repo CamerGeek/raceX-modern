@@ -413,8 +413,6 @@ function SubscriberDashboard() {
             )}
           </section>
 
-          <QuinteOddsChart />
-
           <details className="subscriber-details public-widget">
             <summary>Comprendre les signaux et les limites de l’analyse</summary>
             {analysis.race_details && <p className="subscriber-race-details">{analysis.race_details}</p>}
@@ -438,6 +436,7 @@ function SubscriberDashboard() {
           </details>
         </>
       )}
+      <QuinteOddsChart />
     </main>
   );
 }

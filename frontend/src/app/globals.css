@@ -215,6 +215,15 @@ button, input, select { font: inherit; }
 .odds-chart-legend li { display: flex; align-items: center; gap: .35rem; color: var(--muted); font: .68rem ui-sans-serif, system-ui, sans-serif; }
 .odds-chart-legend li > span:first-child { width: .65rem; height: .65rem; border-radius: 50%; }
 .odds-chart-legend strong { color: var(--ink); }
+.odds-movers { margin-top: .9rem; padding: .8rem 1rem; border: 1px solid var(--line); border-radius: .65rem; background: #f7f8f3; }
+.odds-movers h3 { margin: 0; color: var(--deep); font: 600 .9rem/1.4 ui-sans-serif, system-ui, sans-serif; }
+.odds-movers ol { display: grid; gap: .45rem; margin: .65rem 0 0; padding: 0; list-style: none; }
+.odds-movers li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: .6rem 1rem; font: .76rem/1.4 ui-sans-serif, system-ui, sans-serif; }
+.odds-movers li > strong { overflow: hidden; color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
+.odds-movers li > span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.odds-movers li > b { color: #176443; font-variant-numeric: tabular-nums; }
+.odds-movers li > b.odds-current-value { color: var(--deep); }
+.odds-movers > p { margin: .4rem 0 0; color: var(--muted); font: .75rem/1.5 ui-sans-serif, system-ui, sans-serif; }
 .odds-chart-error { margin: .8rem 0 0; color: #a43c2c; font: .82rem/1.4 ui-sans-serif, system-ui, sans-serif; }
 @media (max-width: 1050px) {
   .quinte-dashboard { grid-template-columns: minmax(0, 1fr); }
@@ -492,6 +501,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 @media (max-width: 380px) {
   .free-analysis { padding: 1rem; }
   .odds-chart-panel { padding: 1rem; }
+  .odds-movers li { grid-template-columns: minmax(0, 1fr) auto; }
+  .odds-movers li > span { grid-column: 1; }
+  .odds-movers li > b { grid-column: 2; grid-row: 1 / span 2; }
   .free-analysis-list { gap: .45rem; }
   .free-analysis-list li { min-width: 2.5rem; min-height: 2.5rem; }
   .public-home { width: min(100% - 1.25rem, 1060px); }

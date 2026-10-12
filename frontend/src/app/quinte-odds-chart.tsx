@@ -9,6 +9,12 @@ type OddsHistory = {
   race: { id: string; race_key: string | null; race_type: "flat" | "trot" } | null;
   series: OddsSeries[];
 };
+type OddsMovement = {
+  runner: OddsSeries;
+  openingOdds: number;
+  latestOdds: number;
+  dropPercent: number;
+};
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const colors = [
@@ -32,6 +38,10 @@ function timeLabel(timestamp: string) {
     minute: "2-digit",
     timeZone: "Europe/Paris",
   }).format(new Date(timestamp));
+}
+
+function formatOdds(odds: number) {
+  return odds.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export default function QuinteOddsChart() {
@@ -66,6 +76,32 @@ export default function QuinteOddsChart() {
 
   const series = history?.series ?? [];
   const allPoints = series.flatMap((runner) => runner.points);
+  const hasComparableSamples = series.some((runner) => {
+    const timestamps = runner.points
+      .map((point) => Date.parse(point.captured_at))
+      .filter(Number.isFinite)
+      .sort((first, second) => first - second);
+    return timestamps.length > 1 && timestamps[0] !== timestamps.at(-1);
+  });
+  const movements = series
+    .map((runner): OddsMovement | null => {
+      const points = runner.points
+        .filter((point) => Number.isFinite(point.odds) && point.odds > 0 && Number.isFinite(Date.parse(point.captured_at)))
+        .sort((first, second) => Date.parse(first.captured_at) - Date.parse(second.captured_at));
+      const openingOdds = points[0]?.odds;
+      const latestOdds = points.at(-1)?.odds;
+      if (openingOdds === undefined || latestOdds === undefined || points.length < 2 || latestOdds >= openingOdds) {
+        return null;
+      }
+      return {
+        runner,
+        openingOdds,
+        latestOdds,
+        dropPercent: ((openingOdds - latestOdds) / openingOdds) * 100,
+      };
+    })
+    .filter((movement): movement is OddsMovement => movement !== null)
+    .sort((first, second) => second.dropPercent - first.dropPercent);
   const timestampValues = allPoints.map((point) => Date.parse(point.captured_at)).filter(Number.isFinite);
   const firstTimestamp = timestampValues.length ? Math.min(...timestampValues) : 0;
   const lastTimestamp = timestampValues.length ? Math.max(...timestampValues) : 0;
@@ -153,6 +189,41 @@ export default function QuinteOddsChart() {
               })}
             </svg>
           </div>
+          <section className="odds-movers" aria-labelledby="odds-movers-title">
+            <h3 id="odds-movers-title">Chevaux avec les cotes en baisse</h3>
+            {movements.length > 0 ? (
+              <ol>
+                {movements.slice(0, 5).map(({ runner, openingOdds, latestOdds, dropPercent }) => (
+                  <li key={runner.number}>
+                    <strong>N° {runner.number}{runner.horse_name ? ` · ${runner.horse_name}` : ""}</strong>
+                    <span>{formatOdds(openingOdds)} → {formatOdds(latestOdds)}</span>
+                    <b>−{dropPercent.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %</b>
+                  </li>
+                ))}
+              </ol>
+            ) : !hasComparableSamples ? (
+              <>
+                <p>Un seul relevé est disponible pour le moment ; les variations apparaîtront au prochain relevé.</p>
+                <ol>
+                  {series.map((runner) => {
+                    const latestPoint = runner.points
+                      .filter((point) => Number.isFinite(point.odds) && point.odds > 0 && Number.isFinite(Date.parse(point.captured_at)))
+                      .sort((first, second) => Date.parse(first.captured_at) - Date.parse(second.captured_at))
+                      .at(-1);
+                    return latestPoint ? (
+                      <li key={runner.number}>
+                        <strong>N° {runner.number}{runner.horse_name ? ` · ${runner.horse_name}` : ""}</strong>
+                        <span>Cote actuelle</span>
+                        <b className="odds-current-value">{formatOdds(latestPoint.odds)}</b>
+                      </li>
+                    ) : null;
+                  })}
+                </ol>
+              </>
+            ) : (
+              <p>Aucune cote en baisse depuis le premier relevé.</p>
+            )}
+          </section>
           <ul className="odds-chart-legend" aria-label="Chevaux représentés sur le graphique">
             {series.map((runner, index) => (
               <li key={runner.number}>
