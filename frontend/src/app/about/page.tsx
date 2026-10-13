@@ -47,7 +47,7 @@ export default function AboutPage() {
         <p>
           L’espace RaceX propose, selon la course et les données disponibles, des synthèses et des
           indicateurs pour comparer les partants. Un compte donne accès à une période de démo de
-          sept jours. L’abonnement est proposé à 10 000 FCFA par mois et les paiements confirmés
+          sept jours. L’abonnement est proposé à 8 000 FCFA par mois et les paiements confirmés
           sont traités par Chariow.
         </p>
         <p>

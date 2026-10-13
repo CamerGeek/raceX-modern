@@ -128,7 +128,7 @@ an account you control using the SQL above; never use shared credentials in
 production.
 
 From **Gestion des comptes**, administrators can activate or extend a
-subscriber account after confirming a 5,000 FCFA manual transfer. Each action
+subscriber account after confirming an 8,000 FCFA manual transfer. Each action
 adds one calendar month to a current subscription, or starts one month
 immediately if the prior access has expired. No payment is collected or
 automatically verified by RaceX. Demo-expired users see WhatsApp contacts for

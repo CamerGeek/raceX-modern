@@ -37,7 +37,7 @@ const questions = [
   {
     question: "Combien coûte l’abonnement ?",
     answer:
-      "L’abonnement est proposé à 10 000 FCFA par mois. Chaque paiement confirmé ajoute un mois d’accès RaceX ; les paiements sont traités sur la plateforme Chariow.",
+      "L’abonnement est proposé à 8 000 FCFA par mois. Chaque paiement confirmé ajoute un mois d’accès RaceX ; les paiements sont traités sur la plateforme Chariow.",
   },
   {
     question: "Quand mon accès est-il activé après un paiement ?",
