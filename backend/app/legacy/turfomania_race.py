@@ -16,11 +16,9 @@ from model_functions import (
 )
 from turfomania_reunions import (
     BASE_URL,
-    FLAT_DISCIPLINES,
     HEADERS,
-    OBSTACLE_DISCIPLINES,
     TIMEOUT_SECONDS,
-    TROT_DISCIPLINES,
+    detect_race_type_from_text,
     _clean,
     _session,
 )
@@ -54,14 +52,7 @@ def _has_runner_table(html: str) -> bool:
 
 
 def detect_discipline(conditions_text: str) -> str | None:
-    lowered = (conditions_text or "").lower()
-    if any(d in lowered for d in TROT_DISCIPLINES):
-        return "trot"
-    if any(d in lowered for d in OBSTACLE_DISCIPLINES):
-        return "obstacles"
-    if "plat" in lowered:
-        return "flat"
-    return None
+    return detect_race_type_from_text(conditions_text)
 
 
 def parse_race_metadata(soup: BeautifulSoup, url: str) -> dict[str, Any]:

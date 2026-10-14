@@ -1,6 +1,7 @@
 from datetime import date
 
 from bs4 import BeautifulSoup
+import pytest
 from turfomania_reunions import parse_race_details
 from turfomania_reunions import parse_reunion
 
@@ -44,6 +45,23 @@ def test_parse_race_details_flat_without_q_plus() -> None:
     assert details["q_plus"] is False
     assert details["discipline"] == "plat"
     assert details["race_type"] == "flat"
+
+
+@pytest.mark.parametrize(
+    "discipline",
+    ["Haie", "Haies", "Steeple Chase", "Steeple-chase", "Cross-country", "Obstacle"],
+)
+def test_parse_race_details_recognizes_obstacle_discipline_variants(discipline: str) -> None:
+    details = parse_race_details(f"R1 C2 Prix de Nantes {discipline} - 3500m")
+
+    assert details["race_type"] == "obstacles"
+
+
+def test_parse_race_details_keeps_mixed_meeting_disciplines_per_race() -> None:
+    flat = parse_race_details("R1 C1 Prix de Nantes Plat - 1600m")
+    obstacles = parse_race_details("R1 C2 Prix de Nantes Haie - 3500m")
+
+    assert [flat["race_type"], obstacles["race_type"]] == ["flat", "obstacles"]
 
 
 def test_parse_reunion_excludes_non_partants_links() -> None:
@@ -146,6 +164,58 @@ def test_persist_skips_race_already_scraped() -> None:
     assert result["races_skipped"] == 1
     assert result["races"][0]["status"] == "scraped"
     assert client.inserts == []
+    assert client.updates == []
+
+
+def test_persist_repairs_stale_race_type_for_existing_scraped_race() -> None:
+    obstacle_card = {
+        **REUNIONS[0]["races"][0],
+        "text": "R1 C1 Prix de Nantes Haie - 3500m - 25000 € 12 partants",
+    }
+    reunions = [{**REUNIONS[0], "races": [obstacle_card]}]
+    client = _CatalogClient(
+        existing_meeting={"id": "meeting-1", "name": "Nantes", "source": "turfomania"},
+        existing_races={
+            "R1C1": {
+                "id": "race-9",
+                "race_key": "R1C1",
+                "status": "scraped",
+                "race_type": "flat",
+                "summary": {"runner_count": 12, "q_plus": False},
+            }
+        },
+    )
+
+    result = persist_turfomania_reunions(reunions, meeting_date=date(2026, 10, 14), client=client)
+
+    assert result["races_updated"] == 1
+    assert result["races"][0]["race_type"] == "obstacles"
+    assert client.updates[0][2]["race_type"] == "obstacles"
+    assert client.updates[0][2]["summary"]["runner_count"] == 12
+
+
+def test_persist_preserves_saved_type_when_catalog_card_has_no_discipline() -> None:
+    card = {**REUNIONS[0]["races"][0], "text": "R1 C1 Prix de Nantes - 3500m"}
+    client = _CatalogClient(
+        existing_meeting={"id": "meeting-1", "name": "Nantes", "source": "turfomania"},
+        existing_races={
+            "R1C1": {
+                "id": "race-9",
+                "race_key": "R1C1",
+                "status": "scraped",
+                "race_type": "obstacles",
+            }
+        },
+    )
+
+    result = persist_turfomania_reunions(
+        [{**REUNIONS[0], "races": [card]}],
+        meeting_date=date(2026, 10, 14),
+        client=client,
+    )
+
+    assert result["races_skipped"] == 1
+    assert result["races"][0]["race_type"] == "obstacles"
     assert client.updates == []
 
 

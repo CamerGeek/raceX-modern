@@ -102,6 +102,49 @@ def test_analyze_includes_model_predictions(monkeypatch) -> None:
     assert result.model_predictions.bet_list == [4]
 
 
+def test_obstacles_analysis_generates_report_with_model_predictions(monkeypatch) -> None:
+    frame = pd.DataFrame([{"N°": "4", "CHEVAL": "Runner"}])
+    analyzed = pd.DataFrame([{"N°": "4", "CHEVAL": "Runner", "Composite": 0.82}])
+    prediction = {
+        "status": "ready",
+        "model_version": "2026-10-05",
+        "bet_list": [4],
+        "rows": [{"NUMERO": 4, "place_prob": 0.75}],
+        "message": None,
+    }
+    monkeypatch.setattr(races, "analyze_race", lambda *_args, **_kwargs: (
+        analyzed,
+        pd.DataFrame([{"N°": "4"}]),
+        None,
+    ))
+    monkeypatch.setattr(races, "_legacy_sections", lambda *_args: [
+        {"title": "Fitness / IF", "columns": ["N°"], "rows": [{"N°": "4"}]},
+    ])
+    monkeypatch.setattr(
+        races,
+        "_flat_overview",
+        lambda *_args: pytest.fail("obstacles should not use the flat overview"),
+    )
+    monkeypatch.setattr(races, "predict_model_race", lambda *_args: prediction)
+
+    report = races._analysis_response(
+        frame,
+        race_type="obstacles",
+        source="turfomania",
+        include_handicap=True,
+        max_horses=8,
+    )
+
+    assert report.race_type == "obstacles"
+    assert report.row_count == 1
+    assert report.rows[0]["CHEVAL"] == "Runner"
+    assert report.prognosis[0]["CHEVAL"] == "Runner"
+    assert report.sections[0]["title"] == "Fitness / IF"
+    assert report.model_predictions is not None
+    assert report.model_predictions.status == "ready"
+    assert report.model_predictions.rows == [{"NUMERO": 4, "place_prob": 0.75}]
+
+
 @pytest.mark.parametrize("force_refresh", [False, True])
 def test_saved_race_analysis_uses_cache_unless_admin_forces_refresh(monkeypatch, force_refresh: bool) -> None:
     cache_response = AnalysisResponse(
@@ -300,6 +343,34 @@ def test_detect_turfomania_race_type_reads_race_conditions(monkeypatch) -> None:
     assert scraping_service.detect_turfomania_race_type(
         "https://www.turfomania.fr/pronostics/partants-race.html?idcourse=123"
     ) == "obstacles"
+
+
+def test_saved_turfomania_race_type_is_refreshed_from_individual_race_page(monkeypatch) -> None:
+    class Client:
+        updates: list[dict] = []
+
+        def select_one(self, *_args, **_kwargs):
+            return {
+                "id": "race-1",
+                "source": "turfomania",
+                "source_url": "https://www.turfomania.fr/pronostics/partants-race.html?idcourse=123",
+                "race_type": "flat",
+            }
+
+        def list(self, *_args, **_kwargs):
+            return [{"raw_data": {"N°": "4", "POIDS": 67}}]
+
+        def update(self, table, *, id_value, payload):
+            self.updates.append(payload)
+            return {"id": id_value, **payload}
+
+    client = Client()
+    monkeypatch.setattr(races, "detect_turfomania_race_type", lambda _url: "obstacles")
+
+    _, race = races._saved_frame(client, "race-1")
+
+    assert race["race_type"] == "obstacles"
+    assert client.updates == [{"race_type": "obstacles"}]
 
 
 def test_saved_turfomania_obstacle_race_repairs_legacy_flat_type() -> None:

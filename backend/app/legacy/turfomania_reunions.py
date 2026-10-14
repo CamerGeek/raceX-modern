@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 import requests
@@ -25,12 +26,25 @@ HEADERS = {
 TIMEOUT_SECONDS = 20
 
 TROT_DISCIPLINES = ("attelé", "monté")
-OBSTACLE_DISCIPLINES = ("steeple-chase", "steeple", "haies", "cross")
+OBSTACLE_DISCIPLINES = ("steeple-chase", "steeple", "haie", "cross", "obstacle", "hurdle")
 FLAT_DISCIPLINES = (*OBSTACLE_DISCIPLINES, "plat")
 
 
 def _clean(s):
     return re.sub(r"\s+", " ", s).strip()
+
+
+def detect_race_type_from_text(text: str) -> str | None:
+    normalized = unicodedata.normalize("NFKD", text or "")
+    normalized = normalized.encode("ascii", "ignore").decode("ascii").lower()
+    normalized = re.sub(r"[-_/]+", " ", normalized)
+    if re.search(r"\b(attele|monte)\b", normalized):
+        return "trot"
+    if re.search(r"\b(steeple(?:\s+chase)?|haies?|cross(?:\s+country)?|obstacles?|hurdles?)\b", normalized):
+        return "obstacles"
+    if re.search(r"\bplat\b", normalized):
+        return "flat"
+    return None
 
 
 def _session():
@@ -102,7 +116,12 @@ def parse_race_details(text: str) -> dict[str, Any]:
     prize = re.search(r"(\d[\d\s\u00a0]*)\s*€", text)
     starters = re.search(r"(\d+)\s*partants", text, re.IGNORECASE)
     start_time = re.search(r"\b(\d{1,2}h\d{2})\b", text, re.IGNORECASE)
-    discipline = next((name for name in (*TROT_DISCIPLINES, *FLAT_DISCIPLINES) if name in lowered), None)
+    discipline = next((name for name in TROT_DISCIPLINES if name in lowered), None)
+    if discipline is None:
+        discipline = next((name for name in OBSTACLE_DISCIPLINES if name in lowered), None)
+    if discipline is None:
+        discipline = "plat" if detect_race_type_from_text(lowered) == "flat" else None
+    race_type = detect_race_type_from_text(text) or "flat"
 
     return {
         "distance_m": int(distance.group(1)) if distance else None,
@@ -111,9 +130,5 @@ def parse_race_details(text: str) -> dict[str, Any]:
         "start_time": start_time.group(1) if start_time else None,
         "q_plus": "q+" in lowered,
         "discipline": discipline,
-        "race_type": (
-            "trot" if discipline in TROT_DISCIPLINES
-            else "obstacles" if discipline in OBSTACLE_DISCIPLINES
-            else "flat"
-        ),
+        "race_type": race_type,
     }

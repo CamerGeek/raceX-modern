@@ -54,6 +54,13 @@ def test_scrape_quinte_accepts_matching_meeting(monkeypatch: pytest.MonkeyPatch)
     assert turfomania_quinte_race_type(result.drop(columns=["POIDS"])) == "trot"
 
 
+def test_quinte_race_type_uses_obstacle_conditions_before_missing_weight_heuristic() -> None:
+    frame = _frame().drop(columns=["POIDS"])
+    frame["RACE_CONDITIONS"] = "Haies - 3600 mètres"
+
+    assert turfomania_quinte_race_type(frame) == "obstacles"
+
+
 @pytest.mark.parametrize(
     ("frame", "message"),
     [

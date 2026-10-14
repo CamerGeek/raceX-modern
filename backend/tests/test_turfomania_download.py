@@ -225,18 +225,30 @@ def test_rejects_non_turfomania_meeting() -> None:
         download_turfomania_meeting("m-1", client=client)
 
 
-def test_downloads_pending_races_and_skips_scraped(fake_manager) -> None:
+def test_downloads_pending_races_and_skips_scraped(fake_manager, monkeypatch: pytest.MonkeyPatch) -> None:
     races = [
         _race("r-2", "R1C2", "pending", "trot", number="2"),
         _race("r-1", "R1C1", "pending", "flat", number="1"),
         _race("r-3", "R1C3", "scraped", "trot", number="3"),
     ]
     client = _Client(MEETING, races)
+    auto_scraped_urls: list[str] = []
+
+    def auto_scrape(url: str, race_type=None, progress_callback=None, cancel_check=None) -> pd.DataFrame:
+        assert race_type is None
+        auto_scraped_urls.append(url)
+        frame = _fake_scrape(url, "flat")
+        frame["POIDS"] = 60
+        frame["RACE_CONDITIONS"] = "Plat - 1600 mètres"
+        return frame
+
+    monkeypatch.setattr(download_module, "scrape_turfomania_race", auto_scrape)
 
     result = download_turfomania_meeting("m-1", client=client)
 
     assert [call[0] for call in _fake_scrape.calls] == [races[1]["source_url"], races[0]["source_url"]]
     assert [call[1] for call in _fake_scrape.calls] == ["flat", "trot"]
+    assert auto_scraped_urls == [races[1]["source_url"]]
     assert result["race_count"] == 2
     assert result["runner_count"] == 4
     assert result["skipped_count"] == 1

@@ -16,7 +16,7 @@ import pandas as pd
 
 from data_sources import data_source_manager
 from turfomania_race import scrape_turfomania_race
-from turfomania_reunions import OBSTACLE_DISCIPLINES, _is_partants_url
+from turfomania_reunions import _is_partants_url, detect_race_type_from_text
 
 from app.services.meeting_persistence import persist_scraped_meeting
 from app.services.supabase_client import SupabaseClientWrapper
@@ -155,14 +155,13 @@ def download_turfomania_meeting(
 
 
 def _infer_race_type(frame: pd.DataFrame) -> str:
-    if "POIDS" not in frame.columns:
-        return "trot"
     text = " ".join(
         str(frame[col].iloc[0]) for col in ("RACE_CONDITIONS", "DESCRIPTIF") if col in frame.columns
-    ).lower()
-    if any(d in text for d in OBSTACLE_DISCIPLINES):
-        return "obstacles"
-    return "flat"
+    )
+    detected = detect_race_type_from_text(text)
+    if detected:
+        return detected
+    return "trot" if "POIDS" not in frame.columns else "flat"
 
 
 def _race_sort_key(race: dict[str, Any]) -> tuple[int, str]:

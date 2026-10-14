@@ -60,7 +60,18 @@ def _saved_frame(client: SupabaseClientWrapper, race_id: str) -> tuple[pd.DataFr
     table = "trot_race_runners" if race["race_type"] == "trot" else "flat_race_runners"
     rows = client.list(table, filters=[("race_id", "eq", race_id)], limit=1000, order_by=("runner_number", "asc"))
     frame = pd.DataFrame([row.get("raw_data") if isinstance(row.get("raw_data"), dict) else row for row in rows])
-    if not frame.empty and race.get("source") == "turfomania" and race.get("race_type") in {None, "flat"}:
+    source_url = str(race.get("source_url") or "")
+    is_turfomania_race_page = (
+        race.get("source") == "turfomania"
+        and "/pronostics/partants-" in source_url
+        and "idcourse=" in source_url
+    )
+    if is_turfomania_race_page:
+        inferred_type = detect_turfomania_race_type(source_url)
+        if race.get("race_type") != inferred_type:
+            race = {**race, "race_type": inferred_type}
+            client.update("races", id_value=race_id, payload={"race_type": inferred_type})
+    elif not frame.empty and race.get("source") == "turfomania" and race.get("race_type") in {None, "flat"}:
         inferred_type = _infer_race_type(frame)
         if inferred_type != race.get("race_type"):
             race = {**race, "race_type": inferred_type}

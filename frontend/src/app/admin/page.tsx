@@ -352,11 +352,15 @@ function AdminPageContent() {
     setUrl(race?.url ?? meetingUrl);
     setAnalysis(null);
     setScrapeResult(null);
-    setDetectingType(Boolean(race && !race.race_type));
-    if (!race) return;
+    const shouldDetectType = Boolean(race && (!race.race_type || isTurfomaniaMeeting));
+    setDetectingType(shouldDetectType);
+    if (!race) {
+      setDetectingType(false);
+      return;
+    }
 
     let selectedRaceOption = race;
-    if (!race.race_type) {
+    if (shouldDetectType) {
       setDetectingType(true);
       try {
         const response = await apiFetch(

@@ -8,7 +8,7 @@ from typing import Any
 import pandas as pd
 
 from turfomania_race import scrape_turfomania_race
-from turfomania_reunions import OBSTACLE_DISCIPLINES
+from turfomania_reunions import detect_race_type_from_text
 
 QUINTE_URL = "https://www.turfomania.fr/quinte/"
 
@@ -101,14 +101,13 @@ def _validate_quinte_frame(meeting: dict[str, Any], source_frame: pd.DataFrame) 
 
 
 def turfomania_quinte_race_type(frame: pd.DataFrame) -> str:
-    if "POIDS" not in frame.columns:
-        return "trot"
     text = " ".join(
         str(frame[col].iloc[0]) for col in ("RACE_CONDITIONS", "DESCRIPTIF") if col in frame.columns
-    ).lower()
-    if any(d in text for d in OBSTACLE_DISCIPLINES):
-        return "obstacles"
-    return "flat"
+    )
+    detected = detect_race_type_from_text(text)
+    if detected:
+        return detected
+    return "trot" if "POIDS" not in frame.columns else "flat"
 
 
 def _same_track(first: str, second: str) -> bool:

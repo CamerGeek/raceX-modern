@@ -117,6 +117,15 @@ def _upsert_catalog_race(client: SupabaseClientWrapper, *, meeting_id: str, card
         return client.insert("races", payload), "created"
     if existing.get("status") == "pending":
         return client.update("races", id_value=existing["id"], payload=payload), "updated"
+    if details["discipline"] and existing.get("race_type") != details["race_type"]:
+        return client.update(
+            "races",
+            id_value=existing["id"],
+            payload={
+                "race_type": details["race_type"],
+                "summary": {**(existing.get("summary") or {}), **details},
+            },
+        ), "updated"
     return existing, "skipped"
 
 
