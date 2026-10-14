@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import requests
 
 from app.core.config import get_settings
+from app.services.subscription_plans import SubscriptionPlan
 
 logger = logging.getLogger(__name__)
 CHARIOW_API_URL = "https://api.chariow.com/v1/checkout"
@@ -42,18 +43,20 @@ def create_checkout(
     last_name: str,
     phone_number: str,
     phone_country_code: str,
+    plan: SubscriptionPlan,
 ) -> str:
     settings = get_settings()
     api_key = settings.chariow_api_key.strip()
     if not api_key:
         raise ChariowCheckoutError("Chariow checkout is not configured")
+    product_id = settings.chariow_plan_product_ids[plan.value]
 
     try:
         response = requests.post(
             CHARIOW_API_URL,
             headers={"Authorization": f"Bearer {api_key}"},
             json={
-                "product_id": settings.chariow_product_id,
+                "product_id": product_id,
                 "email": email,
                 "first_name": first_name,
                 "last_name": last_name,

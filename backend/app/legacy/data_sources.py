@@ -21,6 +21,11 @@ class RaceDataSource(ABC):
         """Scrape trot race data"""
         pass
 
+    @abstractmethod
+    def scrape_obstacles(self, url, progress_callback=None):
+        """Scrape obstacle race data"""
+        pass
+
 
 class ZoneTurfDataSource(RaceDataSource):
     """Data source for zone-turf.fr"""
@@ -43,6 +48,12 @@ class ZoneTurfDataSource(RaceDataSource):
         from zone_trot import scrape_zone_turf_trot
         return scrape_zone_turf_trot(url, progress_callback=progress_callback, cancel_check=cancel_check)
 
+    def scrape_obstacles(self, url, progress_callback=None, cancel_check=None):
+        """Scrape obstacle races from zone-turf (same layout as flat races)."""
+        print(f"[INFO] Scraping obstacle races from {self.name}: {url}")
+        from flat_zone import scrape_zone_turf as scrape_zone_turf_flat
+        return scrape_zone_turf_flat(url, progress_callback=progress_callback, cancel_check=cancel_check)
+
 
 class TurfomaniaDataSource(RaceDataSource):
     """Data source for turfomania.fr"""
@@ -62,6 +73,12 @@ class TurfomaniaDataSource(RaceDataSource):
         print(f"[INFO] Scraping trot race from {self.name}: {url}")
         from turfomania_race import scrape_turfomania_trot
         return scrape_turfomania_trot(url, progress_callback=progress_callback, cancel_check=cancel_check)
+
+    def scrape_obstacles(self, url, progress_callback=None, cancel_check=None):
+        """Scrape an obstacle race from turfomania (one URL per race)"""
+        print(f"[INFO] Scraping obstacle race from {self.name}: {url}")
+        from turfomania_race import scrape_turfomania_obstacles
+        return scrape_turfomania_obstacles(url, progress_callback=progress_callback, cancel_check=cancel_check)
 
 
 class DataSourceManager:
@@ -103,6 +120,8 @@ class DataSourceManager:
             return source.scrape_flat(url, progress_callback=progress_callback, cancel_check=cancel_check)
         elif race_type.lower() == 'trot':
             return source.scrape_trot(url, progress_callback=progress_callback, cancel_check=cancel_check)
+        elif race_type.lower() == 'obstacles':
+            return source.scrape_obstacles(url, progress_callback=progress_callback, cancel_check=cancel_check)
         else:
             raise ValueError(f"Invalid race type: {race_type}")
 

@@ -25,7 +25,8 @@ HEADERS = {
 TIMEOUT_SECONDS = 20
 
 TROT_DISCIPLINES = ("attelé", "monté")
-FLAT_DISCIPLINES = ("steeple-chase", "steeple", "haies", "cross", "plat")
+OBSTACLE_DISCIPLINES = ("steeple-chase", "steeple", "haies", "cross")
+FLAT_DISCIPLINES = (*OBSTACLE_DISCIPLINES, "plat")
 
 
 def _clean(s):
@@ -110,5 +111,9 @@ def parse_race_details(text: str) -> dict[str, Any]:
         "start_time": start_time.group(1) if start_time else None,
         "q_plus": "q+" in lowered,
         "discipline": discipline,
-        "race_type": "trot" if discipline in TROT_DISCIPLINES else "flat",
+        "race_type": (
+            "trot" if discipline in TROT_DISCIPLINES
+            else "obstacles" if discipline in OBSTACLE_DISCIPLINES
+            else "flat"
+        ),
     }

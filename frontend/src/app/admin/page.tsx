@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import SiteNavigation from "../site-navigation";
 import AccessGate from "../access-gate";
 import { useAuth } from "../auth-context";
+import { VotePickCard } from "../quinte-recommendations";
 
 type Horse = Record<string, string | number | boolean | null>;
 type AnalysisSection = { title: string; columns: string[]; rows: Horse[] };
@@ -15,7 +16,7 @@ type FlatOverview = { prognosis: Horse[]; summary: Horse[]; upset_potential: Hor
 type Analysis = {
   race_id?: string;
   row_count: number;
-  race_type: "flat" | "trot";
+  race_type: "flat" | "trot" | "obstacles";
   source: string;
   columns: string[];
   rows: Horse[];
@@ -31,7 +32,7 @@ type Analysis = {
 };
 
 type ScrapeResult = {
-  race_type: "flat" | "trot";
+  race_type: "flat" | "trot" | "obstacles" | null;
   runner_table: string;
   race_count: number;
   runner_count: number;
@@ -40,7 +41,7 @@ type ScrapeResult = {
   already_stored?: boolean;
 };
 
-type RaceOption = { id: string; race_key: string; url: string; race_type?: "flat" | "trot"; q_plus?: boolean };
+type RaceOption = { id: string; race_key: string; url: string; race_type?: "flat" | "trot" | "obstacles"; q_plus?: boolean };
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -153,7 +154,7 @@ function AdminPageContent() {
   const [meetingsLoading, setMeetingsLoading] = useState(true);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [showManualUrl, setShowManualUrl] = useState(false);
-  const [raceType, setRaceType] = useState<"flat" | "trot">("trot");
+  const [raceType, setRaceType] = useState<"flat" | "trot" | "obstacles">("trot");
   const [typeSource, setTypeSource] = useState<"automatic" | "manual">("automatic");
   const [detectingType, setDetectingType] = useState(false);
   const [includeHandicap, setIncludeHandicap] = useState(true);
@@ -179,6 +180,7 @@ function AdminPageContent() {
   const topOdds = topHorse ? field(topHorse, ["COTE", "Cote", "Odds"]) : "-";
   const selectedMeetingLabel = Object.entries(meetings).find(([, meeting]) => meeting === meetingUrl)?.[0] ?? "Selected meeting";
   const selectedRaceLabel = races.find((race) => race.id === selectedRace)?.race_key ?? "Race report";
+  const isTurfomaniaMeeting = meetingUrl.startsWith("turfomania://meetings/");
 
   useEffect(() => {
     let cancelled = false;
@@ -232,14 +234,12 @@ function AdminPageContent() {
   }
 
   useEffect(() => {
-    if (!url || showManualUrl) return;
-    const isTurfomaniaRaceUrl = meetingUrl.startsWith("turfomania://") && url !== meetingUrl;
-    if (isTurfomaniaRaceUrl) return;
+    if (!url || showManualUrl || selectedRace || url.startsWith("turfomania://meetings/")) return;
     let cancelled = false;
     apiFetch(`${apiUrl}/api/v1/races/detect-type?url=${encodeURIComponent(url)}`)
       .then(async (response) => {
         if (!response.ok) throw new Error("Race type detection failed");
-        return response.json() as Promise<{ race_type: "flat" | "trot" }>;
+        return response.json() as Promise<{ race_type: "flat" | "trot" | "obstacles" }>;
       })
       .then((payload) => {
         if (!cancelled) { setRaceType(payload.race_type); setTypeSource("automatic"); }
@@ -247,7 +247,7 @@ function AdminPageContent() {
       .catch(() => { if (!cancelled) setTypeSource("manual"); })
       .finally(() => { if (!cancelled) setDetectingType(false); });
     return () => { cancelled = true; };
-  }, [apiFetch, url, showManualUrl, meetingUrl]);
+  }, [apiFetch, url, showManualUrl, selectedRace]);
 
   function selectMeeting(nextUrl: string) {
     setMeetingUrl(nextUrl);
@@ -256,7 +256,7 @@ function AdminPageContent() {
     setRaces([]);
     setSelectedRace("");
     setStoredMeeting(null);
-    setDetectingType(Boolean(nextUrl));
+    setDetectingType(Boolean(nextUrl) && !nextUrl.startsWith("turfomania://meetings/"));
     setAnalysis(null);
     setScrapeResult(null);
     setError("");
@@ -310,7 +310,10 @@ function AdminPageContent() {
     }
   }
 
-  async function analyzeSelectedRace(race: RaceOption | undefined = races.find((race) => race.id === selectedRace)) {
+  async function analyzeSelectedRace(
+    race: RaceOption | undefined = races.find((race) => race.id === selectedRace),
+    forceRefresh = false,
+  ) {
     if (!race) return;
     setLoading(true);
     setError("");
@@ -321,11 +324,16 @@ function AdminPageContent() {
       const response = await apiFetch(`${apiUrl}/api/v1/races/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: race.url, race_id: race.id, race_type: race.race_type ?? raceType, source, include_handicap: includeHandicap, max_horses: 8 }),
+        body: JSON.stringify({ url: race.url, race_id: race.id, race_type: race.race_type ?? raceType, source, include_handicap: includeHandicap, max_horses: 8, force_refresh: forceRefresh }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail ?? "Race analysis failed");
       setUrl(race.url);
+      setRaceType(payload.race_type);
+      setTypeSource("automatic");
+      setRaces((previous) => previous.map((item) =>
+        item.id === race.id ? { ...item, race_type: payload.race_type } : item,
+      ));
       setAnalysis(payload as Analysis);
       setSelectionExpanded(false);
       setReportTab("overview");
@@ -336,6 +344,40 @@ function AdminPageContent() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function selectRace(raceId: string) {
+    const race = races.find((item) => item.id === raceId);
+    setSelectedRace(raceId);
+    setUrl(race?.url ?? meetingUrl);
+    setAnalysis(null);
+    setScrapeResult(null);
+    setDetectingType(Boolean(race && !race.race_type));
+    if (!race) return;
+
+    let selectedRaceOption = race;
+    if (!race.race_type) {
+      setDetectingType(true);
+      try {
+        const response = await apiFetch(
+          `${apiUrl}/api/v1/races/detect-type?url=${encodeURIComponent(race.url)}`,
+        );
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail ?? "Race type detection failed");
+        selectedRaceOption = { ...race, race_type: payload.race_type };
+        setRaces((previous) => previous.map((item) =>
+          item.id === race.id ? selectedRaceOption : item,
+        ));
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : "Race type detection failed");
+        return;
+      } finally {
+        setDetectingType(false);
+      }
+    }
+    setRaceType(selectedRaceOption.race_type ?? raceType);
+    setTypeSource("automatic");
+    void analyzeSelectedRace(selectedRaceOption);
   }
 
   async function analyzeTurfomaniaQuinte() {
@@ -353,6 +395,7 @@ function AdminPageContent() {
           meeting_id: meetingUrl.slice(prefix.length),
           include_handicap: includeHandicap,
           max_horses: 8,
+          force_refresh: true,
         }),
       });
       const payload = await response.json() as Analysis;
@@ -383,7 +426,7 @@ function AdminPageContent() {
     }
   }
 
-  async function loadBettingTab(tab: "simulation" | "combinations") {
+  async function loadBettingTab(tab: "simulation" | "combinations", forceRefresh = false) {
     const race = races.find((item) => item.id === selectedRace);
     if (!race) return;
     setReportTab(tab);
@@ -392,8 +435,8 @@ function AdminPageContent() {
     try {
       const endpoint = tab === "simulation" ? "simulate" : "combinations";
       const body = tab === "simulation"
-        ? { race_id: race.id, race_type: race.race_type ?? raceType, simulations: 5000 }
-        : { race_id: race.id, race_type: race.race_type ?? raceType, combination_size: 5, max_combinations: 50, mandatory: [], excluded: [] };
+        ? { race_id: race.id, race_type: race.race_type ?? raceType, simulations: 5000, force_refresh: forceRefresh }
+        : { race_id: race.id, race_type: race.race_type ?? raceType, combination_size: 5, max_combinations: 50, mandatory: [], excluded: [], force_refresh: forceRefresh };
       const response = await apiFetch(`${apiUrl}/api/v1/races/${endpoint}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail ?? `${tab} failed`);
@@ -441,38 +484,32 @@ function AdminPageContent() {
           {storedMeeting && <p className="stored-notice" role="status">Already saved. Choose a race below, or enable fresh download.</p>}
           {races.length > 0 && <>
             <label htmlFor="race-select">Races in meeting</label>
-            <select id="race-select" value={selectedRace} onChange={(event) => {
-              const next = races.find((race) => race.id === event.target.value);
-              setSelectedRace(event.target.value);
-              setUrl(next?.url ?? meetingUrl);
-              setAnalysis(null);
-              setScrapeResult(null);
-              if (next) void analyzeSelectedRace(next);
-            }}>
+            <select id="race-select" value={selectedRace} onChange={(event) => void selectRace(event.target.value)}>
               <option value="">Choose a REF_COURSE</option>
-              {races.map((race) => <option value={race.id} key={race.id}>{race.race_key}{race.q_plus ? " · Q+" : ""}</option>)}
+              {races.map((race) => <option value={race.id} key={race.id}>{race.race_key}{race.race_type ? ` · ${race.race_type}` : ""}{race.q_plus ? " · Q+" : ""}</option>)}
             </select>
           </>}
           {storedMeeting && <label className="toggle"><input type="checkbox" checked={forceRefresh} onChange={(event) => setForceRefresh(event.target.checked)} /><span>Download meeting again</span></label>}
           <button type="button" className="manual-toggle" onClick={() => setShowManualUrl((visible) => !visible)}>{showManualUrl ? "Use meeting picker" : "Enter a race URL manually"}<span>↗</span></button>
           {showManualUrl && <><label htmlFor="race-url">Race URL</label><input id="race-url" type="url" required value={url} onChange={(event) => { setUrl(event.target.value); setTypeSource("automatic"); }} placeholder="https://www.zone-turf.fr/..." /></>}
 
-          <div className="control-row">
+          {(!isTurfomaniaMeeting || selectedRace || showManualUrl) && <div className="control-row">
             <div>
               <div className="type-label"><span className="label">Discipline</span><span className={typeSource === "automatic" ? "auto-badge" : "manual-badge"}>{detectingType ? "Detecting..." : typeSource === "automatic" ? "Auto-detected" : "Manual override"}</span></div>
               <div className="segmented">
                 <button type="button" className={raceType === "trot" ? "selected" : ""} onClick={() => { setRaceType("trot"); setTypeSource("manual"); }}>Trot</button>
                 <button type="button" className={raceType === "flat" ? "selected" : ""} onClick={() => { setRaceType("flat"); setTypeSource("manual"); }}>Flat</button>
+                <button type="button" className={raceType === "obstacles" ? "selected" : ""} onClick={() => { setRaceType("obstacles"); setTypeSource("manual"); }}>Obstacles</button>
               </div>
             </div>
             <label className="toggle"><input type="checkbox" checked={includeHandicap} onChange={(event) => setIncludeHandicap(event.target.checked)} /><span>Handicap mechanics</span></label>
-          </div>
+          </div>}
 
           <button className="analyze-button" type="submit" disabled={loading || detectingType || !meetingUrl && !url}>{loading ? "Saving meeting..." : storedMeeting && !forceRefresh ? "Load saved meeting" : "Download & save meeting"}<span aria-hidden="true">↗</span></button>
-          {selectedRace && <button className="analyze-button" type="button" onClick={() => void analyzeSelectedRace()} disabled={loading || detectingType}>{loading ? "Analyzing race..." : "Re-run analysis"}<span aria-hidden="true">↗</span></button>}
+          {selectedRace && <button className="analyze-button" type="button" onClick={() => void analyzeSelectedRace(undefined, true)} disabled={loading || detectingType}>{loading ? "Analyzing race..." : "Re-run analysis"}<span aria-hidden="true">↗</span></button>}
           {meetingUrl.startsWith("turfomania://meetings/") && !showManualUrl && <>
             <button className="analyze-button quinte-button" type="button" onClick={() => void analyzeTurfomaniaQuinte()} disabled={loading || meetingDate !== today}>
-              {loading ? "Scraping & analyzing Quinté+..." : "Scrape & analyze today’s Quinté+"}<span aria-hidden="true">↗</span>
+            {loading ? "Refreshing Quinté analysis..." : "Refresh today’s Quinté analysis"}<span aria-hidden="true">↗</span>
             </button>
             {meetingDate !== today && <p className="stored-notice">The generic Turfomania Quinté page only provides the current day’s race.</p>}
           </>}
@@ -536,7 +573,7 @@ function AdminPageContent() {
               <div className="overview-card"><h3>Odds divergence</h3><p>Composite rank versus market rank</p><ol>{analysis.overview.odds_divergence.slice(0, 8).map((horse, index) => <li key={`divergence-${index}`}><strong>{field(horse, ["N", "N°", "Numero"])}</strong><span>{field(horse, ["Cheval", "CHEVAL"], "Unknown")}</span><b>{formatValue(horse.Divergence)}</b></li>)}</ol></div>
               <div className="overview-card starting-post-card"><h3>Best starting posts</h3><p>{analysis.overview.track || "Track unavailable"}{analysis.overview.distance ? ` / ${analysis.overview.distance}m` : ""}</p>{analysis.overview.best_starting_posts.length ? <div className="post-list">{analysis.overview.best_starting_posts.map((horseNumber) => <span key={horseNumber}>{horseNumber}</span>)}</div> : <strong className="muted-result">No track-specific post data</strong>}</div>
             </div>}
-            {analysis.model_predictions && <div className="overview-grid"><article className="overview-card"><h3>Model shortlist</h3><p>Top 8 horses sorted by deep score</p>{analysis.model_predictions.status === "ready" ? <div className="post-list">{modelOverviewRows.map((horse, index) => <span key={`shortlist-${field(horse, ["NUMERO", "N°", "N"], String(index))}`}>{field(horse, ["NUMERO", "N°", "N"], String(index + 1))}</span>)}</div> : <strong className="muted-result">{analysis.model_predictions.message}</strong>}</article></div>}
+            {analysis.model_predictions && <div className="overview-grid"><article className="overview-card"><h3>Model shortlist</h3><p>Top 8 horses sorted by deep score</p>{analysis.model_predictions.status === "ready" ? <div className="post-list">{modelOverviewRows.map((horse, index) => <span key={`shortlist-${field(horse, ["NUMERO", "N°", "N"], String(index))}`}>{field(horse, ["NUMERO", "N°", "N"], String(index + 1))}</span>)}</div> : <strong className="muted-result">{analysis.model_predictions.message}</strong>}</article><VotePickCard predictions={analysis.model_predictions} /></div>}
             </>}
             {reportTab === "model" && analysis.model_predictions && <div className="report-section"><div className="section-title"><span>ML</span><h3>Model shortlist</h3><p>{analysis.model_predictions.status === "ready" ? `${modelShortlistRows.length} horses · sorted by deep score` : analysis.model_predictions.status}</p></div>{analysis.model_predictions.status === "ready" ? <><p className="muted-result">Class-balanced model scores are useful for ranking, not as calibrated probabilities. Model {analysis.model_predictions.model_version ?? "version unavailable"}.</p><div className="table-scroll-hint" aria-hidden="true">Swipe to see all columns <span>→</span></div><div className="table-wrap"><table><thead><tr><th>Rank</th><th>Horse</th><th>Place score</th><th>Deep score</th><th>Win score</th><th>Dark-horse score</th><th>Votes</th><th>Priority tier</th></tr></thead><tbody>{modelShortlistRows.map((horse, index) => <tr key={`model-${field(horse, ["NUMERO", "N°", "N"], String(index))}`}><td className="rank">{index + 1}</td><td>{field(horse, ["NUMERO", "N°", "N"], "-")} / {field(horse, ["CHEVAL", "Cheval"], "Unknown")}</td><td>{formatValue(horse.place_prob)}</td><td>{formatValue(horse.place_prob_deep)}</td><td>{formatValue(horse.p_win)}</td><td>{formatValue(horse.dark_prob)}</td><td>{formatValue(horse.votes)}</td><td>{formatValue(horse.bet_tier)}</td></tr>)}</tbody></table></div></> : <p className="muted-result">{analysis.model_predictions.message}</p>}</div>}
             {reportTab === "composite" && <>
@@ -550,8 +587,8 @@ function AdminPageContent() {
               </article>;
             }); })()}</div></div>
             </>}
-            {reportTab === "simulation" && <div className="report-section"><div className="section-title"><span>MC</span><h3>Monte Carlo simulation</h3><p>5,000 simulated race orders</p></div>{bettingLoading && <p className="muted-result">Running simulation...</p>}{bettingError && <p className="error">{bettingError}</p>}{!bettingLoading && !bettingError && <><div className="table-scroll-hint" aria-hidden="true">Swipe to see all columns <span>→</span></div><div className="table-wrap"><table><thead><tr><th>Horse</th><th>Win probability</th><th>Top-3 probability</th><th>Average rank</th></tr></thead><tbody>{simulationRows.slice(0, 16).map((horse, index) => <tr key={`sim-${index}`}><td>{field(horse, ["N°", "N"], "-")} / {field(horse, ["Cheval", "CHEVAL"], "Unknown")}</td><td>{(horse.win_probability * 100).toFixed(1)}%</td><td>{(horse.podium_probability * 100).toFixed(1)}%</td><td>{horse.average_simulated_rank.toFixed(2)}</td></tr>)}</tbody></table></div></>}</div>}
-            {reportTab === "combinations" && <div className="report-section"><div className="section-title"><span>COMB</span><h3>Generated combinations</h3><p>{combinations.length} tickets / 5 horses</p></div>{bettingLoading && <p className="muted-result">Generating combinations...</p>}{bettingError && <p className="error">{bettingError}</p>}{!bettingLoading && !bettingError && <div className="combination-grid">{combinations.map((combination, index) => <div className="combination-row" key={`combo-${index}`}><strong>{String(index + 1).padStart(2, "0")}</strong>{combination.map((horse) => <span key={horse}>{horse}</span>)}</div>)}</div>}</div>}
+            {reportTab === "simulation" && <div className="report-section"><div className="section-title"><span>MC</span><h3>Monte Carlo simulation</h3><p>5,000 simulated race orders</p><button type="button" className="cache-refresh-button" onClick={() => void loadBettingTab("simulation", true)} disabled={bettingLoading}>Recalculate</button></div>{bettingLoading && <p className="muted-result">Running simulation...</p>}{bettingError && <p className="error">{bettingError}</p>}{!bettingLoading && !bettingError && <><div className="table-scroll-hint" aria-hidden="true">Swipe to see all columns <span>→</span></div><div className="table-wrap"><table><thead><tr><th>Horse</th><th>Win probability</th><th>Top-3 probability</th><th>Average rank</th></tr></thead><tbody>{simulationRows.slice(0, 16).map((horse, index) => <tr key={`sim-${index}`}><td>{field(horse, ["N°", "N"], "-")} / {field(horse, ["Cheval", "CHEVAL"], "Unknown")}</td><td>{(horse.win_probability * 100).toFixed(1)}%</td><td>{(horse.podium_probability * 100).toFixed(1)}%</td><td>{horse.average_simulated_rank.toFixed(2)}</td></tr>)}</tbody></table></div></>}</div>}
+            {reportTab === "combinations" && <div className="report-section"><div className="section-title"><span>COMB</span><h3>Generated combinations</h3><p>{combinations.length} tickets / 5 horses</p><button type="button" className="cache-refresh-button" onClick={() => void loadBettingTab("combinations", true)} disabled={bettingLoading}>Recalculate</button></div>{bettingLoading && <p className="muted-result">Generating combinations...</p>}{bettingError && <p className="error">{bettingError}</p>}{!bettingLoading && !bettingError && <div className="combination-grid">{combinations.map((combination, index) => <div className="combination-row" key={`combo-${index}`}><strong>{String(index + 1).padStart(2, "0")}</strong>{combination.map((horse) => <span key={horse}>{horse}</span>)}</div>)}</div>}</div>}
             {reportTab === "overview" && <>
             <div className="report-section"><div className="section-title"><span>02</span><h3>Handicap mechanics</h3><p>Distance and penalty signals</p></div><div className="handicap-panel"><strong>{analysis.handicap?.distance ? `${analysis.handicap.distance}m handicap` : "No distance handicap detected"}</strong><span>{analysis.handicap ? `${analysis.handicap.penalized_count} runners carry a penalty` : "The field is compared without a distance adjustment."}</span></div></div>
             </>}

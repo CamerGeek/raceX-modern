@@ -85,7 +85,7 @@ class MeetingScrapeRequest(BaseModel):
     meeting_date: date = Field(alias="date")
     meeting_url: str = Field(min_length=1)
     meeting_name: str | None = None
-    race_type: Literal["flat", "trot"] | None = None
+    race_type: Literal["flat", "trot", "obstacles"] | None = None
     source: str = "zone-turf"
     force_refresh: bool = False
 
@@ -123,6 +123,6 @@ def _scrape_turfomania_meeting(meeting_id: str | None, request: MeetingScrapeReq
     if not bundle:
         raise HTTPException(status_code=404, detail=f"Turfomania meeting {meeting_id} not found")
     if not request.force_refresh and bundle["races"] and all(race.get("status") in STORED_STATUSES for race in bundle["races"]):
-        return {"already_stored": True, "meeting": bundle["meeting"], "races": [_race_option(race) for race in bundle["races"]], "race_type": bundle["races"][0].get("race_type") if bundle["races"] else None}
+        return {"already_stored": True, "meeting": bundle["meeting"], "races": [_race_option(race) for race in bundle["races"]], "race_type": None}
     result = download_turfomania_meeting(meeting_id, force_refresh=request.force_refresh)
-    return result | {"race_type": result["races"][0].get("race_type") if result["races"] else None}
+    return result | {"race_type": None}

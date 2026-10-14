@@ -23,7 +23,7 @@ type FlatOverview = {
 };
 type Analysis = {
   race_id: string;
-  race_type: "flat" | "trot";
+  race_type: "flat" | "trot" | "obstacles";
   row_count: number;
   rows: Horse[];
   race_details: string;
@@ -120,7 +120,9 @@ function shoeingDescription(horse: Horse) {
 
 function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
   const isFlat = analysis.race_type === "flat";
-  const flatCards = isFlat
+  const isTrot = analysis.race_type === "trot";
+  const isObstacles = analysis.race_type === "obstacles";
+  const disciplineCards = isFlat
     ? [
         {
           title: "Régularité des signaux",
@@ -137,7 +139,8 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
           metricLabel: "Écart",
         },
       ]
-    : [
+    : isTrot
+    ? [
         {
           title: "Prognosis trot",
           description: "Synthèse des signaux propres au trot",
@@ -166,10 +169,26 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
           metricKeys: ["DQ_Risk_Amplified", "DQ_Risk"],
           metricLabel: "Risque",
         },
-      ];
+      ]
+    : [];
 
-  const fitnessRows = isFlat ? [] : sectionRows(analysis, "Fitness (FA/FM)").slice(0, 4);
-  const shoeingRows = isFlat ? [] : sectionRows(analysis, "Shoeing Strategy").slice(0, 4);
+  const fitnessRows = isTrot ? sectionRows(analysis, "Fitness (FA/FM)").slice(0, 4) : [];
+  const shoeingRows = isTrot ? sectionRows(analysis, "Shoeing Strategy").slice(0, 4) : [];
+  const obstacleModelRows = isObstacles
+    ? (analysis.model_predictions?.rows ?? [])
+        .map((horse) => {
+          const rawScore = firstValue(horse, ["place_prob_avg", "place_prob_deep", "place_prob"])
+            .trim()
+            .replace(",", ".");
+          const score = rawScore ? Number(rawScore) : null;
+          return { horse, score };
+        })
+        .filter((item): item is { horse: Horse; score: number } =>
+          item.score !== null && Number.isFinite(item.score),
+        )
+        .sort((first, second) => second.score - first.score)
+        .slice(0, 4)
+    : [];
   const bestPosts = analysis.overview?.best_starting_posts ?? [];
   const track = analysis.overview?.track ?? "";
   const distance = analysis.overview?.distance ?? 0;
@@ -179,16 +198,20 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
       <div className="subscriber-section-heading">
         <div>
           <p className="public-kicker">FACTEURS PROPRES À LA DISCIPLINE</p>
-          <h2 id="subscriber-discipline-title">{isFlat ? "Repères du plat" : "Repères du trot"}</h2>
+          <h2 id="subscriber-discipline-title">
+            {isFlat ? "Repères du plat" : isTrot ? "Repères du trot" : "Repères des obstacles"}
+          </h2>
           <p>
             {isFlat
               ? "Régularité, écart au marché et avantage des stalles lorsque ces données sont disponibles."
-              : "Performance, forme, ferrure et risque de disqualification selon les données disponibles."}
+              : isTrot
+              ? "Performance, forme, ferrure et risque de disqualification selon les données disponibles."
+              : "Classement établi par les modèles dédiés aux courses d’obstacles."}
           </p>
         </div>
       </div>
       <div className="subscriber-discipline-grid">
-        {flatCards.map((card) => {
+        {disciplineCards.map((card) => {
           const rows = card.rows.slice(0, 4);
           if (!rows.length) return null;
           return (
@@ -207,6 +230,21 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
             </article>
           );
         })}
+        {isObstacles && obstacleModelRows.length > 0 && (
+          <article className="subscriber-discipline-card">
+            <h3>Classement du modèle obstacles</h3>
+            <p>Scores de classement du modèle dédié, et non probabilités calibrées.</p>
+            <ol>
+              {obstacleModelRows.map(({ horse, score }, index) => (
+                <li key={`${horseNumber(horse)}-${index}`}>
+                  <strong>{horseNumber(horse)}</strong>
+                  <span>{horseName(horse)}</span>
+                  <b>{formatMetric(String(score))}</b>
+                </li>
+              ))}
+            </ol>
+          </article>
+        )}
         {isFlat && bestPosts.length > 0 && (
           <article className="subscriber-discipline-card subscriber-posts-card">
             <h3>Stalles favorables</h3>
@@ -336,7 +374,7 @@ function SubscriberDashboard() {
         </div>
       </header>
 
-      {loading && <section className="subscriber-state" role="status">Chargement de l’analyse et des partants…</section>}
+      {loading && <section className="subscriber-state" role="status">Chargement de l’analyse enregistrée…</section>}
       {!loading && error && (
         <section className="subscriber-state subscriber-error" role="alert">
           <p>{error}</p>
@@ -352,7 +390,7 @@ function SubscriberDashboard() {
             {venue && <div><span>HIPPODROME</span><strong>{venue}</strong></div>}
             {distance && <div><span>DISTANCE</span><strong>{distance}</strong></div>}
             <div><span>PARTANTS ANALYSÉS</span><strong>{analysis.row_count}</strong></div>
-            <div><span>DISCIPLINE</span><strong>{analysis.race_type === "flat" ? "Plat" : "Trot"}</strong></div>
+            <div><span>DISCIPLINE</span><strong>{analysis.race_type === "flat" ? "Plat" : analysis.race_type === "obstacles" ? "Obstacles" : "Trot"}</strong></div>
           </section>
 
           {leadingHorse && (

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.api.auth import _add_month, _is_active
+from app.api.auth import _is_active
 from app.services import auth_service
 from app.services.auth_service import effective_role
 from fastapi.security import HTTPAuthorizationCredentials
@@ -35,12 +35,6 @@ def test_active_subscriber_keeps_access_until_expiry() -> None:
 
     assert effective_role(profile, now=datetime(2026, 10, 8, tzinfo=timezone.utc)) == "subscriber"
     assert effective_role(profile, now=datetime(2026, 11, 9, tzinfo=timezone.utc)) == "simple"
-
-
-def test_calendar_month_extension_handles_month_end() -> None:
-    assert _add_month(datetime(2026, 1, 31, 12, tzinfo=timezone.utc)) == datetime(
-        2026, 2, 28, 12, tzinfo=timezone.utc
-    )
 
 
 def test_active_expiry_comparison_is_timezone_aware() -> None:

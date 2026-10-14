@@ -1,0 +1,67 @@
+INFO:     127.0.0.1:55596 - "GET /api/v1/health HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55601 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52186 - "OPTIONS /api/v1/races/turfomania/quinte/today/public HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52196 - "POST /api/v1/races/turfomania/quinte/today/public HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52234 - "POST /api/v1/races/turfomania/quinte/today/public HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52873 - "OPTIONS /api/v1/races/turfomania/quinte/today/public HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52873 - "POST /api/v1/races/turfomania/quinte/today/public HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52903 - "OPTIONS /api/v1/auth/profile HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52903 - "GET /api/v1/auth/profile HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52911 - "OPTIONS /api/v1/races/turfomania/quinte/today/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52911 - "GET /api/v1/races/turfomania/quinte/today/odds HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52912 - "POST /api/v1/races/turfomania/quinte/today/analyze HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:52963 - "OPTIONS /api/v1/meetings?date=2026-10-13&refresh=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52962 - "OPTIONS /api/v1/meetings?date=2026-10-13&refresh=true HTTP/1.1" 200 OK
+[INFO] Fetching meetings from: https://zone-turf.fr/programmes/mardi-13-octobre-2026/
+[INFO] Successfully scraped 10 meetings
+[INFO] Cache loaded from C:\Users\HP\AppData\Roaming\zone_turf\cache\meetings_cache.json
+[INFO] Cache saved to C:\Users\HP\AppData\Roaming\zone_turf\cache\meetings_cache.json
+[INFO] Cached 10 meetings for 2026-10-13
+[INFO] Cached 10 meetings for 2026-10-13
+INFO:     127.0.0.1:52962 - "GET /api/v1/meetings?date=2026-10-13&refresh=true HTTP/1.1" 200 OK
+[INFO] Fetching meetings from: https://zone-turf.fr/programmes/mardi-13-octobre-2026/
+[ERROR] Request timeout when scraping meetings (server not responding)
+INFO:     127.0.0.1:52972 - "GET /api/v1/meetings?date=2026-10-13&refresh=true HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53007 - "OPTIONS /api/v1/meetings/stored?meeting_url=turfomania%3A%2F%2Fmeetings%2F06805761-93a9-42ca-bb45-1f6ba33a0ea7&date=2026-10-13 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53009 - "OPTIONS /api/v1/races/detect-type?url=turfomania%3A%2F%2Fmeetings%2F06805761-93a9-42ca-bb45-1f6ba33a0ea7 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53007 - "GET /api/v1/races/detect-type?url=turfomania%3A%2F%2Fmeetings%2F06805761-93a9-42ca-bb45-1f6ba33a0ea7 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53009 - "GET /api/v1/meetings/stored?meeting_url=turfomania%3A%2F%2Fmeetings%2F06805761-93a9-42ca-bb45-1f6ba33a0ea7&date=2026-10-13 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53026 - "OPTIONS /api/v1/races/analyze HTTP/1.1" 200 OK
+[DEBUG] compute_composite_score: is_trot=False, metrics_used=['IC', 'S_COEFF', 'IF', 'n_weight', 'COTE', 'Corde', 'VALEUR']
+[DEBUG] weights being applied: IC=0.2 | S_COEFF=0.2 | IF=0.15 | n_weight=0.1 | COTE=0.2 | Corde=0.1 | VALEUR=0.05
+[DEBUG] Weighted composite scores (first 5): [0.5  0.67 0.5  0.76 0.31]
+[DEBUG] Composite score stats: min=0.31, max=0.87, mean=0.60, std=0.1497
+[DEBUG] analyze_consistency_score: Found horse number column: 'N°'
+[DEBUG] analyze_odds_divergence: Found horse number column: 'N°'
+[DEBUG compute_favorable] Starting with hippodrome=LONGCHAMP, distance=1600
+[DEBUG get_favorable] Original: 'LONGCHAMP' -> Normalized: 'Longchamp' | key='longchamp'
+[DEBUG get_favorable] Distance 1600m -> category: medium
+[DEBUG get_favorable] Found in dict (exact): [1, 2, 3]
+[DEBUG compute_favorable] get_favorable_cordes returned: [1, 2, 3]
+[DEBUG compute_favorable] Columns OK, filtering CORDE values in [1, 2, 3]
+[DEBUG compute_favorable] CORDE column type: int64
+[DEBUG compute_favorable] Sample CORDE values: [9, 12, 7, 5, 15]
+[DEBUG compute_favorable] Sample CORDE types: ['int', 'int', 'int', 'int', 'int']
+[DEBUG compute_favorable] After filter: 3 horses match favorable cordes
+[DEBUG compute_favorable] Returning top horses: ['5', '16', '14']
+INFO:     127.0.0.1:53026 - "POST /api/v1/races/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53060 - "OPTIONS /api/v1/races/turfomania/quinte/today/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53060 - "POST /api/v1/races/turfomania/quinte/today/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53059 - "GET /api/v1/races/turfomania/quinte/today/odds HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:53108 - "GET /api/v1/races/turfomania/quinte/today/odds HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53172 - "GET /api/v1/races/turfomania/quinte/today/odds HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53227 - "GET /api/v1/races/turfomania/quinte/today/odds HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53316 - "GET /api/v1/races/turfomania/quinte/today/odds HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53390 - "GET /api/v1/races/turfomania/quinte/today/odds HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53457 - "GET /api/v1/races/turfomania/quinte/today/odds HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53475 - "OPTIONS /api/v1/auth/profile HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53475 - "OPTIONS /api/v1/races/turfomania/quinte/today/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53479 - "OPTIONS /api/v1/auth/profile HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53487 - "OPTIONS /api/v1/races/turfomania/quinte/today/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53492 - "OPTIONS /api/v1/auth/profile HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53494 - "OPTIONS /api/v1/races/turfomania/quinte/today/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53479 - "GET /api/v1/auth/profile HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53487 - "POST /api/v1/races/turfomania/quinte/today/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53476 - "GET /api/v1/auth/profile HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53492 - "POST /api/v1/races/turfomania/quinte/today/analyze HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53494 - "GET /api/v1/auth/profile HTTP/1.1" 503 Service Unavailable

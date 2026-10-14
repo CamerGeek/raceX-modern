@@ -37,7 +37,7 @@ const questions = [
   {
     question: "Combien coûte l’abonnement ?",
     answer:
-      "L’abonnement est proposé à 8 000 FCFA par mois. Chaque paiement confirmé ajoute un mois d’accès RaceX ; les paiements sont traités sur la plateforme Chariow.",
+      "Vous pouvez choisir une formule hebdomadaire à 2 500 FCFA (7 jours), mensuelle à 8 000 FCFA (1 mois) ou annuelle à 80 000 FCFA (1 an). Chaque paiement confirmé ajoute la durée correspondante à votre accès RaceX. Les paiements sont traités sur Chariow.",
   },
   {
     question: "Quand mon accès est-il activé après un paiement ?",

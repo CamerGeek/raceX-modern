@@ -18,6 +18,7 @@ from turfomania_reunions import (
     BASE_URL,
     FLAT_DISCIPLINES,
     HEADERS,
+    OBSTACLE_DISCIPLINES,
     TIMEOUT_SECONDS,
     TROT_DISCIPLINES,
     _clean,
@@ -56,7 +57,9 @@ def detect_discipline(conditions_text: str) -> str | None:
     lowered = (conditions_text or "").lower()
     if any(d in lowered for d in TROT_DISCIPLINES):
         return "trot"
-    if any(d in lowered for d in FLAT_DISCIPLINES):
+    if any(d in lowered for d in OBSTACLE_DISCIPLINES):
+        return "obstacles"
+    if "plat" in lowered:
         return "flat"
     return None
 
@@ -372,7 +375,7 @@ def scrape_turfomania_race(url, race_type=None, progress_callback=None, cancel_c
     rows = parse_runners(soup, race_type, meta)
     if cancel_check and cancel_check():
         return pd.DataFrame()
-    if race_type == "flat":
+    if race_type in ("flat", "obstacles"):
         rows = _add_flat_derived(rows)
     if progress_callback:
         progress_callback(100, f"Scraped {len(rows)} runners")
@@ -385,3 +388,7 @@ def scrape_turfomania_flat(url, progress_callback=None, cancel_check=None) -> pd
 
 def scrape_turfomania_trot(url, progress_callback=None, cancel_check=None) -> pd.DataFrame:
     return scrape_turfomania_race(url, "trot", progress_callback, cancel_check)
+
+
+def scrape_turfomania_obstacles(url, progress_callback=None, cancel_check=None) -> pd.DataFrame:
+    return scrape_turfomania_race(url, "obstacles", progress_callback, cancel_check)

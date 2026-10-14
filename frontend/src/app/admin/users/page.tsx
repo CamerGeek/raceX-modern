@@ -16,6 +16,14 @@ type Account = {
   created_at: string;
 };
 
+type SubscriptionPlan = "weekly" | "monthly" | "annual";
+
+const subscriptionPlans: { value: SubscriptionPlan; label: string; action: string }[] = [
+  { value: "weekly", label: "Hebdomadaire · 2 500 FCFA · 7 jours", action: "une semaine" },
+  { value: "monthly", label: "Mensuelle · 8 000 FCFA · 1 mois", action: "un mois" },
+  { value: "annual", label: "Annuelle · 80 000 FCFA · 1 an", action: "un an" },
+];
+
 function displayDate(value: string | null) {
   return value
     ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeZone: "Africa/Ouagadougou" }).format(new Date(value))
@@ -28,6 +36,7 @@ function AdminUsersContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeUser, setActiveUser] = useState("");
+  const [selectedPlans, setSelectedPlans] = useState<Record<string, SubscriptionPlan>>({});
 
   const loadUsers = useCallback(async () => {
     try {
@@ -48,14 +57,14 @@ function AdminUsersContent() {
     return () => window.clearTimeout(timer);
   }, [loadUsers]);
 
-  async function promote(userId: string) {
+  async function promote(userId: string, plan: SubscriptionPlan) {
     setActiveUser(userId);
     setError("");
     try {
       const response = await apiFetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/api/v1/auth/admin/promote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: userId }),
+        body: JSON.stringify({ user_id: userId, plan }),
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail ?? "Impossible d’activer l’abonnement.");
@@ -74,7 +83,7 @@ function AdminUsersContent() {
         <div>
           <p className="subscriber-eyebrow">ADMINISTRATION</p>
           <h1>Gestion des comptes</h1>
-          <p className="subscriber-date">Après confirmation du transfert, activez ou prolongez un accès d’un mois.</p>
+          <p className="subscriber-date">Après confirmation du transfert, choisissez la durée à accorder ou à ajouter à l’accès existant.</p>
         </div>
         <button type="button" className="subscriber-refresh" onClick={() => { setLoading(true); void loadUsers(); }}>Actualiser</button>
       </header>
@@ -96,9 +105,33 @@ function AdminUsersContent() {
                     <td>{displayDate(user.subscriber_expires_at)}</td>
                     <td>
                       {user.role === "admin" ? "Administrateur" : (
-                        <button type="button" className="admin-promote-button" onClick={() => void promote(user.id)} disabled={activeUser === user.id}>
-                          {activeUser === user.id ? "Activation…" : user.effective_role === "subscriber" ? "Prolonger d’un mois" : "Activer un mois"}
-                        </button>
+                        <div className="admin-plan-actions">
+                          <select
+                            aria-label={`Durée d’abonnement pour ${user.email}`}
+                            value={selectedPlans[user.id] ?? "monthly"}
+                            onChange={(event) => {
+                              const plan = event.target.value;
+                              if (plan === "weekly" || plan === "monthly" || plan === "annual") {
+                                setSelectedPlans((current) => ({ ...current, [user.id]: plan }));
+                              }
+                            }}
+                            disabled={activeUser === user.id}
+                          >
+                            {subscriptionPlans.map(({ value, label }) => (
+                              <option key={value} value={value}>{label}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            className="admin-promote-button"
+                            onClick={() => void promote(user.id, selectedPlans[user.id] ?? "monthly")}
+                            disabled={activeUser === user.id}
+                          >
+                            {activeUser === user.id
+                              ? "Activation…"
+                              : `Activer ${subscriptionPlans.find(({ value }) => value === (selectedPlans[user.id] ?? "monthly"))?.action}`}
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -108,7 +141,7 @@ function AdminUsersContent() {
           </div>
         )}
       </section>
-      <p className="account-basic-note">Le bouton ajoute un mois à la date de fin existante, ou démarre un mois dès aujourd’hui si l’accès est expiré.</p>
+      <p className="account-basic-note">La durée choisie s’ajoute à la date de fin existante, ou démarre dès aujourd’hui si l’accès est expiré.</p>
     </main>
   );
 }

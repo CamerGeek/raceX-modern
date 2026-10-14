@@ -35,16 +35,29 @@ def _get_trot_predictor() -> Any:
     return TrotPredictor(models_dir=models_path)
 
 
+@lru_cache(maxsize=1)
+def _get_obstacles_predictor() -> Any:
+    models_path = str(MODELS_DIR)
+    if models_path not in sys.path:
+        sys.path.insert(0, models_path)
+
+    from predict_obstacles import ObstaclesPredictor
+
+    return ObstaclesPredictor(models_dir=models_path)
+
+
 def predict_race(frame: pd.DataFrame, race_type: str, source: str) -> dict[str, Any]:
     if race_type == "trot":
         return _trot_predictions(frame)
+    if race_type == "obstacles":
+        return _obstacles_predictions(frame)
     if race_type != "flat":
         return {
             "status": "unsupported",
             "model_version": None,
             "bet_list": [],
             "rows": [],
-            "message": "The available prediction models support flat and trot races only.",
+            "message": "The available prediction models support flat, trot and obstacles races only.",
         }
 
     try:
@@ -81,6 +94,28 @@ def _trot_predictions(frame: pd.DataFrame) -> dict[str, Any]:
         }
     except Exception:
         logger.exception("Trot model prediction failed")
+        return {
+            "status": "unavailable",
+            "model_version": None,
+            "bet_list": [],
+            "rows": [],
+            "message": "Model predictions are unavailable for this race.",
+        }
+
+
+def _obstacles_predictions(frame: pd.DataFrame) -> dict[str, Any]:
+    try:
+        predictor = _get_obstacles_predictor()
+        result = predictor.predict_race(frame)
+        return {
+            "status": "ready",
+            "model_version": predictor.meta.get("created"),
+            "bet_list": result["bet_list"],
+            "rows": dataframe_records(result["table"]),
+            "message": None,
+        }
+    except Exception:
+        logger.exception("Obstacles model prediction failed")
         return {
             "status": "unavailable",
             "model_version": None,

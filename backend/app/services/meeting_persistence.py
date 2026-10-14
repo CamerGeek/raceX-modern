@@ -56,8 +56,8 @@ def persist_scraped_meeting(
     client: SupabaseClientWrapper | None = None,
     meeting: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    if race_type not in {"flat", "trot"}:
-        raise ValueError("race_type must be flat or trot")
+    if race_type not in {"flat", "trot", "obstacles"}:
+        raise ValueError("race_type must be flat, trot or obstacles")
     if frame.empty:
         return {"meeting": meeting, "race_count": 0, "runner_count": 0, "runner_table": _runner_table(race_type), "races": []}
 
@@ -99,7 +99,7 @@ def persist_scraped_meeting(
         for runner_index, row in enumerate(dataframe_records(race_frame), start=1):
             if race_type == "trot":
                 row = _normalize_trot_row(row)
-            payload = {key: value for key, value in row.items() if key in (FLAT_COLUMNS if race_type == "flat" else TROT_COLUMNS)}
+            payload = {key: value for key, value in row.items() if key in (TROT_COLUMNS if race_type == "trot" else FLAT_COLUMNS)}
             payload = _normalize_integer_columns(payload)
             payload["race_id"] = race["id"]
             payload.setdefault("N°", str(runner_index))
@@ -124,7 +124,8 @@ def persist_scraped_meeting(
 
 
 def _runner_table(race_type: str) -> str:
-    return FLAT_TABLE if race_type == "flat" else TROT_TABLE
+    # Obstacle runners share the flat table (same columns; raw_data is JSONB).
+    return TROT_TABLE if race_type == "trot" else FLAT_TABLE
 
 
 def _normalize_integer_columns(payload: dict[str, Any]) -> dict[str, Any]:

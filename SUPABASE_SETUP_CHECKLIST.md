@@ -128,11 +128,22 @@ an account you control using the SQL above; never use shared credentials in
 production.
 
 From **Gestion des comptes**, administrators can activate or extend a
-subscriber account after confirming an 8,000 FCFA manual transfer. Each action
-adds one calendar month to a current subscription, or starts one month
-immediately if the prior access has expired. No payment is collected or
-automatically verified by RaceX. Demo-expired users see WhatsApp contacts for
+subscriber account after confirming a manual transfer, selecting weekly,
+monthly, or annual access. It adds the chosen duration to a current
+subscription, or starts that duration immediately if the prior access has
+expired. Chariow checkout offers a weekly
+plan for 2,500 FCFA, a monthly plan for 8,000 FCFA, and an annual plan for
+80,000 FCFA. These Chariow payments are activated only after RaceX verifies
+the signed sale notification. Demo-expired users see WhatsApp contacts for
 Moov Burkina (`+226 60 35 44 00`) and Orange (`+226 74 91 15 38`).
+
+Configure `CHARIOW_PRODUCT_ID`, `CHARIOW_WEEKLY_PRODUCT_ID`, and
+`CHARIOW_ANNUAL_PRODUCT_ID` in the backend environment with the corresponding
+Chariow product IDs. Apply `backend/migrations/20261014_chariow_plan_entitlements.sql`
+to the Supabase project before deploying the backend, so verified sales can
+apply the selected plan duration.
+Apply `backend/migrations/20261014_admin_subscription_plans.sql` as well to
+enable the plan selector for administrator-granted access.
 
 ## 6. Verify locally
 

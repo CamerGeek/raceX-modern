@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import calendar
 from datetime import datetime, timezone
 from typing import Any
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -10,12 +10,14 @@ from pydantic import BaseModel, Field
 from app.services.auth_service import current_profile, require_admin
 from app.services.chariow import ChariowCheckoutError, create_checkout
 from app.services.supabase_client import SupabaseClientWrapper
+from app.services.subscription_plans import SubscriptionPlan
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 class PromoteSubscriberRequest(BaseModel):
-    user_id: str = Field(min_length=1)
+    user_id: UUID
+    plan: SubscriptionPlan = SubscriptionPlan.MONTHLY
 
 
 class ChariowCheckoutRequest(BaseModel):
@@ -23,13 +25,7 @@ class ChariowCheckoutRequest(BaseModel):
     last_name: str = Field(min_length=1, max_length=50)
     phone_number: str = Field(pattern=r"^[0-9]{5,15}$")
     phone_country_code: str = Field(pattern=r"^[A-Z]{2}$")
-
-
-def _add_month(value: datetime) -> datetime:
-    month = value.month % 12 + 1
-    year = value.year + (1 if value.month == 12 else 0)
-    day = min(value.day, calendar.monthrange(year, month)[1])
-    return value.replace(year=year, month=month, day=day)
+    plan: SubscriptionPlan
 
 
 @router.get("/profile")
@@ -52,6 +48,7 @@ def chariow_checkout(
             last_name=request.last_name.strip(),
             phone_number=request.phone_number,
             phone_country_code=request.phone_country_code,
+            plan=request.plan,
         )
     except ChariowCheckoutError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
@@ -102,36 +99,20 @@ def promote_subscriber(
 ) -> dict[str, Any]:
     client = SupabaseClientWrapper()
     try:
-        user = client.select_one(
-            "user_profiles",
-            filters=[("id", "eq", request.user_id)],
-        )
-        if not user:
-            raise HTTPException(status_code=404, detail="Account not found")
-        if user.get("role") == "admin":
-            raise HTTPException(status_code=409, detail="Admin accounts cannot be promoted as subscribers")
-
-        now = datetime.now(timezone.utc)
-        current_expiry = user.get("subscriber_expires_at")
-        if user.get("role") == "subscriber" and _is_active(current_expiry, now):
-            current_expiry_dt = datetime.fromisoformat(current_expiry.replace("Z", "+00:00"))
-            base = max(now, current_expiry_dt)
-        else:
-            base = now
-        expires_at = _add_month(base)
-        updated = client.update(
-            "user_profiles",
-            id_value=request.user_id,
-            payload={
-                "role": "subscriber",
-                "subscriber_expires_at": expires_at.isoformat(),
-                "updated_at": now.isoformat(),
+        result = client.rpc(
+            "apply_admin_subscription_plan",
+            {
+                "p_user_id": str(request.user_id),
+                "p_plan": request.plan.value,
             },
         )
-        if not updated:
+        if result == "not_found":
+            raise HTTPException(status_code=404, detail="Account not found")
+        if result == "admin":
+            raise HTTPException(status_code=409, detail="Admin accounts cannot be promoted as subscribers")
+        if result != "activated":
             raise HTTPException(status_code=502, detail="Subscriber access could not be updated")
-        updated["effective_role"] = "subscriber"
-        return {"user": updated}
+        return {"status": result, "plan": request.plan.value}
     except HTTPException:
         raise
     except Exception as exc:

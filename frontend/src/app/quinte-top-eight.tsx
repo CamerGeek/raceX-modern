@@ -116,7 +116,7 @@ export default function QuinteTopEight() {
         {analysis && <span className="free-analysis-count">{analysis.row_count} partants</span>}
       </div>
 
-      {loading && <p className="free-analysis-status" role="status">Analyse du Quinté+ en cours…</p>}
+      {loading && <p className="free-analysis-status" role="status">Chargement de l’analyse enregistrée…</p>}
       {!loading && error && (
         <div className="free-analysis-error" role="alert">
           <p>{error}</p>

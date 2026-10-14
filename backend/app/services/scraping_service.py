@@ -56,3 +56,13 @@ def detect_race_type(url: str) -> str:
     response = requests.get(url, timeout=get_settings().source_timeout_seconds)
     response.raise_for_status()
     return detect_race_type_from_html(BeautifulSoup(response.text, "html.parser"))
+
+
+def detect_turfomania_race_type(url: str) -> str:
+    from turfomania_race import detect_discipline, fetch_race_html, parse_race_metadata
+
+    metadata = parse_race_metadata(BeautifulSoup(fetch_race_html(url), "html.parser"), url)
+    race_type = detect_discipline(metadata.get("RACE_CONDITIONS", ""))
+    if not race_type:
+        raise ValueError("Could not determine the discipline from this Turfomania race page")
+    return race_type

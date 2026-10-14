@@ -10,6 +10,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request
 
 from app.core.config import get_settings
+from app.services.subscription_plans import SubscriptionPlan
 from app.services.supabase_client import SupabaseClientWrapper
 
 logger = logging.getLogger(__name__)
@@ -74,11 +75,19 @@ async def chariow_pulse(request: Request) -> dict[str, str]:
     sale = payload.get("sale")
     product = payload.get("product")
     metadata = sale.get("custom_metadata") if isinstance(sale, dict) else None
+    plan = next(
+        (
+            SubscriptionPlan(plan_name)
+            for plan_name, product_id in settings.chariow_plan_product_ids.items()
+            if isinstance(product, dict) and product.get("id") == product_id
+        ),
+        None,
+    )
     if (
         not isinstance(sale, dict)
         or not isinstance(product, dict)
         or sale.get("status") != "completed"
-        or product.get("id") != settings.chariow_product_id
+        or plan is None
         or not isinstance(metadata, dict)
     ):
         logger.error("Ignoring Chariow sale event with unexpected sale or product data")
@@ -105,6 +114,7 @@ async def chariow_pulse(request: Request) -> dict[str, str]:
                 "p_delivery_id": delivery_id,
                 "p_sale_id": sale_id,
                 "p_user_id": normalized_user_id,
+                "p_plan": plan.value,
             },
         )
     except Exception as exc:

@@ -1,9 +1,11 @@
 from datetime import date
 
 import pandas as pd
+import pytest
+from fastapi import HTTPException
 
 from app.api import races
-from app.schemas.races import AnalysisResponse, ModelPredictionResponse, TurfomaniaQuinteAnalysisResponse
+from app.schemas.races import ModelPredictionResponse, TurfomaniaQuinteAnalysisResponse
 from app.schemas.races import TodayQuinteAnalysisRequest
 
 
@@ -78,53 +80,75 @@ def test_display_frame_aligns_computed_scores_by_runner_number() -> None:
     ]
 
 
-def test_stale_homepage_analysis_is_recomputed_from_persisted_runners(monkeypatch) -> None:
+def test_stale_homepage_analysis_is_served_without_recomputation(monkeypatch) -> None:
+    cached = TurfomaniaQuinteAnalysisResponse(
+        race_id="race-id",
+        race_type="flat",
+        source="turfomania",
+        row_count=1,
+        columns=["N°", "CHEVAL", "Composite"],
+        rows=[{"N°": "3", "CHEVAL": "Horse Three", "Composite": 0.9}],
+        model_version="test",
+        prognosis=[],
+    )
+
     class Client:
-        def select_one(self, table, *, filters, **kwargs):
+        def list(self, table, *, filters, **kwargs):
             if table == "analysis_runs":
-                return {
+                return [{
                     "created_at": "2026-10-09T06:33:31+00:00",
                     "summary": {
-                        "homepage_cache_version": "daily-quinte-composite-v1",
-                        "homepage_analysis": {"rows": []},
+                        "homepage_cache_version": races.HOMEPAGE_QUINTE_CACHE_VERSION,
+                        "homepage_analysis": cached.model_dump(mode="json"),
                     },
-                }
+                }]
+            if table == "meetings":
+                return [{"id": "meeting-id"}]
+            if table == "races":
+                return [{
+                    "id": "race-id",
+                    "source": "turfomania",
+                    "race_type": "flat",
+                    "summary": {"q_plus": True},
+                }]
+            raise AssertionError(f"unexpected list table: {table}")
+
+        def select_one(self, table, *, filters, **kwargs):
             if table == "flat_race_runners":
                 return {"updated_at": "2026-10-09T07:55:10+00:00"}
             raise AssertionError(f"unexpected select table: {table}")
 
-        def list(self, table, *, filters, limit, order_by):
-            assert table == "flat_race_runners"
-            return [
-                {"runner_number": "3", "raw_data": {"CHEVAL": "Horse Three"}},
-                {"runner_number": "4", "raw_data": {"CHEVAL": "Horse Four"}},
-            ]
+    monkeypatch.setattr(races, "SupabaseClientWrapper", Client)
+    monkeypatch.setattr(races, "_analysis_response", lambda *_args, **_kwargs: pytest.fail("read requests must not analyze"))
+    monkeypatch.setattr(races, "scrape_turfomania_quinte", lambda *_args: pytest.fail("read requests must not scrape"))
 
-        def insert(self, table, payload):
-            assert table == "analysis_runs"
-            return payload
+    result = races._analyze_today_turfomania_quinte(TodayQuinteAnalysisRequest(date=date(2026, 10, 9)))
 
-    analyzed_rows = []
+    assert result.model_dump() == cached.model_dump()
 
-    def analyze(frame, **kwargs):
-        analyzed_rows.extend(frame.to_dict("records"))
-        return AnalysisResponse(
-            race_type="flat",
-            source="turfomania",
-            row_count=len(frame),
-            columns=["N°", "CHEVAL", "Composite"],
-            rows=[
-                {"N°": row["N°"], "CHEVAL": row["CHEVAL"], "Composite": score}
-                for row, score in zip(frame.to_dict("records"), [0.9, 0.8])
-            ],
-            model_version="test",
-            prognosis=[],
-        )
 
-    monkeypatch.setattr(races, "_analysis_response", analyze)
+def test_today_quinte_cache_miss_does_not_start_analysis(monkeypatch) -> None:
+    class Client:
+        def list(self, table, *, filters, **kwargs):
+            if table == "meetings":
+                return [{"id": "meeting-id"}]
+            if table == "races":
+                return [{
+                    "id": "race-id",
+                    "source": "turfomania",
+                    "race_type": "flat",
+                    "summary": {"q_plus": True},
+                }]
+            if table == "analysis_runs":
+                return []
+            raise AssertionError(f"unexpected list table: {table}")
 
-    result = races._reanalyze_stale_homepage_quinte(Client(), "race-id", "flat")
+        def select_one(self, *_args, **_kwargs):
+            return {"updated_at": "2026-10-09T07:55:10+00:00"}
 
-    assert result is not None
-    assert result.race_id == "race-id"
-    assert [row["N°"] for row in analyzed_rows] == ["3", "4"]
+    monkeypatch.setattr(races, "SupabaseClientWrapper", Client)
+    monkeypatch.setattr(races, "_analysis_response", lambda *_args, **_kwargs: pytest.fail("cache miss must not analyze"))
+    monkeypatch.setattr(races, "scrape_turfomania_quinte", lambda *_args: pytest.fail("cache miss must not scrape"))
+
+    with pytest.raises(HTTPException, match="No prepared Quinté analysis"):
+        races._analyze_today_turfomania_quinte(TodayQuinteAnalysisRequest(date=date(2026, 10, 9)))

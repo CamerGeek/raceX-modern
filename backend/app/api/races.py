@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -20,14 +21,12 @@ from app.services.analysis_service import analyze_race
 from app.services.model_prediction_service import predict_race as predict_model_race
 from app.services.meeting_persistence import FLAT_TABLE, TROT_TABLE, persist_scraped_meeting
 from app.services.quinte_odds_service import get_today_quinte_odds_history
-from app.services.scraping_service import detect_race_type, scrape_race
+from app.services.scraping_service import detect_race_type, detect_turfomania_race_type, scrape_race
 from app.services.serialization import dataframe_records
 from app.services.supabase_client import SupabaseClientWrapper
 from app.services.auth_service import require_admin, require_subscriber_features
-from app.services.turfomania_download import parse_turfomania_meeting_url
-from app.services.turfomania_catalog import persist_turfomania_reunions, scrape_turfomania_reunions
+from app.services.turfomania_download import _infer_race_type, parse_turfomania_meeting_url
 from app.services.turfomania_quinte import (
-    find_turfomania_quinte_meeting,
     scrape_turfomania_quinte,
     turfomania_quinte_race_type,
 )
@@ -50,18 +49,108 @@ router = APIRouter(prefix="/races", tags=["races"])
 
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
 HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v2"
+RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v1"
+BETTING_CACHE_VERSION = "betting-analysis-v1"
 
 
 def _saved_frame(client: SupabaseClientWrapper, race_id: str) -> tuple[pd.DataFrame, dict]:
     race = client.select_one("races", filters=[("id", "eq", race_id)])
     if not race:
         raise HTTPException(status_code=404, detail="Saved race not found")
-    table = "flat_race_runners" if race["race_type"] == "flat" else "trot_race_runners"
+    table = "trot_race_runners" if race["race_type"] == "trot" else "flat_race_runners"
     rows = client.list(table, filters=[("race_id", "eq", race_id)], limit=1000, order_by=("runner_number", "asc"))
     frame = pd.DataFrame([row.get("raw_data") if isinstance(row.get("raw_data"), dict) else row for row in rows])
+    if not frame.empty and race.get("source") == "turfomania" and race.get("race_type") in {None, "flat"}:
+        inferred_type = _infer_race_type(frame)
+        if inferred_type != race.get("race_type"):
+            race = {**race, "race_type": inferred_type}
+            client.update("races", id_value=race_id, payload={"race_type": inferred_type})
     if race["race_type"] == "trot":
         frame = frame.drop(columns=TROT_DISPLAY_EXCLUDED_COLUMNS, errors="ignore")
     return frame, race
+
+
+def _runner_table_for_race(race_type: str) -> str | None:
+    if race_type == "trot":
+        return TROT_TABLE
+    if race_type in {"flat", "obstacles"}:
+        return FLAT_TABLE
+    return None
+
+
+def _cached_result(
+    client: SupabaseClientWrapper,
+    *,
+    race_id: str,
+    runner_table: str,
+    cache_version: str,
+    cache_kind: str,
+    options: dict[str, Any],
+) -> Any | None:
+    runs = client.list(
+        "analysis_runs",
+        filters=[("race_id", "eq", race_id)],
+        limit=100,
+        order_by=("created_at", "desc"),
+    )
+    for run in runs:
+        summary = run.get("summary") or {}
+        cache = summary.get("racex_cache") if isinstance(summary, dict) else None
+        if (
+            not isinstance(cache, dict)
+            or cache.get("version") != cache_version
+            or cache.get("kind") != cache_kind
+            or cache.get("options") != options
+            or "result" not in cache
+        ):
+            continue
+        latest_runner = client.select_one(
+            runner_table,
+            filters=[("race_id", "eq", race_id)],
+            order_by=("updated_at", "desc"),
+        )
+        if _homepage_cache_is_fresh(run, latest_runner):
+            return cache["result"]
+    return None
+
+
+def _store_cached_result(
+    client: SupabaseClientWrapper,
+    *,
+    race_id: str,
+    runner_table: str,
+    model_version: str,
+    cache_version: str,
+    cache_kind: str,
+    options: dict[str, Any],
+    result: Any,
+) -> None:
+    latest_runner = client.select_one(
+        runner_table,
+        filters=[("race_id", "eq", race_id)],
+        order_by=("updated_at", "desc"),
+    )
+    if not latest_runner:
+        raise ValueError(f"Cannot cache analysis without stored runners for race {race_id}")
+    serialized_result = result.model_dump(mode="json") if hasattr(result, "model_dump") else result
+    client.insert(
+        "analysis_runs",
+        {
+            "race_id": race_id,
+            "model_version": model_version,
+            "summary": {
+                "racex_cache": {
+                    "version": cache_version,
+                    "kind": cache_kind,
+                    "options": options,
+                    "result": serialized_result,
+                }
+            },
+            "prognosis": serialized_result.get("prognosis", []) if isinstance(serialized_result, dict) else [],
+            "handicap": serialized_result.get("handicap") or {} if isinstance(serialized_result, dict) else {},
+            "raw_rows": serialized_result.get("rows", []) if isinstance(serialized_result, dict) else [],
+        },
+    )
 
 
 def _display_frame(source: pd.DataFrame, analyzed: pd.DataFrame, race_type: str) -> pd.DataFrame:
@@ -102,22 +191,23 @@ def _display_frame(source: pd.DataFrame, analyzed: pd.DataFrame, race_type: str)
 
 @router.get("/detect-type")
 def detect_type(url: str = Query(min_length=1), _: dict[str, Any] = Depends(require_admin)) -> dict[str, str]:
+    if parse_turfomania_meeting_url(url):
+        raise HTTPException(
+            status_code=422,
+            detail="Race type is specific to each race. Select a race instead of a meeting.",
+        )
     try:
-        turfomania_id = parse_turfomania_meeting_url(url)
-        if turfomania_id:
-            race_type = _turfomania_race_type(turfomania_id)
-            if race_type:
-                return {"race_type": race_type}
-            raise ValueError(f"No races found for Turfomania meeting {turfomania_id}")
+        parsed_url = urlparse(url)
+        if (
+            parsed_url.hostname
+            and parsed_url.hostname.lower() in {"turfomania.fr", "www.turfomania.fr"}
+            and parsed_url.path.startswith("/pronostics/partants-")
+            and "idcourse" in parse_qs(parsed_url.query)
+        ):
+            return {"race_type": detect_turfomania_race_type(url)}
         return {"race_type": detect_race_type(url)}
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Race type detection failed: {exc}") from exc
-
-
-def _turfomania_race_type(meeting_id: str) -> str | None:
-    client = SupabaseClientWrapper()
-    races = client.list("races", filters=[("meeting_id", "eq", meeting_id)], limit=500, order_by=("race_key", "asc"))
-    return next((race.get("race_type") for race in races if race.get("race_type") in {"flat", "trot"}), None)
 
 
 @router.post("/scrape", response_model=RaceResponse)
@@ -140,20 +230,54 @@ def analyze(request: AnalysisRequest, _: dict[str, Any] = Depends(require_admin)
     try:
         race_type = request.race_type
         source = request.source
+        client: SupabaseClientWrapper | None = None
         if request.race_id:
             client = SupabaseClientWrapper()
             frame, race = _saved_frame(client, request.race_id)
             race_type = race["race_type"]
             source = race.get("source", source)
+            runner_table = _runner_table_for_race(race_type)
+            options = {
+                "race_type": race_type,
+                "source": source,
+                "include_handicap": request.include_handicap,
+                "max_horses": request.max_horses,
+            }
+            cached = (
+                _cached_result(
+                    client,
+                    race_id=request.race_id,
+                    runner_table=runner_table,
+                    cache_version=RACE_ANALYSIS_CACHE_VERSION,
+                    cache_kind="race-analysis",
+                    options=options,
+                )
+                if runner_table and not request.force_refresh
+                else None
+            )
+            if cached is not None:
+                return AnalysisResponse.model_validate(cached)
         else:
             frame = scrape_race(request.url, race_type, source)
-        return _analysis_response(
+        result = _analysis_response(
             frame,
             race_type=race_type,
             source=source,
             include_handicap=request.include_handicap,
             max_horses=request.max_horses,
         )
+        if client and request.race_id and runner_table:
+            _store_cached_result(
+                client,
+                race_id=request.race_id,
+                runner_table=runner_table,
+                model_version=result.model_version,
+                cache_version=RACE_ANALYSIS_CACHE_VERSION,
+                cache_kind="race-analysis",
+                options=options,
+                result=result,
+            )
+        return result
     except HTTPException:
         raise
     except Exception as exc:
@@ -213,8 +337,48 @@ def analyze_turfomania_quinte(
         raise HTTPException(status_code=422, detail="Selected meeting is not a Turfomania meeting")
 
     try:
+        options = {
+            "race_type": None,
+            "source": "turfomania",
+            "include_handicap": request.include_handicap,
+            "max_horses": request.max_horses,
+        }
+        if not request.force_refresh:
+            for race in client.list(
+                "races",
+                filters=[("meeting_id", "eq", request.meeting_id)],
+                limit=500,
+            ):
+                summary = race.get("summary") or {}
+                if race.get("source") != "turfomania" or not summary.get("q_plus"):
+                    continue
+                race_type = race.get("race_type")
+                runner_table = _runner_table_for_race(race_type)
+                if not runner_table:
+                    continue
+                cache_options = {**options, "race_type": race_type}
+                if request.include_handicap and request.max_horses == 8:
+                    cached_homepage = _cached_homepage_quinte_analysis(
+                        client,
+                        race["id"],
+                        race_type,
+                    )
+                    if cached_homepage:
+                        return cached_homepage
+                cached = _cached_result(
+                    client,
+                    race_id=race["id"],
+                    runner_table=runner_table,
+                    cache_version=RACE_ANALYSIS_CACHE_VERSION,
+                    cache_kind="turfomania-quinte",
+                    options=cache_options,
+                )
+                if cached is not None:
+                    return TurfomaniaQuinteAnalysisResponse.model_validate(cached)
+
         frame = scrape_turfomania_quinte(meeting)
         race_type = turfomania_quinte_race_type(frame)
+        runner_table = _runner_table_for_race(race_type)
         persisted = persist_scraped_meeting(
             frame,
             meeting_date=date.fromisoformat(str(meeting["meeting_date"])),
@@ -228,10 +392,6 @@ def analyze_turfomania_quinte(
         if not persisted["races"]:
             raise ValueError("No Quinté race was persisted")
         race_id = persisted["races"][0]["id"]
-        if request.include_handicap and request.max_horses == 8:
-            cached = _cached_homepage_quinte_analysis(client, race_id, race_type)
-            if cached:
-                return cached
         response = _analysis_response(
             frame,
             race_type=race_type,
@@ -242,6 +402,17 @@ def analyze_turfomania_quinte(
         result = TurfomaniaQuinteAnalysisResponse(**response.model_dump(), race_id=race_id)
         if request.include_handicap and request.max_horses == 8:
             _store_homepage_quinte_analysis(client, result)
+        elif runner_table:
+            _store_cached_result(
+                client,
+                race_id=race_id,
+                runner_table=runner_table,
+                model_version=result.model_version,
+                cache_version=RACE_ANALYSIS_CACHE_VERSION,
+                cache_kind="turfomania-quinte",
+                options={**options, "race_type": race_type},
+                result=result,
+            )
         return result
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
@@ -314,24 +485,9 @@ def _analyze_today_turfomania_quinte(
             limit=100,
         )
         if not meetings:
-            reunions = scrape_turfomania_reunions()
-            persist_turfomania_reunions(
-                reunions,
-                meeting_date=meeting_date,
-                client=client,
-            )
-            meetings = client.list(
-                "meetings",
-                filters=[
-                    ("source", "eq", "turfomania"),
-                    ("meeting_date", "eq", meeting_date.isoformat()),
-                ],
-                limit=100,
-            )
-        if not meetings:
             raise HTTPException(
                 status_code=404,
-                detail=f"No Turfomania meetings found for {meeting_date.isoformat()}",
+                detail=f"No prepared Turfomania Quinté analysis found for {meeting_date.isoformat()}",
             )
 
         for meeting in meetings:
@@ -346,50 +502,14 @@ def _analyze_today_turfomania_quinte(
                         client,
                         race["id"],
                         race.get("race_type"),
+                        require_fresh=False,
                     )
                     if cached:
                         return cached
-                    refreshed = _reanalyze_stale_homepage_quinte(
-                        client,
-                        race["id"],
-                        race.get("race_type"),
-                    )
-                    if refreshed:
-                        return refreshed
-
-        meeting, frame = find_turfomania_quinte_meeting(meetings)
-        race_type = turfomania_quinte_race_type(frame)
-        persisted = persist_scraped_meeting(
-            frame,
-            meeting_date=meeting_date,
-            meeting_name=meeting.get("name"),
-            meeting_url=None,
-            race_type=race_type,
-            source="turfomania",
-            client=client,
-            meeting=meeting,
+        raise HTTPException(
+            status_code=404,
+            detail=f"No prepared Quinté analysis found for {meeting_date.isoformat()}; ask an admin to run it.",
         )
-        if not persisted["races"]:
-            raise ValueError("No Quinté race was persisted")
-
-        race_id = persisted["races"][0]["id"]
-        cached = _cached_homepage_quinte_analysis(client, race_id, race_type)
-        if cached:
-            return cached
-
-        response = _analysis_response(
-            frame,
-            race_type=race_type,
-            source="turfomania",
-            include_handicap=True,
-            max_horses=8,
-        )
-        result = TurfomaniaQuinteAnalysisResponse(
-            **response.model_dump(),
-            race_id=race_id,
-        )
-        _store_homepage_quinte_analysis(client, result)
-        return result
     except HTTPException:
         raise
     except ValueError as exc:
@@ -420,18 +540,16 @@ def _cached_homepage_quinte_analysis(
     client: SupabaseClientWrapper,
     race_id: str,
     race_type: str,
+    *,
+    require_fresh: bool = True,
 ) -> TurfomaniaQuinteAnalysisResponse | None:
-    cached_run = client.select_one(
+    cached_runs = client.list(
         "analysis_runs",
         filters=[("race_id", "eq", race_id)],
+        limit=100,
         order_by=("created_at", "desc"),
     )
-    if not cached_run:
-        return None
-    summary = cached_run.get("summary") or {}
-    if summary.get("homepage_cache_version") != HOMEPAGE_QUINTE_CACHE_VERSION:
-        return None
-    runner_table = FLAT_TABLE if race_type == "flat" else TROT_TABLE if race_type == "trot" else None
+    runner_table = _runner_table_for_race(race_type)
     if runner_table is None:
         return None
     latest_runner = client.select_one(
@@ -439,12 +557,16 @@ def _cached_homepage_quinte_analysis(
         filters=[("race_id", "eq", race_id)],
         order_by=("updated_at", "desc"),
     )
-    if not _homepage_cache_is_fresh(cached_run, latest_runner):
-        return None
-    cached_response = summary.get("homepage_analysis")
-    if not isinstance(cached_response, dict):
-        return None
-    return TurfomaniaQuinteAnalysisResponse.model_validate(cached_response)
+    for cached_run in cached_runs:
+        summary = cached_run.get("summary") or {}
+        if summary.get("homepage_cache_version") != HOMEPAGE_QUINTE_CACHE_VERSION:
+            continue
+        if require_fresh and not _homepage_cache_is_fresh(cached_run, latest_runner):
+            continue
+        cached_response = summary.get("homepage_analysis")
+        if isinstance(cached_response, dict):
+            return TurfomaniaQuinteAnalysisResponse.model_validate(cached_response)
+    return None
 
 
 def _homepage_cache_is_fresh(
@@ -454,63 +576,6 @@ def _homepage_cache_is_fresh(
     cached_at = _parse_cache_timestamp(cached_run.get("created_at"))
     runner_updated_at = _parse_cache_timestamp((latest_runner or {}).get("updated_at"))
     return cached_at is not None and runner_updated_at is not None and cached_at >= runner_updated_at
-
-
-def _reanalyze_stale_homepage_quinte(
-    client: SupabaseClientWrapper,
-    race_id: str,
-    race_type: str,
-) -> TurfomaniaQuinteAnalysisResponse | None:
-    runner_table = FLAT_TABLE if race_type == "flat" else TROT_TABLE if race_type == "trot" else None
-    if runner_table is None:
-        return None
-    cached_run = client.select_one(
-        "analysis_runs",
-        filters=[("race_id", "eq", race_id)],
-        order_by=("created_at", "desc"),
-    )
-    if not cached_run:
-        return None
-    summary = cached_run.get("summary") or {}
-    if not isinstance(summary.get("homepage_analysis"), dict):
-        return None
-    latest_runner = client.select_one(
-        runner_table,
-        filters=[("race_id", "eq", race_id)],
-        order_by=("updated_at", "desc"),
-    )
-    cache_is_current = summary.get("homepage_cache_version") == HOMEPAGE_QUINTE_CACHE_VERSION
-    if cache_is_current and _homepage_cache_is_fresh(cached_run, latest_runner):
-        return None
-    runners = client.list(
-        runner_table,
-        filters=[("race_id", "eq", race_id)],
-        limit=500,
-        order_by=("runner_number", "asc"),
-    )
-    if not runners:
-        return None
-    rows: list[dict[str, Any]] = []
-    for runner in runners:
-        raw_data = runner.get("raw_data")
-        row = dict(raw_data) if isinstance(raw_data, dict) else {}
-        if runner.get("runner_number") is not None:
-            row["N°"] = runner["runner_number"]
-        rows.append(row)
-    frame = pd.DataFrame(rows)
-    response = _analysis_response(
-        frame,
-        race_type=race_type,
-        source="turfomania",
-        include_handicap=True,
-        max_horses=8,
-    )
-    refreshed = TurfomaniaQuinteAnalysisResponse(
-        **response.model_dump(),
-        race_id=race_id,
-    )
-    _store_homepage_quinte_analysis(client, refreshed)
-    return refreshed
 
 
 def _parse_cache_timestamp(value: Any) -> datetime | None:
@@ -548,8 +613,42 @@ def _store_homepage_quinte_analysis(
 @router.post("/simulate")
 def simulate(request: BettingRequest, _: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
     try:
-        frame, race = _saved_frame(SupabaseClientWrapper(), request.race_id)
-        return {"race_id": request.race_id, "race_type": race["race_type"], "simulations": request.simulations, "rows": simulate_race(frame, race["race_type"], request.simulations)}
+        client = SupabaseClientWrapper()
+        frame, race = _saved_frame(client, request.race_id)
+        options = {"race_type": race["race_type"], "simulations": request.simulations}
+        runner_table = _runner_table_for_race(race["race_type"])
+        cached = (
+            _cached_result(
+                client,
+                race_id=request.race_id,
+                runner_table=runner_table,
+                cache_version=BETTING_CACHE_VERSION,
+                cache_kind="simulation",
+                options=options,
+            )
+            if runner_table and not request.force_refresh
+            else None
+        )
+        if cached is not None:
+            return cached
+        result = {
+            "race_id": request.race_id,
+            "race_type": race["race_type"],
+            "simulations": request.simulations,
+            "rows": simulate_race(frame, race["race_type"], request.simulations),
+        }
+        if runner_table:
+            _store_cached_result(
+                client,
+                race_id=request.race_id,
+                runner_table=runner_table,
+                model_version=BETTING_CACHE_VERSION,
+                cache_version=BETTING_CACHE_VERSION,
+                cache_kind="simulation",
+                options=options,
+                result=result,
+            )
+        return result
     except HTTPException:
         raise
     except Exception as exc:
@@ -559,9 +658,44 @@ def simulate(request: BettingRequest, _: dict[str, Any] = Depends(require_admin)
 @router.post("/combinations")
 def combinations(request: BettingRequest, _: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
     try:
-        frame, race = _saved_frame(SupabaseClientWrapper(), request.race_id)
+        client = SupabaseClientWrapper()
+        frame, race = _saved_frame(client, request.race_id)
+        options = {
+            "race_type": race["race_type"],
+            "combination_size": request.combination_size,
+            "max_combinations": request.max_combinations,
+            "mandatory": request.mandatory,
+            "excluded": request.excluded,
+        }
+        runner_table = _runner_table_for_race(race["race_type"])
+        cached = (
+            _cached_result(
+                client,
+                race_id=request.race_id,
+                runner_table=runner_table,
+                cache_version=BETTING_CACHE_VERSION,
+                cache_kind="combinations",
+                options=options,
+            )
+            if runner_table and not request.force_refresh
+            else None
+        )
+        if cached is not None:
+            return cached
         combos = generate_combinations(frame, race["race_type"], request.combination_size, request.max_combinations, request.mandatory, request.excluded)
-        return {"race_id": request.race_id, "race_type": race["race_type"], "combination_size": request.combination_size, "combinations": combos}
+        result = {"race_id": request.race_id, "race_type": race["race_type"], "combination_size": request.combination_size, "combinations": combos}
+        if runner_table:
+            _store_cached_result(
+                client,
+                race_id=request.race_id,
+                runner_table=runner_table,
+                model_version=BETTING_CACHE_VERSION,
+                cache_version=BETTING_CACHE_VERSION,
+                cache_kind="combinations",
+                options=options,
+                result=result,
+            )
+        return result
     except HTTPException:
         raise
     except Exception as exc:

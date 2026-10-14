@@ -41,6 +41,7 @@ function AccountPageContent() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<"weekly" | "monthly" | "annual">("monthly");
   const [paymentReturn, setPaymentReturn] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -99,6 +100,7 @@ function AccountPageContent() {
           last_name: lastName.trim(),
           phone_number: parsedPhone.nationalNumber,
           phone_country_code: parsedPhone.countryCode,
+          plan: selectedPlan,
         }),
       });
       const result: unknown = await response.json();
@@ -225,9 +227,24 @@ function AccountPageContent() {
             <div className="account-renewal">
               <h3>{profile.role === "subscriber" ? "Renouveler votre accès" : "Passer à l’abonnement"}</h3>
               <p>
-                Payez les 8 000 FCFA sur Chariow. Chaque paiement confirmé ajoute un mois d’accès RaceX. Le paiement est traité de façon sécurisée par Chariow.
+                Choisissez une formule. Chaque paiement confirmé ajoute la durée correspondante à votre accès RaceX. Le paiement est traité de façon sécurisée par Chariow.
               </p>
               <form className="account-form account-checkout-form" onSubmit={startCheckout}>
+                <label htmlFor="checkout-plan">Formule</label>
+                <select
+                  id="checkout-plan"
+                  value={selectedPlan}
+                  onChange={(event) => {
+                    const plan = event.target.value;
+                    if (plan === "weekly" || plan === "monthly" || plan === "annual") {
+                      setSelectedPlan(plan);
+                    }
+                  }}
+                >
+                  <option value="weekly">Hebdomadaire · 2 500 FCFA · 7 jours</option>
+                  <option value="monthly">Mensuelle · 8 000 FCFA · 1 mois</option>
+                  <option value="annual">Annuelle · 80 000 FCFA · 1 an</option>
+                </select>
                 <label htmlFor="checkout-first-name">Prénom</label>
                 <input id="checkout-first-name" autoComplete="given-name" maxLength={50} required value={firstName} onChange={(event) => setFirstName(event.target.value)} />
                 <label htmlFor="checkout-last-name">Nom</label>
@@ -257,7 +274,7 @@ function AccountPageContent() {
               {error && <p className="account-error" role="alert">{error}</p>}
               <div className="account-whatsapp-links">
                 {whatsappAccounts.map((contact) => (
-                  <a key={contact.number} href={`https://wa.me/${contact.number}?text=${encodeURIComponent("Bonjour, j’ai une question concernant le paiement ou l’activation de mon abonnement RaceX à 8 000 FCFA.")}`} target="_blank" rel="noreferrer">
+                  <a key={contact.number} href={`https://wa.me/${contact.number}?text=${encodeURIComponent("Bonjour, j’ai une question concernant le paiement ou l’activation de mon abonnement RaceX.")}`} target="_blank" rel="noreferrer">
                     Contacter sur WhatsApp · {contact.label}
                   </a>
                 ))}

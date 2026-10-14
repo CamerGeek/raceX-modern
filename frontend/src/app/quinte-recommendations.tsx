@@ -13,6 +13,7 @@ type QuinteRecommendationsProps = {
 
 const horseNumberFields = ["NUMERO", "N°", "N", "Numero", "N?", "NUM"];
 const deepScoreFields = ["place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score"];
+const voteFields = ["votes", "Votes", "VOTES"];
 
 function horseNumber(row: Horse) {
   const key = horseNumberFields.find((field) =>
@@ -48,6 +49,23 @@ function modelShortlist(predictions: QuinteModelPredictions | null) {
     .slice(0, 8);
 }
 
+function voteShortlist(predictions: QuinteModelPredictions | null) {
+  if (predictions?.status !== "ready") return [];
+
+  return predictions.rows
+    .map((row, index) => {
+      const number = horseNumber(row);
+      const voteKey = voteFields.find((field) =>
+        row[field] !== null && row[field] !== undefined && row[field] !== "",
+      );
+      const rawVotes = voteKey ? String(row[voteKey]).trim().replace(",", ".") : "";
+      const votes = Number(rawVotes);
+      return { number, votes, index };
+    })
+    .filter((item) => Boolean(item.number) && Number.isInteger(item.votes) && item.votes > 0)
+    .sort((first, second) => second.votes - first.votes || first.index - second.index);
+}
+
 function PickCard({
   title,
   description,
@@ -79,6 +97,39 @@ function PickCard({
   );
 }
 
+export function VotePickCard({
+  predictions,
+}: {
+  predictions: QuinteModelPredictions | null;
+}) {
+  const horses = voteShortlist(predictions);
+  const message = predictions?.status === "ready"
+    ? "Aucun cheval n’a reçu de vote exploitable."
+    : predictions?.message ?? "Le classement des votes n’est pas disponible pour cette course.";
+
+  return (
+    <section className="public-widget quinte-pick-card" aria-label="Chevaux les plus votés">
+      <div>
+        <p className="public-kicker">SÉLECTION DU JOUR</p>
+        <h2>Consensus des votes</h2>
+        <p className="quinte-pick-description">Tous les chevaux ayant au moins un vote, classés par nombre de votes décroissant.</p>
+      </div>
+      {horses.length > 0 ? (
+        <ol className="vote-analysis-list" aria-label="Chevaux classés par nombre de votes">
+          {horses.map(({ number, votes }, index) => (
+            <li key={`${number}-${index}`}>
+              <strong>{number}</strong>
+              <span>{votes} {votes === 1 ? "vote" : "votes"}</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="free-analysis-status">{message}</p>
+      )}
+    </section>
+  );
+}
+
 export default function QuinteRecommendations({
   prognosis,
   modelPredictions,
@@ -92,17 +143,18 @@ export default function QuinteRecommendations({
   return (
     <div className="quinte-picks-grid">
       <PickCard
-        title="Notre Prono Flash"
-        description="Ordre de la sélection issue de la prognosis de la course."
+        title="Prono Flash"
+        description="Ordre de la sélection issue d'un pronostic de la course généré automatiquement."
         numbers={flashNumbers}
         emptyMessage="Notre Prono Flash n’est pas disponible pour cette course."
       />
       <PickCard
-        title="Model Shortlist"
+        title="Model Shortlist(Choix du modele d'IA)"
         description="Jusqu’à 8 numéros classés par deep score décroissant."
         numbers={modelNumbers}
         emptyMessage={modelMessage}
       />
+      <VotePickCard predictions={modelPredictions} />
     </div>
   );
 }

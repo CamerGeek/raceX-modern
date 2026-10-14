@@ -16,7 +16,7 @@ import pandas as pd
 
 from data_sources import data_source_manager
 from turfomania_race import scrape_turfomania_race
-from turfomania_reunions import _is_partants_url
+from turfomania_reunions import OBSTACLE_DISCIPLINES, _is_partants_url
 
 from app.services.meeting_persistence import persist_scraped_meeting
 from app.services.supabase_client import SupabaseClientWrapper
@@ -100,7 +100,9 @@ def download_turfomania_meeting(
             report(base + int(percent * 0.8 / max(len(race_rows), 1)), f"[{race_key}] {message}")
 
         try:
-            race_type = race.get("race_type") if race.get("race_type") in {"flat", "trot"} else None
+            # Stored "flat" rows are re-inferred: obstacle races catalogued
+            # before the obstacles pipeline were persisted as "flat".
+            race_type = race.get("race_type") if race.get("race_type") in {"trot", "obstacles"} else None
             if race_type:
                 frame = data_source_manager.scrape_races(
                     url, race_type, source_name=SOURCE, progress_callback=race_progress, cancel_check=cancel_check
@@ -153,7 +155,14 @@ def download_turfomania_meeting(
 
 
 def _infer_race_type(frame: pd.DataFrame) -> str:
-    return "flat" if "POIDS" in frame.columns else "trot"
+    if "POIDS" not in frame.columns:
+        return "trot"
+    text = " ".join(
+        str(frame[col].iloc[0]) for col in ("RACE_CONDITIONS", "DESCRIPTIF") if col in frame.columns
+    ).lower()
+    if any(d in text for d in OBSTACLE_DISCIPLINES):
+        return "obstacles"
+    return "flat"
 
 
 def _race_sort_key(race: dict[str, Any]) -> tuple[int, str]:

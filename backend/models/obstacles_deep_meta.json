@@ -1,0 +1,83 @@
+{
+  "created": "2026-10-13T16:04:40",
+  "tensorflow_version": "2.18.0",
+  "model_file": "obstacles_deep_place.keras",
+  "scaler_file": "obstacles_deep_scaler.joblib",
+  "feature_columns": [
+    "COTE",
+    "POIDS",
+    "GAIN",
+    "PAST_POIDS",
+    "AGE",
+    "IC",
+    "FS",
+    "FH",
+    "FC",
+    "FT",
+    "N_WEIGHT",
+    "NUMERO",
+    "DISTANCE",
+    "STARTERS",
+    "S_COEFF",
+    "INCIDENT_COUNT",
+    "LAST_RACE_INCIDENT",
+    "HAS_FALLEN",
+    "HAS_STOPPED",
+    "SEXE=0",
+    "SEXE=1",
+    "SEXE=2",
+    "HIPPOID=1",
+    "HIPPOID=10",
+    "HIPPOID=11",
+    "HIPPOID=13",
+    "HIPPOID=14",
+    "HIPPOID=15",
+    "HIPPOID=16",
+    "HIPPOID=19",
+    "HIPPOID=2",
+    "HIPPOID=20",
+    "HIPPOID=21",
+    "HIPPOID=3",
+    "HIPPOID=6",
+    "HIPPOID=9"
+  ],
+  "onehot_levels": {
+    "SEXE": [
+      "0",
+      "1",
+      "2"
+    ],
+    "HIPPOID": [
+      "1",
+      "10",
+      "11",
+      "13",
+      "14",
+      "15",
+      "16",
+      "19",
+      "2",
+      "20",
+      "21",
+      "3",
+      "6",
+      "9"
+    ]
+  },
+  "target": "RANG <= 3",
+  "probability_note": "trained with balanced class weights, so positive probabilities are inflated; use for ranking, not as true probabilities",
+  "architecture": "Dense(256,relu)-Dropout(0.3)-Dense(128,relu)-Dropout(0.2)-Dense(1,sigmoid)",
+  "random_seed": 42,
+  "training": {
+    "data": "C:\\Users\\HP\\processed_data.csv",
+    "rows": 43449,
+    "races": 5769,
+    "train_rows": 34860,
+    "test_rows": 8589,
+    "sample": null
+  },
+  "metrics": {
+    "test_auc": 0.7427,
+    "test_top3_recall": 0.6028
+  }
+}

@@ -90,6 +90,9 @@ def test_quinte_analysis_endpoint_persists_and_returns_race_id(monkeypatch: pyte
         def select_one(self, *_args: object, **_kwargs: object) -> dict:
             return MEETING
 
+        def list(self, *_args: object, **_kwargs: object) -> list[dict]:
+            return []
+
         def insert(self, *_args: object, **_kwargs: object) -> dict:
             return {}
 
@@ -128,69 +131,50 @@ def test_quinte_analysis_endpoint_persists_and_returns_race_id(monkeypatch: pyte
 
 def test_today_quinte_analysis_reuses_cached_response(monkeypatch: pytest.MonkeyPatch) -> None:
     meeting = {**MEETING, "meeting_date": "2026-10-03"}
+    cached = races_api.TurfomaniaQuinteAnalysisResponse(
+        race_id="race-today",
+        race_type="flat",
+        source="turfomania",
+        row_count=1,
+        columns=["N°", "CHEVAL", "Composite"],
+        rows=[{"N°": "1", "CHEVAL": "TEST HORSE", "Composite": 0.9}],
+        model_version="initial-migration",
+        prognosis=[],
+    )
+    race = {
+        "id": "race-today",
+        "source": "turfomania",
+        "race_type": "flat",
+        "summary": {"q_plus": True},
+    }
+    analysis_run = {
+        "race_id": race["id"],
+        "created_at": "2026-10-03T10:00:00+00:00",
+        "summary": {
+            "homepage_cache_version": races_api.HOMEPAGE_QUINTE_CACHE_VERSION,
+            "homepage_analysis": cached.model_dump(mode="json"),
+        },
+    }
 
     class Client:
-        def __init__(self) -> None:
-            self.races: list[dict] = []
-            self.analysis_runs: list[dict] = []
-
         def list(self, table: str, *, filters: list[tuple[str, str, object]], **_: object) -> list[dict]:
             if table == "meetings":
                 return [meeting]
             if table == "races":
-                return self.races
+                return [race]
+            if table == "analysis_runs":
+                return [analysis_run]
             raise AssertionError(f"unexpected list table: {table}")
 
         def select_one(self, table: str, *, filters: list[tuple[str, str, object]], **_: object) -> dict | None:
-            race_id = next(value for column, _, value in filters if column == "race_id")
-            if table == "analysis_runs":
-                return next((run for run in reversed(self.analysis_runs) if run["race_id"] == race_id), None)
             if table == "flat_race_runners":
                 return {"updated_at": "2026-10-03T10:00:00+00:00"}
             raise AssertionError(f"unexpected select table: {table}")
 
-        def insert(self, table: str, payload: dict) -> dict:
-            if table == "analysis_runs":
-                run = {**payload, "created_at": "2026-10-03T10:00:00+00:00"}
-                self.analysis_runs.append(run)
-                return run
-            raise AssertionError(f"unexpected insert table: {table}")
-
     client = Client()
     monkeypatch.setattr(races_api, "SupabaseClientWrapper", lambda: client)
-    monkeypatch.setattr(
-        races_api,
-        "find_turfomania_quinte_meeting",
-        lambda _meetings: (meeting, _frame()),
-    )
-
-    def persist(*_args: object, **_kwargs: object) -> dict:
-        race = {
-            "id": "race-today",
-            "source": "turfomania",
-            "race_type": "flat",
-            "summary": {"q_plus": True},
-        }
-        client.races = [race]
-        return {"races": [{"id": race["id"]}]}
-
-    monkeypatch.setattr(races_api, "persist_scraped_meeting", persist)
-    analysis_calls = 0
-
-    def analyze(*_args: object, **_kwargs: object) -> AnalysisResponse:
-        nonlocal analysis_calls
-        analysis_calls += 1
-        return AnalysisResponse(
-            race_type="flat",
-            source="turfomania",
-            row_count=1,
-            columns=["N°", "CHEVAL", "Composite"],
-            rows=[{"N°": "1", "CHEVAL": "TEST HORSE", "Composite": 0.9}],
-            model_version="initial-migration",
-            prognosis=[],
-        )
-
-    monkeypatch.setattr(races_api, "_analysis_response", analyze)
+    monkeypatch.setattr(races_api, "_analysis_response", lambda *_args, **_kwargs: pytest.fail("cached reads must not analyze"))
+    monkeypatch.setattr(races_api, "scrape_turfomania_quinte", lambda *_args: pytest.fail("cached reads must not scrape"))
     request = races_api.TodayQuinteAnalysisRequest(date="2026-10-03")
 
     first = races_api.analyze_today_turfomania_quinte(request)
@@ -198,5 +182,3 @@ def test_today_quinte_analysis_reuses_cached_response(monkeypatch: pytest.Monkey
 
     assert first.race_id == "race-today"
     assert second.model_dump() == first.model_dump()
-    assert analysis_calls == 1
-    assert len(client.analysis_runs) == 1

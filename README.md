@@ -33,15 +33,20 @@ administrator promotion endpoint remains available for manually confirmed
 payments when needed.
 
 Chariow checkout starts from the account page and associates each sale with its
-RaceX user through checkout metadata. To enable it, configure `CHARIOW_API_KEY`,
-`CHARIOW_PULSE_SECRET`, `CHARIOW_PRODUCT_ID`, and `CHARIOW_RETURN_URL` in the
-backend environment. `CHARIOW_PULSE_SECRET` is the signing secret for the
-specific Chariow Pulse, not the API key. In Chariow, create a Pulse for
-**Successful Sale**, restricted to the RaceX product, and set its URL to
+RaceX user through checkout metadata. Weekly, monthly, and annual products are
+configured through `CHARIOW_WEEKLY_PRODUCT_ID`, `CHARIOW_PRODUCT_ID`, and
+`CHARIOW_ANNUAL_PRODUCT_ID`. Also configure `CHARIOW_API_KEY`,
+`CHARIOW_PULSE_SECRET`, and `CHARIOW_RETURN_URL` in the backend environment.
+`CHARIOW_PULSE_SECRET` is the signing secret for the specific Chariow Pulse,
+not the API key. In Chariow, create a Pulse for **Successful Sale**, covering
+all three RaceX products, and set its URL to
 `https://<backend-host>/api/v1/webhooks/chariow`. Copy the Pulse signing secret
-to `CHARIOW_PULSE_SECRET`, then run the Chariow section of
-`backend/supabase_schema.sql` in Supabase. Successful verified sales add one
-calendar month of access; failed or unverified events do not.
+to `CHARIOW_PULSE_SECRET`, then apply
+`backend/migrations/20261014_chariow_plan_entitlements.sql` and
+`backend/migrations/20261014_admin_subscription_plans.sql` in Supabase.
+Verified sales add the duration for their product; failed or unverified events
+do not. Administrators can select weekly, monthly, or annual access in
+**Gestion des comptes** after confirming a manual transfer.
 
 Supabase and deployment setup is documented in [SUPABASE_SETUP_CHECKLIST.md](SUPABASE_SETUP_CHECKLIST.md).
 
