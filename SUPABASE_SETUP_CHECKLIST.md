@@ -21,6 +21,9 @@ Do not commit the `service_role` key or place it in the Next.js frontend. It byp
    If the schema was already installed, run the updated file again to add phone
    storage and update the signup trigger; the profile phone-column change is
    safe to re-run.
+   If upgrading an existing database, also run
+   [`backend/migrations/20261014_allow_obstacles_race_type.sql`](backend/migrations/20261014_allow_obstacles_race_type.sql)
+   so saved races can be repaired to the `obstacles` type.
 4. Open **Table Editor** and confirm these tables exist:
    - `meetings`
    - `races`

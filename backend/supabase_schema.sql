@@ -18,7 +18,7 @@ create table if not exists public.races (
     id uuid primary key default gen_random_uuid(),
     meeting_id uuid references public.meetings(id) on delete cascade,
     source text not null default 'zone-turf',
-    race_type text not null check (race_type in ('flat','trot')),
+    race_type text not null check (race_type in ('flat','trot','obstacles')),
     source_url text not null,
     race_number text,
     race_key text,

@@ -92,3 +92,43 @@ def test_admin_grant_rejects_granting_to_an_admin(monkeypatch) -> None:
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Admin accounts cannot be promoted as subscribers"
+
+
+@pytest.mark.parametrize(
+    ("error_code", "expected_detail"),
+    [
+        (
+            "PGRST202",
+            "Subscription activation is not configured in Supabase. Apply "
+            "backend/migrations/20261014_admin_subscription_plans.sql and retry.",
+        ),
+        (
+            "42501",
+            "Subscription activation requires the backend Supabase service_role key.",
+        ),
+    ],
+)
+def test_admin_grant_reports_supabase_setup_errors(
+    monkeypatch,
+    error_code: str,
+    expected_detail: str,
+) -> None:
+    class SupabaseError(Exception):
+        code = error_code
+
+    class FakeSupabase:
+        def rpc(self, function, parameters):
+            raise SupabaseError("Supabase RPC failed")
+
+    monkeypatch.setattr(auth_api, "SupabaseClientWrapper", FakeSupabase)
+
+    response = _client().post(
+        "/api/v1/auth/admin/promote",
+        json={
+            "user_id": "71bffbf1-46f4-4646-98fc-f92ea687f915",
+            "plan": "monthly",
+        },
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == expected_detail

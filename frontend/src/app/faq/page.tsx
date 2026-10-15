@@ -4,21 +4,21 @@ import SiteNavigation from "../site-navigation";
 
 export const metadata: Metadata = {
   title: "Questions fréquentes",
-  description: "Réponses aux questions fréquentes sur les comptes, la démo, les analyses et les paiements RaceX.",
+  description: "Réponses sur les comptes, les paiements et la façon dont RaceX construit ses pronostics, sélections de modèles et votes.",
   alternates: { canonical: "/faq" },
   openGraph: {
     type: "website",
     locale: "fr_FR",
     siteName: "RaceX",
     title: "Questions fréquentes sur RaceX",
-    description: "Réponses aux questions fréquentes sur les comptes, la démo, les analyses et les paiements RaceX.",
+    description: "Réponses sur les comptes, les paiements et la façon dont RaceX construit ses pronostics, sélections de modèles et votes.",
     url: "/faq",
     images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "RaceX — Analyse des courses hippiques" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Questions fréquentes sur RaceX",
-    description: "Réponses aux questions fréquentes sur les comptes, la démo, les analyses et les paiements RaceX.",
+    description: "Réponses sur les comptes, les paiements et la façon dont RaceX construit ses pronostics, sélections de modèles et votes.",
     images: ["/opengraph-image"],
   },
 };
@@ -48,6 +48,21 @@ const questions = [
     question: "Les partants, les cotes et les analyses sont-ils définitifs ?",
     answer:
       "Non. Les partants et les cotes peuvent évoluer. Les analyses dépendent des données disponibles au moment de leur consultation et ne garantissent pas le résultat d’une course.",
+  },
+  {
+    question: "Comment le Pronostic (Prono Flash) est-il établi ?",
+    answer:
+      "Pour les courses plates et les obstacles, RaceX compare les classements de forme (IF), de classe (IC) et de coefficient de réussite (S_COEFF). Les chevaux présents dans la moitié supérieure des trois classements sont prioritaires, puis ceux présents dans deux ; des chevaux repérés par un seul classement peuvent compléter la sélection, jusqu’à huit. Au trot, le pronostic repose sur sept indicateurs pondérés : coefficient de réussite (20 %), forme/fitness (15 %), tendance de forme (15 %), risque de disqualification (20 %), cote (15 %), courses récentes (10 %) et ferrure (5 %). Les indicateurs disponibles contribuent au score des chevaux qui figurent dans leur première moitié de classement.",
+  },
+  {
+    question: "Comment le Model Shortlist est-il choisi ?",
+    answer:
+      "Il s’agit d’un classement distinct du Pronostic : le modèle d’apprentissage automatique classe les chevaux par score Deep décroissant et affiche jusqu’à huit chevaux. Ces scores servent à classer les partants ; ce ne sont pas des probabilités de victoire ou de placé calibrées.",
+  },
+  {
+    question: "Que signifient les votes et le Consensus des votes ?",
+    answer:
+      "Un vote n’est pas un vote d’utilisateur : c’est un signal de modèle. Un cheval reçoit un vote pour chaque source où il figure parmi les trois meilleurs scores de placé, les trois meilleurs scores de victoire, les quatre meilleurs scores « dark horse » ou, si disponible, les trois meilleurs scores Deep. En course plate, les pronostics fournis avec les données de course peuvent aussi compter comme une source. Le Consensus affiche tous les chevaux ayant au moins un vote, du plus grand nombre de votes au plus petit. Les listes Prognosis, Model Shortlist et Consensus mesurent donc des signaux différents.",
   },
   {
     question: "Les analyses RaceX garantissent-elles un gain ?",

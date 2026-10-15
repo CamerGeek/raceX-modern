@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import logging
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
@@ -46,6 +47,7 @@ from race_scraper_app import (
 from favorable_cordes import compute_favorable_corde_horses
 
 router = APIRouter(prefix="/races", tags=["races"])
+logger = logging.getLogger(__name__)
 
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
 HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v2"
@@ -292,6 +294,7 @@ def analyze(request: AnalysisRequest, _: dict[str, Any] = Depends(require_admin)
     except HTTPException:
         raise
     except Exception as exc:
+        logger.exception("Race analysis failed")
         raise HTTPException(status_code=502, detail=f"Race analysis failed: {exc}") from exc
 
 

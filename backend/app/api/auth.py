@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -13,6 +14,7 @@ from app.services.supabase_client import SupabaseClientWrapper
 from app.services.subscription_plans import SubscriptionPlan
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+logger = logging.getLogger(__name__)
 
 
 class PromoteSubscriberRequest(BaseModel):
@@ -97,8 +99,8 @@ def promote_subscriber(
     request: PromoteSubscriberRequest,
     _: dict[str, Any] = Depends(require_admin),
 ) -> dict[str, Any]:
-    client = SupabaseClientWrapper()
     try:
+        client = SupabaseClientWrapper()
         result = client.rpc(
             "apply_admin_subscription_plan",
             {
@@ -116,4 +118,19 @@ def promote_subscriber(
     except HTTPException:
         raise
     except Exception as exc:
+        logger.exception("Could not grant admin-selected subscription plan")
+        error_code = getattr(exc, "code", None)
+        if error_code in {"PGRST202", "42883"}:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Subscription activation is not configured in Supabase. "
+                    "Apply backend/migrations/20261014_admin_subscription_plans.sql and retry."
+                ),
+            ) from exc
+        if error_code == "42501":
+            raise HTTPException(
+                status_code=503,
+                detail="Subscription activation requires the backend Supabase service_role key.",
+            ) from exc
         raise HTTPException(status_code=502, detail="Could not promote account") from exc
