@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "./auth-context";
 
 type Horse = Record<string, string | number | boolean | null>;
 
@@ -67,11 +68,14 @@ function topEight(rows: Horse[]) {
 }
 
 export default function QuinteTopEight() {
+  const { loading: authLoading } = useAuth();
   const [analysis, setAnalysis] = useState<QuinteAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (authLoading) return;
+
     let active = true;
     requestTodayAnalysis()
       .then((result) => {
@@ -88,7 +92,7 @@ export default function QuinteTopEight() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [authLoading]);
 
   function retry() {
     setLoading(true);
@@ -116,7 +120,11 @@ export default function QuinteTopEight() {
         {analysis && <span className="free-analysis-count">{analysis.row_count} partants</span>}
       </div>
 
-      {loading && <p className="free-analysis-status" role="status">Chargement de l’analyse enregistrée…</p>}
+      {loading && (
+        <p className="free-analysis-status" role="status">
+          {authLoading ? "Vérification des accès…" : "Chargement de l’analyse enregistrée…"}
+        </p>
+      )}
       {!loading && error && (
         <div className="free-analysis-error" role="alert">
           <p>{error}</p>
