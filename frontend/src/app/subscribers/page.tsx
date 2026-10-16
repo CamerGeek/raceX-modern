@@ -86,8 +86,26 @@ function horseName(horse: Horse) {
   return firstValue(horse, nameFields) || "Cheval sans nom";
 }
 
+function horseNameWithoutParenthesizedContent(horse: Horse) {
+  return horseName(horse).replace(/\s*\([^)]*\)/g, "").trim() || "Cheval sans nom";
+}
+
 function horseMetric(horse: Horse, keys: string[]) {
   return firstValue(horse, keys) || "—";
+}
+
+function lowestMetricFirst(rows: Horse[], keys: string[]) {
+  return rows
+    .map((horse, index) => {
+      const rawMetric = firstValue(horse, keys).trim().replace(",", ".");
+      const metric = rawMetric ? Number(rawMetric) : Number.NaN;
+      return { horse, index, metric };
+    })
+    .filter((item): item is { horse: Horse; index: number; metric: number } =>
+      Number.isFinite(item.metric),
+    )
+    .sort((first, second) => first.metric - second.metric || first.index - second.index)
+    .map(({ horse }) => horse);
 }
 
 function formatMetric(value: string) {
@@ -142,13 +160,6 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
     : isTrot
     ? [
         {
-          title: "Prognosis trot",
-          description: "Synthèse des signaux propres au trot",
-          rows: sectionRows(analysis, "Summary & Prognosis"),
-          metricKeys: ["Composite", "Status"],
-          metricLabel: "Score",
-        },
-        {
           title: "Performance",
           description: "Coefficient de réussite, ajusté si handicap",
           rows: sectionRows(analysis, "Performance (S_COEFF)"),
@@ -163,8 +174,8 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
           metricLabel: "Tendance",
         },
         {
-          title: "Risque de disqualification",
-          description: "Échelle 0–100 : les valeurs élevées appellent à la prudence",
+          title: "Chevaux sûrs",
+          description: "Classés du risque de disqualification le plus faible au plus élevé",
           rows: sectionRows(analysis, "Disqualification Risk"),
           metricKeys: ["DQ_Risk_Amplified", "DQ_Risk"],
           metricLabel: "Risque",
@@ -205,14 +216,17 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
             {isFlat
               ? "Régularité, écart au marché et avantage des stalles lorsque ces données sont disponibles."
               : isTrot
-              ? "Performance, forme, ferrure et risque de disqualification selon les données disponibles."
+              ? "Performance, forme, ferrure et chevaux les moins exposés à la disqualification."
               : "Classement établi par les modèles dédiés aux courses d’obstacles."}
           </p>
         </div>
       </div>
       <div className="subscriber-discipline-grid">
         {disciplineCards.map((card) => {
-          const rows = card.rows.slice(0, 4);
+          const orderedRows = card.title === "Chevaux sûrs"
+            ? lowestMetricFirst(card.rows, card.metricKeys)
+            : card.rows;
+          const rows = orderedRows.slice(0, 4);
           if (!rows.length) return null;
           return (
             <article className="subscriber-discipline-card" key={card.title}>
@@ -222,7 +236,11 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
                 {rows.map((horse, index) => (
                   <li key={`${horseNumber(horse)}-${index}`}>
                     <strong>{horseNumber(horse)}</strong>
-                    <span>{horseName(horse)}</span>
+                    <span>
+                      {card.title === "Forme récente"
+                        ? horseNameWithoutParenthesizedContent(horse)
+                        : horseName(horse)}
+                    </span>
                     <b>{formatMetric(horseMetric(horse, card.metricKeys))}</b>
                   </li>
                 ))}
@@ -418,12 +436,12 @@ function SubscriberDashboard() {
             </section>
           )}
 
-          <DisciplineHighlights analysis={analysis} />
-
           <QuinteRecommendations
             prognosis={analysis.prognosis}
             modelPredictions={analysis.model_predictions}
           />
+
+          <DisciplineHighlights analysis={analysis} />
 
           <section className="subscriber-contenders public-widget" aria-labelledby="subscriber-contenders-title">
             <div className="subscriber-section-heading">
