@@ -115,27 +115,6 @@ function formatMetric(value: string) {
     : value || "—";
 }
 
-function shoeingDescription(horse: Horse) {
-  const rawEquipment = firstValue(horse, ["DEF.", "DEF", "Def"]);
-  if (rawEquipment) return rawEquipment;
-
-  const features = [
-    ["Bare Front", "déferré antérieurs"],
-    ["Bare Back", "déferré postérieurs"],
-    ["Plate Front", "plaques antérieurs"],
-    ["Plate Back", "plaques postérieurs"],
-  ]
-    .filter(([key]) => {
-      const value = horse[key];
-      return value === true || value === 1 || value === "1";
-    })
-    .map(([, label]) => label);
-  if (features.length) return features.join(", ");
-
-  const aggressiveness = firstValue(horse, ["Shoeing Aggressiveness"]);
-  return aggressiveness ? `Indice ferrure ${aggressiveness}/4` : "Non renseignée";
-}
-
 function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
   const isFlat = analysis.race_type === "flat";
   const isTrot = analysis.race_type === "trot";
@@ -184,7 +163,6 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
     : [];
 
   const fitnessRows = isTrot ? sectionRows(analysis, "Fitness (FA/FM)").slice(0, 4) : [];
-  const shoeingRows = isTrot ? sectionRows(analysis, "Shoeing Strategy").slice(0, 4) : [];
   const obstacleModelRows = isObstacles
     ? (analysis.model_predictions?.rows ?? [])
         .map((horse) => {
@@ -216,7 +194,7 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
             {isFlat
               ? "Régularité, écart au marché et avantage des stalles lorsque ces données sont disponibles."
               : isTrot
-              ? "Performance, forme, ferrure et chevaux les moins exposés à la disqualification."
+              ? "Performance, forme et chevaux les moins exposés à la disqualification."
               : "Classement établi par les modèles dédiés aux courses d’obstacles."}
           </p>
         </div>
@@ -284,23 +262,6 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
                   <b>{formatMetric(horseMetric(horse, ["Fitness_Adjusted", "Fitness"]))}</b>
                 </li>
               ))}
-            </ol>
-          </article>
-        )}
-        {!isFlat && shoeingRows.length > 0 && (
-          <article className="subscriber-discipline-card">
-            <h3>Ferrure</h3>
-            <p>Équipement déclaré pour la course, si renseigné.</p>
-            <ol>
-              {shoeingRows.map((horse, index) => {
-                return (
-                  <li key={`${horseNumber(horse)}-${index}`}>
-                    <strong>{horseNumber(horse)}</strong>
-                    <span>{horseName(horse)}</span>
-                    <b>{shoeingDescription(horse)}</b>
-                  </li>
-                );
-              })}
             </ol>
           </article>
         )}
