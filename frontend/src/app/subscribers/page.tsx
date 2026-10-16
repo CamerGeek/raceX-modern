@@ -358,10 +358,26 @@ function SubscriberDashboard() {
     void loadAnalysis();
   }
 
+  function exportCurrentRacePdf() {
+    const previousTitle = document.title;
+    document.title = `RaceX-Quinte-${todayInParis()}`;
+    window.addEventListener("afterprint", () => {
+      document.title = previousTitle;
+    }, { once: true });
+    window.print();
+  }
+
   const ranked = (analysis?.rows ?? [])
     .map((horse) => ({ horse, score: scoreOf(horse) }))
     .filter((item): item is { horse: Horse; score: number } => item.score !== null)
     .sort((first, second) => second.score - first.score);
+  const completeCompositeScores = (analysis?.rows ?? [])
+    .map((horse, index) => ({ horse, index, score: scoreOf(horse) }))
+    .sort((first, second) => {
+      if (first.score === null) return second.score === null ? first.index - second.index : 1;
+      if (second.score === null) return -1;
+      return second.score - first.score || first.index - second.index;
+    });
   const contenders = ranked.slice(0, 8);
   const leadingHorse = contenders[0]?.horse;
   const leaderScore = contenders[0]?.score ?? null;
@@ -386,6 +402,16 @@ function SubscriberDashboard() {
         </div>
         <div className="subscriber-header-actions">
           {loadedAt && <span className="subscriber-updated">Données chargées à {loadedAt} · heure de Paris</span>}
+          {analysis && !loading && !error && (
+            <button
+              type="button"
+              className="subscriber-refresh subscriber-export"
+              onClick={exportCurrentRacePdf}
+              title="Ouvre l’impression du navigateur pour enregistrer le document au format PDF."
+            >
+              Imprimer / enregistrer en PDF
+            </button>
+          )}
           <button type="button" className="subscriber-refresh" onClick={refreshAnalysis} disabled={loading}>
             {loading ? "Actualisation…" : "Actualiser"}
           </button>
@@ -403,6 +429,19 @@ function SubscriberDashboard() {
 
       {analysis && !loading && !error && (
         <>
+          <header className="subscriber-print-masthead">
+            <p className="subscriber-eyebrow">RACEX · LE QUINTÉ+ DU JOUR</p>
+            <h1>Le journal des courses</h1>
+            <p>
+              {raceDateLabel()}
+              {venue && <> · {venue}</>}
+              {distance && <> · {distance}</>}
+              {" · "}
+              {analysis.race_type === "flat" ? "Plat" : analysis.race_type === "obstacles" ? "Obstacles" : "Trot"}
+            </p>
+            <span>Analyse chargée à {loadedAt} · heure de Paris · Modèle {analysis.model_version}</span>
+          </header>
+
           <section className="subscriber-race-summary" aria-label="Résumé de la course">
             <div><span>COURSE</span><strong>Quinté+ du jour</strong></div>
             {venue && <div><span>HIPPODROME</span><strong>{venue}</strong></div>}
@@ -442,6 +481,40 @@ function SubscriberDashboard() {
           />
 
           <DisciplineHighlights analysis={analysis} />
+
+          <section className="subscriber-composite-print" aria-labelledby="subscriber-composite-print-title">
+            <div className="subscriber-section-heading">
+              <div>
+                <p className="public-kicker">CLASSEMENT COMPLET</p>
+                <h2 id="subscriber-composite-print-title">Scores composites de tous les partants</h2>
+                <p>Classés du score composite le plus élevé au plus faible.</p>
+              </div>
+            </div>
+            <table className="subscriber-composite-table">
+              <thead>
+                <tr>
+                  <th scope="col">Rang</th>
+                  <th scope="col">N°</th>
+                  <th scope="col">Cheval</th>
+                  <th scope="col">Cote</th>
+                  <th scope="col">Forme récente</th>
+                  <th scope="col">Score composite</th>
+                </tr>
+              </thead>
+              <tbody>
+                {completeCompositeScores.map(({ horse, index, score }, rank) => (
+                  <tr key={`${horseNumber(horse)}-${index}`}>
+                    <td>{score === null ? "—" : rank + 1}</td>
+                    <td>{horseNumber(horse)}</td>
+                    <td>{horseName(horse)}</td>
+                    <td>{firstValue(horse, oddsFields) || "—"}</td>
+                    <td>{firstValue(horse, formFields) || "—"}</td>
+                    <td>{displayScore(score)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
 
           <section className="subscriber-contenders public-widget" aria-labelledby="subscriber-contenders-title">
             <div className="subscriber-section-heading">

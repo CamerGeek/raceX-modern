@@ -523,3 +523,59 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 }
 @media (max-width: 900px) { .quinte-picks-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .quinte-picks-grid { grid-template-columns: 1fr; } }
+.subscriber-print-masthead, .subscriber-composite-print { display: none; }
+@media print {
+  @page { size: A4; margin: 13mm 12mm; }
+  body { background: #fff; color: #18221f; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .site-footer, .subscriber-shell > .site-navigation, .subscriber-header,
+  .subscriber-contenders, .subscriber-details, .odds-chart-panel,
+  .subscriber-state { display: none !important; }
+  .subscriber-shell { max-width: none; padding: 0; }
+  .subscriber-print-masthead {
+    display: block;
+    margin-bottom: 1rem;
+    padding-bottom: .8rem;
+    border-bottom: 3px double #103b32;
+    text-align: center;
+  }
+  .subscriber-print-masthead .subscriber-eyebrow { margin: 0 0 .2rem; }
+  .subscriber-print-masthead h1 { margin: 0; color: #103b32; font-size: 2rem; font-weight: 500; }
+  .subscriber-print-masthead > p:not(.subscriber-eyebrow) { margin: .35rem 0; font: 700 .8rem ui-sans-serif, system-ui, sans-serif; }
+  .subscriber-print-masthead > span { color: #65736d; font: .65rem ui-sans-serif, system-ui, sans-serif; }
+  .subscriber-race-summary { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .35rem; }
+  .subscriber-race-summary div { min-height: 3.5rem; padding: .5rem; border-radius: 0; background: #fff; }
+  .subscriber-race-summary strong { font-size: .72rem; }
+  .subscriber-featured { grid-template-columns: minmax(0, 1.4fr) minmax(12rem, .7fr); gap: 1rem; margin-bottom: .7rem; padding: .9rem; border: 1px solid #d7d8ca; border-left: 4px solid #c96f3b; break-inside: avoid; }
+  .subscriber-featured h2, .subscriber-section-heading h2 { font-size: 1.2rem; }
+  .subscriber-rationale { font-size: .75rem; }
+  .subscriber-caveat { font-size: .62rem; }
+  .subscriber-featured-stats div { padding: .4rem .55rem; }
+  .subscriber-featured-stats strong { font-size: .82rem; }
+  .quinte-picks-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .45rem; margin: .6rem 0; }
+  .quinte-pick-card { padding: .65rem; border: 1px solid #d7d8ca; border-top: 3px solid #1d594b; background: #fff; break-inside: avoid; }
+  .quinte-pick-card h2 { font-size: .9rem; }
+  .quinte-pick-description, .quinte-pick-card .free-analysis-status { font-size: .62rem; }
+  .quinte-pick-card .free-analysis-list li { min-width: 1.8rem; min-height: 1.8rem; padding: .25rem; font-size: .72rem; }
+  .vote-analysis-list { font-size: .62rem; }
+  .vote-analysis-list li { padding: .25rem .35rem; }
+  .subscriber-discipline { margin: .7rem 0; }
+  .subscriber-discipline > .subscriber-section-heading { margin-bottom: .4rem; }
+  .subscriber-discipline-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; }
+  .subscriber-discipline-card { padding: .65rem; border-radius: .35rem; box-shadow: none; break-inside: avoid; }
+  .subscriber-discipline-card h3 { font-size: .8rem; }
+  .subscriber-discipline-card > p { margin: .2rem 0 .4rem; font-size: .6rem; }
+  .subscriber-discipline-card li { padding: .3rem; font-size: .62rem; }
+  .subscriber-discipline-card li > strong { min-height: 1.4rem; }
+  .subscriber-discipline-card li > b { font-size: .6rem; }
+  .subscriber-composite-print { display: block; margin-top: .8rem; }
+  .subscriber-composite-print .subscriber-section-heading { margin-bottom: .45rem; }
+  .subscriber-composite-table { width: 100%; border-collapse: collapse; font: .68rem/1.35 ui-sans-serif, system-ui, sans-serif; }
+  .subscriber-composite-table thead { display: table-header-group; }
+  .subscriber-composite-table th { padding: .45rem .4rem; background: #103b32; color: #fff; text-align: left; }
+  .subscriber-composite-table td { padding: .35rem .4rem; border-bottom: 1px solid #d7d8ca; }
+  .subscriber-composite-table tbody tr { break-inside: avoid; }
+  .subscriber-composite-table td:first-child,
+  .subscriber-composite-table td:nth-child(2),
+  .subscriber-composite-table td:nth-child(6) { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .subscriber-composite-table td:nth-child(6) { color: #103b32; text-align: right; }
+}
