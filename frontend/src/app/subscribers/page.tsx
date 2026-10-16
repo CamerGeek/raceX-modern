@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useState } from "react";
 import QuinteOddsChart from "../quinte-odds-chart";
 import QuinteRecommendations, { type QuinteModelPredictions } from "../quinte-recommendations";
@@ -391,15 +392,20 @@ function SubscriberDashboard() {
       {analysis && !loading && !error && (
         <>
           <header className="subscriber-print-masthead">
-            <p className="subscriber-eyebrow">RACEX · LE QUINTÉ+ DU JOUR</p>
-            <h1>Le journal des courses</h1>
-            <p>
-              {raceDateLabel()}
-              {venue && <> · {venue}</>}
-              {distance && <> · {distance}</>}
-              {" · "}
-              {analysis.race_type === "flat" ? "Plat" : analysis.race_type === "obstacles" ? "Obstacles" : "Trot"}
-            </p>
+            <div className="subscriber-print-brand">
+              <Image src="/icon-192.png" alt="RaceX" width={48} height={48} />
+              <div>
+                <p className="subscriber-eyebrow">RACEX · LE QUINTÉ+ DU JOUR</p>
+                <h1>Le journal des courses</h1>
+                <p>
+                  {raceDateLabel()}
+                  {venue && <> · {venue}</>}
+                  {distance && <> · {distance}</>}
+                  {" · "}
+                  {analysis.race_type === "flat" ? "Plat" : analysis.race_type === "obstacles" ? "Obstacles" : "Trot"}
+                </p>
+              </div>
+            </div>
             <span>Analyse chargée à {loadedAt} · heure de Paris · Modèle {analysis.model_version}</span>
           </header>
 
@@ -476,6 +482,19 @@ function SubscriberDashboard() {
               </tbody>
             </table>
           </section>
+
+          <footer className="subscriber-print-footer">
+            <p>
+              Analyse indicative fondée sur les données disponibles au moment du chargement. Les scores,
+              pronostics et cotes peuvent évoluer et ne garantissent aucun résultat ; ce document ne
+              constitue pas un conseil de mise.
+            </p>
+            <span>
+              © {new Date().getFullYear()} RaceX · Développé par Georges BODIONG
+              <br />
+              deebodiong@gmail.com · +22660354400 / +22674911538
+            </span>
+          </footer>
 
           <section className="subscriber-contenders public-widget" aria-labelledby="subscriber-contenders-title">
             <div className="subscriber-section-heading">
