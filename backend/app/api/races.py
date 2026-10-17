@@ -507,22 +507,13 @@ def _analyze_today_turfomania_quinte(
             limit=100,
         )
 
-        for meeting in meetings:
-            for race in client.list(
-                "races",
-                filters=[("meeting_id", "eq", meeting["id"])],
-                limit=500,
-            ):
-                summary = race.get("summary") or {}
-                if race.get("source") == "turfomania" and summary.get("q_plus"):
-                    cached = _cached_homepage_quinte_analysis(
-                        client,
-                        race["id"],
-                        race.get("race_type"),
-                        require_fresh=False,
-                    )
-                    if cached:
-                        return cached
+        cached = _cached_homepage_quinte_for_date(
+            client,
+            meeting_date,
+            meetings=meetings,
+        )
+        if cached:
+            return cached
 
         if allow_tomorrow_analysis and meeting_date == paris_today + timedelta(days=1):
             meeting_ref = {
@@ -575,6 +566,39 @@ def _analyze_today_turfomania_quinte(
             status_code=502,
             detail=f"Turfomania Quinté analysis failed: {exc}",
         ) from exc
+
+
+def _cached_homepage_quinte_for_date(
+    client: SupabaseClientWrapper,
+    meeting_date: date,
+    *,
+    meetings: list[dict[str, Any]] | None = None,
+) -> TurfomaniaQuinteAnalysisResponse | None:
+    meeting_rows = meetings if meetings is not None else client.list(
+        "meetings",
+        filters=[
+            ("source", "eq", "turfomania"),
+            ("meeting_date", "eq", meeting_date.isoformat()),
+        ],
+        limit=100,
+    )
+    for meeting in meeting_rows:
+        for race in client.list(
+            "races",
+            filters=[("meeting_id", "eq", meeting["id"])],
+            limit=500,
+        ):
+            summary = race.get("summary") or {}
+            if race.get("source") == "turfomania" and summary.get("q_plus"):
+                cached = _cached_homepage_quinte_analysis(
+                    client,
+                    race["id"],
+                    race.get("race_type"),
+                    require_fresh=False,
+                )
+                if cached:
+                    return cached
+    return None
 
 
 @router.get("/turfomania/quinte/today/odds")
