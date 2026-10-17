@@ -68,11 +68,17 @@ function todayInParis() {
   }).format(new Date());
 }
 
-function raceDateLabel() {
+function raceDateLabel(value = todayInParis()) {
   return new Intl.DateTimeFormat("fr-FR", {
     timeZone: "Europe/Paris",
     dateStyle: "full",
-  }).format(new Date());
+  }).format(new Date(`${value}T12:00:00`));
+}
+
+function addDays(value: string, days: number) {
+  const result = new Date(`${value}T00:00:00Z`);
+  result.setUTCDate(result.getUTCDate() + days);
+  return result.toISOString().slice(0, 10);
 }
 
 function sectionRows(analysis: Analysis, title: string) {
@@ -283,13 +289,19 @@ function SubscriberDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [loadedAt, setLoadedAt] = useState("");
+  const [selectedRaceDate, setSelectedRaceDate] = useState(todayInParis);
+  const parisToday = todayInParis();
+  const tomorrowDate = addDays(parisToday, 1);
+  const isTomorrowSelected = selectedRaceDate === tomorrowDate;
 
   const loadAnalysis = useCallback(async () => {
+    setLoading(true);
+    setError("");
     try {
       const response = await apiFetch(`${apiUrl}/api/v1/races/turfomania/quinte/today/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: todayInParis() }),
+        body: JSON.stringify({ date: selectedRaceDate }),
         cache: "no-store",
       });
       const payload = await response.json();
@@ -307,7 +319,7 @@ function SubscriberDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [apiFetch]);
+  }, [apiFetch, selectedRaceDate]);
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void loadAnalysis(), 0);
@@ -322,7 +334,7 @@ function SubscriberDashboard() {
 
   function exportCurrentRacePdf() {
     const previousTitle = document.title;
-    document.title = `RaceX-Quinte-${todayInParis()}`;
+    document.title = `RaceX-Quinte-${selectedRaceDate}`;
     window.addEventListener("afterprint", () => {
       document.title = previousTitle;
     }, { once: true });
@@ -360,7 +372,7 @@ function SubscriberDashboard() {
         <div>
           <p className="subscriber-eyebrow">RACEX · ESPACE ABONNÉS</p>
           <h1>Votre tableau de bord Quinté+</h1>
-          <p className="subscriber-date">{raceDateLabel()}</p>
+          <p className="subscriber-date">{raceDateLabel(selectedRaceDate)}</p>
         </div>
         <div className="subscriber-header-actions">
           {loadedAt && <span className="subscriber-updated">Données chargées à {loadedAt} · heure de Paris</span>}
@@ -379,6 +391,24 @@ function SubscriberDashboard() {
           </button>
         </div>
       </header>
+      <div className="subscriber-race-date-switch" role="group" aria-label="Choisir la course à analyser">
+        <button
+          type="button"
+          className={isTomorrowSelected ? "" : "selected"}
+          aria-pressed={!isTomorrowSelected}
+          onClick={() => setSelectedRaceDate(parisToday)}
+        >
+          Quinté+ du jour
+        </button>
+        <button
+          type="button"
+          className={isTomorrowSelected ? "selected" : ""}
+          aria-pressed={isTomorrowSelected}
+          onClick={() => setSelectedRaceDate(tomorrowDate)}
+        >
+          Quinté+ de demain
+        </button>
+      </div>
 
       {loading && <section className="subscriber-state" role="status">Chargement de l’analyse enregistrée…</section>}
       {!loading && error && (
@@ -395,10 +425,10 @@ function SubscriberDashboard() {
             <div className="subscriber-print-brand">
               <Image src="/icon-192.png" alt="RaceX" width={48} height={48} />
               <div>
-                <p className="subscriber-eyebrow">RACEX · LE QUINTÉ+ DU JOUR</p>
+                <p className="subscriber-eyebrow">RACEX · {isTomorrowSelected ? "LE QUINTÉ+ DE DEMAIN" : "LE QUINTÉ+ DU JOUR"}</p>
                 <h1>Le journal des courses</h1>
                 <p>
-                  {raceDateLabel()}
+                  {raceDateLabel(selectedRaceDate)}
                   {venue && <> · {venue}</>}
                   {distance && <> · {distance}</>}
                   {" · "}
@@ -410,7 +440,7 @@ function SubscriberDashboard() {
           </header>
 
           <section className="subscriber-race-summary" aria-label="Résumé de la course">
-            <div><span>COURSE</span><strong>Quinté+ du jour</strong></div>
+            <div><span>COURSE</span><strong>{isTomorrowSelected ? "Quinté+ de demain" : "Quinté+ du jour"}</strong></div>
             {venue && <div><span>HIPPODROME</span><strong>{venue}</strong></div>}
             {distance && <div><span>DISTANCE</span><strong>{distance}</strong></div>}
             <div><span>PARTANTS ANALYSÉS</span><strong>{analysis.row_count}</strong></div>
@@ -447,41 +477,43 @@ function SubscriberDashboard() {
             modelPredictions={analysis.model_predictions}
           />
 
-          <DisciplineHighlights analysis={analysis} />
-
-          <section className="subscriber-composite-print" aria-labelledby="subscriber-composite-print-title">
+          <section className="subscriber-composite-scores public-widget" aria-labelledby="subscriber-composite-scores-title">
             <div className="subscriber-section-heading">
               <div>
                 <p className="public-kicker">CLASSEMENT COMPLET</p>
-                <h2 id="subscriber-composite-print-title">Scores composites de tous les partants</h2>
+                <h2 id="subscriber-composite-scores-title">Scores composites de tous les partants</h2>
                 <p>Classés du score composite le plus élevé au plus faible.</p>
               </div>
             </div>
-            <table className="subscriber-composite-table">
-              <thead>
-                <tr>
-                  <th scope="col">Rang</th>
-                  <th scope="col">N°</th>
-                  <th scope="col">Cheval</th>
-                  <th scope="col">Cote</th>
-                  <th scope="col">Forme récente</th>
-                  <th scope="col">Score composite</th>
-                </tr>
-              </thead>
-              <tbody>
-                {completeCompositeScores.map(({ horse, index, score }, rank) => (
-                  <tr key={`${horseNumber(horse)}-${index}`}>
-                    <td>{score === null ? "—" : rank + 1}</td>
-                    <td>{horseNumber(horse)}</td>
-                    <td>{horseName(horse)}</td>
-                    <td>{firstValue(horse, oddsFields) || "—"}</td>
-                    <td>{firstValue(horse, formFields) || "—"}</td>
-                    <td>{displayScore(score)}</td>
+            <div className="subscriber-composite-table-wrap">
+              <table className="subscriber-composite-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Rang</th>
+                    <th scope="col">N°</th>
+                    <th scope="col">Cheval</th>
+                    <th scope="col">Cote</th>
+                    <th scope="col">Forme récente</th>
+                    <th scope="col">Score composite</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {completeCompositeScores.map(({ horse, index, score }, rank) => (
+                    <tr key={`${horseNumber(horse)}-${index}`}>
+                      <td>{score === null ? "—" : rank + 1}</td>
+                      <td>{horseNumber(horse)}</td>
+                      <td>{horseName(horse)}</td>
+                      <td>{firstValue(horse, oddsFields) || "—"}</td>
+                      <td>{firstValue(horse, formFields) || "—"}</td>
+                      <td>{displayScore(score)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
+
+          <DisciplineHighlights analysis={analysis} />
 
           <footer className="subscriber-print-footer">
             <p>
@@ -495,32 +527,6 @@ function SubscriberDashboard() {
               deebodiong@gmail.com · +22660354400 / +22674911538
             </span>
           </footer>
-
-          <section className="subscriber-contenders public-widget" aria-labelledby="subscriber-contenders-title">
-            <div className="subscriber-section-heading">
-              <div>
-                <p className="public-kicker">SYNTHÈSE DES PARTANTS</p>
-                <h2 id="subscriber-contenders-title">Les 8 principaux chevaux</h2>
-                <p>Triés par score composite décroissant. Les cotes sont indicatives et peuvent évoluer.</p>
-              </div>
-            </div>
-            {contenders.length > 0 ? (
-              <ol className="subscriber-contender-list">
-                {contenders.map(({ horse, score }, index) => (
-                  <li key={`${firstValue(horse, numberFields)}-${index}`}>
-                    <span className="subscriber-rank">{String(index + 1).padStart(2, "0")}</span>
-                    <span className="subscriber-horse-number">{firstValue(horse, numberFields) || "—"}</span>
-                    <span className="subscriber-horse-name">{firstValue(horse, nameFields) || "Cheval sans nom"}</span>
-                    <span className="subscriber-score"><small>COMPOSITE</small><strong>{displayScore(score)}</strong></span>
-                    <span className="subscriber-horse-odds"><small>COTE</small><strong>{firstValue(horse, oddsFields) || "—"}</strong></span>
-                    <span className="subscriber-horse-form"><small>FORME</small><strong>{firstValue(horse, formFields) || "—"}</strong></span>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="subscriber-state">Le score composite n’est pas disponible pour cette course.</p>
-            )}
-          </section>
 
           <details className="subscriber-details public-widget">
             <summary>Comprendre les signaux et les limites de l’analyse</summary>
@@ -548,7 +554,7 @@ function SubscriberDashboard() {
           </details>
         </>
       )}
-      <QuinteOddsChart />
+      <QuinteOddsChart meetingDate={selectedRaceDate} />
     </main>
   );
 }

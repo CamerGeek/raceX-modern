@@ -11,19 +11,22 @@ from turfomania_race import scrape_turfomania_race
 from turfomania_reunions import detect_race_type_from_text
 
 QUINTE_URL = "https://www.turfomania.fr/quinte/"
+QUINTE_TOMORROW_URL = "https://www.turfomania.fr/quinte/demain/"
 
 
 def scrape_turfomania_quinte(
     meeting: dict[str, Any],
     frame: pd.DataFrame | None = None,
+    *,
+    url: str = QUINTE_URL,
 ) -> pd.DataFrame:
-    """Scrape today's Quinté runners after verifying the selected meeting."""
+    """Scrape Quinté runners after verifying the selected meeting."""
     if meeting.get("source") != "turfomania":
         raise ValueError("Selected meeting is not a Turfomania meeting")
 
     return _validate_quinte_frame(
         meeting,
-        frame if frame is not None else scrape_turfomania_race(QUINTE_URL, None),
+        frame if frame is not None else scrape_turfomania_race(url, None),
     )
 
 
@@ -81,7 +84,7 @@ def _validate_quinte_frame(meeting: dict[str, Any], source_frame: pd.DataFrame) 
 
     race_track = str(frame["HIPPODROME"].iloc[0] or "")
     meeting_track = str(meeting.get("name") or "")
-    if not _same_track(race_track, meeting_track):
+    if meeting_track and not _same_track(race_track, meeting_track):
         raise ValueError(
             f"Turfomania's Quinté is at {race_track or 'an unknown track'}, "
             f"not {meeting_track or 'the selected meeting'}"

@@ -44,14 +44,15 @@ function formatOdds(odds: number) {
   return odds.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-export default function QuinteOddsChart() {
+export default function QuinteOddsChart({ meetingDate }: { meetingDate?: string }) {
   const [history, setHistory] = useState<OddsHistory | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const loadHistory = useCallback(async () => {
     try {
-      const response = await fetch(`${apiUrl}/api/v1/races/turfomania/quinte/today/odds`, {
+      const dateQuery = meetingDate ? `?date=${encodeURIComponent(meetingDate)}` : "";
+      const response = await fetch(`${apiUrl}/api/v1/races/turfomania/quinte/today/odds${dateQuery}`, {
         cache: "no-store",
       });
       const payload = await response.json();
@@ -63,7 +64,7 @@ export default function QuinteOddsChart() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [meetingDate]);
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void loadHistory(), 0);

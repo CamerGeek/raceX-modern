@@ -54,6 +54,31 @@ def test_scrape_quinte_accepts_matching_meeting(monkeypatch: pytest.MonkeyPatch)
     assert turfomania_quinte_race_type(result.drop(columns=["POIDS"])) == "trot"
 
 
+def test_scrape_tomorrow_quinte_uses_tomorrow_url_and_target_date(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert quinte_module.QUINTE_TOMORROW_URL == "https://www.turfomania.fr/quinte/demain/"
+    next_day_meeting = {
+        "source": "turfomania",
+        "meeting_date": "2026-10-04",
+    }
+    calls: list[tuple[str, str | None]] = []
+
+    def fake_scrape(url: str, race_type: str | None) -> pd.DataFrame:
+        calls.append((url, race_type))
+        return _frame(race_date="04/10/2026")
+
+    monkeypatch.setattr(quinte_module, "scrape_turfomania_race", fake_scrape)
+
+    result = scrape_turfomania_quinte(
+        next_day_meeting,
+        url=quinte_module.QUINTE_TOMORROW_URL,
+    )
+
+    assert calls == [(quinte_module.QUINTE_TOMORROW_URL, None)]
+    assert result["RACE_DATE"].tolist() == ["04/10/2026"]
+
+
 def test_quinte_race_type_uses_obstacle_conditions_before_missing_weight_heuristic() -> None:
     frame = _frame().drop(columns=["POIDS"])
     frame["RACE_CONDITIONS"] = "Haies - 3600 mètres"
@@ -189,3 +214,64 @@ def test_today_quinte_analysis_reuses_cached_response(monkeypatch: pytest.Monkey
 
     assert first.race_id == "race-today"
     assert second.model_dump() == first.model_dump()
+
+
+def test_tomorrow_quinte_analysis_scrapes_and_caches_for_next_day(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Client:
+        def __init__(self) -> None:
+            self.inserted: list[tuple[str, dict]] = []
+
+        def list(self, table: str, **_: object) -> list[dict]:
+            if table == "meetings":
+                return []
+            raise AssertionError(f"unexpected list table: {table}")
+
+        def insert(self, table: str, payload: dict) -> dict:
+            self.inserted.append((table, payload))
+            return {}
+
+    client = Client()
+    frame = _frame(race_date="04/10/2026")
+    scraped_urls: list[str] = []
+    persisted: dict[str, object] = {}
+    monkeypatch.setattr(races_api, "_paris_today", lambda: date(2026, 10, 3))
+    monkeypatch.setattr(races_api, "SupabaseClientWrapper", lambda: client)
+
+    def fake_scrape(meeting: dict, *, url: str) -> pd.DataFrame:
+        assert meeting["meeting_date"] == "2026-10-04"
+        scraped_urls.append(url)
+        return frame
+
+    def fake_persist(_frame: pd.DataFrame, **kwargs: object) -> dict:
+        persisted.update(kwargs)
+        return {"races": [{"id": "race-tomorrow"}]}
+
+    monkeypatch.setattr(races_api, "scrape_turfomania_quinte", fake_scrape)
+    monkeypatch.setattr(races_api, "persist_scraped_meeting", fake_persist)
+    monkeypatch.setattr(
+        races_api,
+        "_analysis_response",
+        lambda *_args, **_kwargs: AnalysisResponse(
+            race_type="flat",
+            source="turfomania",
+            row_count=1,
+            columns=["N°"],
+            rows=[{"N°": "1"}],
+            model_version="test",
+            prognosis=[],
+        ),
+    )
+
+    result = races_api._analyze_today_turfomania_quinte(
+        races_api.TodayQuinteAnalysisRequest(date="2026-10-04"),
+        allow_tomorrow_analysis=True,
+    )
+
+    assert result.race_id == "race-tomorrow"
+    assert scraped_urls == [races_api.QUINTE_TOMORROW_URL]
+    assert persisted["meeting_date"] == date(2026, 10, 4)
+    assert persisted["meeting_name"] == "LONGCHAMP"
+    assert client.inserted[0][0] == "analysis_runs"
+    assert client.inserted[0][1]["summary"]["homepage_cache_version"] == races_api.HOMEPAGE_QUINTE_CACHE_VERSION

@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import logging
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -28,6 +28,7 @@ from app.services.supabase_client import SupabaseClientWrapper
 from app.services.auth_service import require_admin, require_subscriber_features
 from app.services.turfomania_download import _infer_race_type, parse_turfomania_meeting_url
 from app.services.turfomania_quinte import (
+    QUINTE_TOMORROW_URL,
     scrape_turfomania_quinte,
     turfomania_quinte_race_type,
 )
@@ -444,7 +445,7 @@ def analyze_today_turfomania_quinte(
     request: TodayQuinteAnalysisRequest,
     _: dict[str, Any] = Depends(require_subscriber_features),
 ) -> TurfomaniaQuinteAnalysisResponse:
-    return _analyze_today_turfomania_quinte(request)
+    return _analyze_today_turfomania_quinte(request, allow_tomorrow_analysis=True)
 
 
 @router.post("/turfomania/quinte/today/public")
@@ -484,11 +485,18 @@ def public_today_turfomania_quinte(request: TodayQuinteAnalysisRequest) -> dict[
     }
 
 
+def _paris_today() -> date:
+    return datetime.now(ZoneInfo("Europe/Paris")).date()
+
+
 def _analyze_today_turfomania_quinte(
     request: TodayQuinteAnalysisRequest,
+    *,
+    allow_tomorrow_analysis: bool = False,
 ) -> TurfomaniaQuinteAnalysisResponse:
     client = SupabaseClientWrapper()
-    meeting_date = request.meeting_date or date.today()
+    paris_today = _paris_today()
+    meeting_date = request.meeting_date or paris_today
     try:
         meetings = client.list(
             "meetings",
@@ -498,11 +506,6 @@ def _analyze_today_turfomania_quinte(
             ],
             limit=100,
         )
-        if not meetings:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No prepared Turfomania Quinté analysis found for {meeting_date.isoformat()}",
-            )
 
         for meeting in meetings:
             for race in client.list(
@@ -520,6 +523,45 @@ def _analyze_today_turfomania_quinte(
                     )
                     if cached:
                         return cached
+
+        if allow_tomorrow_analysis and meeting_date == paris_today + timedelta(days=1):
+            meeting_ref = {
+                "source": "turfomania",
+                "meeting_date": meeting_date.isoformat(),
+            }
+            frame = scrape_turfomania_quinte(meeting_ref, url=QUINTE_TOMORROW_URL)
+            race_type = turfomania_quinte_race_type(frame)
+            meeting_name = str(frame["HIPPODROME"].iloc[0] or "") or None
+            persisted = persist_scraped_meeting(
+                frame,
+                meeting_date=meeting_date,
+                meeting_name=meeting_name,
+                meeting_url=QUINTE_TOMORROW_URL,
+                race_type=race_type,
+                source="turfomania",
+                client=client,
+            )
+            if not persisted["races"]:
+                raise ValueError("No Quinté race was persisted")
+            response = _analysis_response(
+                frame,
+                race_type=race_type,
+                source="turfomania",
+                include_handicap=True,
+                max_horses=8,
+            )
+            result = TurfomaniaQuinteAnalysisResponse(
+                **response.model_dump(),
+                race_id=persisted["races"][0]["id"],
+            )
+            _store_homepage_quinte_analysis(client, result)
+            return result
+
+        if not meetings:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No prepared Turfomania Quinté analysis found for {meeting_date.isoformat()}",
+            )
         raise HTTPException(
             status_code=404,
             detail=f"No prepared Quinté analysis found for {meeting_date.isoformat()}; ask an admin to run it.",
@@ -531,7 +573,7 @@ def _analyze_today_turfomania_quinte(
     except Exception as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"Today's Turfomania Quinté analysis failed: {exc}",
+            detail=f"Turfomania Quinté analysis failed: {exc}",
         ) from exc
 
 
