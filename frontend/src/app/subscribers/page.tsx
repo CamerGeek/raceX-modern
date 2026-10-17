@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import QuinteOddsChart from "../quinte-odds-chart";
 import QuinteRecommendations, { type QuinteModelPredictions } from "../quinte-recommendations";
 import SiteNavigation from "../site-navigation";
@@ -289,12 +289,18 @@ function SubscriberDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [loadedAt, setLoadedAt] = useState("");
-  const [selectedRaceDate, setSelectedRaceDate] = useState(todayInParis);
-  const parisToday = todayInParis();
-  const tomorrowDate = addDays(parisToday, 1);
-  const isTomorrowSelected = selectedRaceDate === tomorrowDate;
+  const [parisToday, setParisToday] = useState(todayInParis);
+  const [selectedDayOffset, setSelectedDayOffset] = useState(0);
+  const requestSequence = useRef(0);
+  const selectedRaceDate = addDays(parisToday, selectedDayOffset);
+  const selectedDayLabel = selectedDayOffset === -1
+    ? "Quinté+ d'hier"
+    : selectedDayOffset === 1
+      ? "Quinté+ de demain"
+      : "Quinté+ du jour";
 
   const loadAnalysis = useCallback(async () => {
+    const sequence = ++requestSequence.current;
     setLoading(true);
     setError("");
     try {
@@ -308,6 +314,7 @@ function SubscriberDashboard() {
       if (!response.ok) {
         throw new Error(payload.detail ?? "Impossible de charger l’analyse de la course.");
       }
+      if (sequence !== requestSequence.current) return;
       setAnalysis(payload as Analysis);
       setLoadedAt(new Intl.DateTimeFormat("fr-FR", {
         timeZone: "Europe/Paris",
@@ -315,15 +322,26 @@ function SubscriberDashboard() {
         minute: "2-digit",
       }).format(new Date()));
     } catch (loadError) {
+      if (sequence !== requestSequence.current) return;
       setError(loadError instanceof Error ? loadError.message : "Impossible de charger l’analyse de la course.");
     } finally {
-      setLoading(false);
+      if (sequence === requestSequence.current) setLoading(false);
     }
   }, [apiFetch, selectedRaceDate]);
 
   useEffect(() => {
+    const updateParisDate = () => {
+      const currentDate = todayInParis();
+      setParisToday((previousDate) => previousDate === currentDate ? previousDate : currentDate);
+    };
+    const interval = window.setInterval(updateParisDate, 60_000);
+    window.addEventListener("focus", updateParisDate);
     const initialLoad = window.setTimeout(() => void loadAnalysis(), 0);
-    return () => window.clearTimeout(initialLoad);
+    return () => {
+      window.clearTimeout(initialLoad);
+      window.clearInterval(interval);
+      window.removeEventListener("focus", updateParisDate);
+    };
   }, [loadAnalysis]);
 
   function refreshAnalysis() {
@@ -394,17 +412,25 @@ function SubscriberDashboard() {
       <div className="subscriber-race-date-switch" role="group" aria-label="Choisir la course à analyser">
         <button
           type="button"
-          className={isTomorrowSelected ? "" : "selected"}
-          aria-pressed={!isTomorrowSelected}
-          onClick={() => setSelectedRaceDate(parisToday)}
+          className={selectedDayOffset === -1 ? "selected" : ""}
+          aria-pressed={selectedDayOffset === -1}
+          onClick={() => setSelectedDayOffset(-1)}
+        >
+          Quinté+ d’hier
+        </button>
+        <button
+          type="button"
+          className={selectedDayOffset === 0 ? "selected" : ""}
+          aria-pressed={selectedDayOffset === 0}
+          onClick={() => setSelectedDayOffset(0)}
         >
           Quinté+ du jour
         </button>
         <button
           type="button"
-          className={isTomorrowSelected ? "selected" : ""}
-          aria-pressed={isTomorrowSelected}
-          onClick={() => setSelectedRaceDate(tomorrowDate)}
+          className={selectedDayOffset === 1 ? "selected" : ""}
+          aria-pressed={selectedDayOffset === 1}
+          onClick={() => setSelectedDayOffset(1)}
         >
           Quinté+ de demain
         </button>
@@ -425,7 +451,7 @@ function SubscriberDashboard() {
             <div className="subscriber-print-brand">
               <Image src="/icon-192.png" alt="RaceX" width={48} height={48} />
               <div>
-                <p className="subscriber-eyebrow">RACEX · {isTomorrowSelected ? "LE QUINTÉ+ DE DEMAIN" : "LE QUINTÉ+ DU JOUR"}</p>
+                <p className="subscriber-eyebrow">RACEX · {selectedDayLabel.toLocaleUpperCase("fr-FR")}</p>
                 <h1>Le journal des courses</h1>
                 <p>
                   {raceDateLabel(selectedRaceDate)}
@@ -440,7 +466,7 @@ function SubscriberDashboard() {
           </header>
 
           <section className="subscriber-race-summary" aria-label="Résumé de la course">
-            <div><span>COURSE</span><strong>{isTomorrowSelected ? "Quinté+ de demain" : "Quinté+ du jour"}</strong></div>
+            <div><span>COURSE</span><strong>{selectedDayLabel}</strong></div>
             {venue && <div><span>HIPPODROME</span><strong>{venue}</strong></div>}
             {distance && <div><span>DISTANCE</span><strong>{distance}</strong></div>}
             <div><span>PARTANTS ANALYSÉS</span><strong>{analysis.row_count}</strong></div>
