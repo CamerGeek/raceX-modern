@@ -539,7 +539,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
     text-align: left;
   }
   .subscriber-print-brand { display: flex; align-items: center; gap: .75rem; }
-  .subscriber-print-brand img { width: 2.5rem; height: 2.5rem; object-fit: contain; }
+  .subscriber-print-brand svg { display: block; flex: 0 0 2.5rem; width: 2.5rem; height: 2.5rem; }
   .subscriber-print-masthead .subscriber-eyebrow { margin: 0 0 .1rem; font-size: .58rem; }
   .subscriber-print-masthead h1 { margin: 0; color: #103b32; font-size: 1.65rem; font-weight: 500; }
   .subscriber-print-brand > div > p:last-child { margin: .2rem 0 0; font: 700 .72rem ui-sans-serif, system-ui, sans-serif; }

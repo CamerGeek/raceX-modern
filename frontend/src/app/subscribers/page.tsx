@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import QuinteOddsChart from "../quinte-odds-chart";
 import QuinteRecommendations, { type QuinteModelPredictions } from "../quinte-recommendations";
@@ -449,7 +448,16 @@ function SubscriberDashboard() {
         <>
           <header className="subscriber-print-masthead">
             <div className="subscriber-print-brand">
-              <Image src="/icon-192.png" alt="RaceX" width={48} height={48} />
+              <svg
+                aria-label="RaceX"
+                role="img"
+                viewBox="0 0 512 512"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect width="512" height="512" rx="112" fill="#103b32" />
+                <path d="M75 105h362v58H303L124 349h142v58H75v-58l179-186H75z" fill="#f3f0e8" />
+                <path d="M310 224 437 407h-75l-90-130-91 130h-72l127-181-112-161h75l75 108 76-108h72z" fill="#2ac7ff" />
+              </svg>
               <div>
                 <p className="subscriber-eyebrow">RACEX · {selectedDayLabel.toLocaleUpperCase("fr-FR")}</p>
                 <h1>Le journal des courses</h1>
