@@ -276,6 +276,7 @@ button, input, select { font: inherit; }
 .workspace { display: grid; grid-template-columns: minmax(260px, .75fr) minmax(0, 1.45fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
 .control-panel, .results-panel { background: var(--panel); padding: 2rem; }
 .control-panel { display: flex; flex-direction: column; gap: .7rem; }
+.selection-controls > button { margin-top: .4rem; }
 .form-heading { display: flex; align-items: start; justify-content: space-between; padding-bottom: .8rem; border-bottom: 1px solid var(--line); margin-bottom: .35rem; }
 .form-heading h3 { margin: .35rem 0 0; color: var(--green); font-size: 1.25rem; font-weight: 500; }
 .live-label { color: var(--muted); font: 700 .6rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .1em; }

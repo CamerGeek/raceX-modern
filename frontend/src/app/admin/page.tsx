@@ -148,9 +148,6 @@ function AdminPageContent() {
     day: "2-digit",
   }).formatToParts(new Date());
   const today = `${todayParts.find((part) => part.type === "year")?.value}-${todayParts.find((part) => part.type === "month")?.value}-${todayParts.find((part) => part.type === "day")?.value}`;
-  const tomorrowDate = new Date(`${today}T00:00:00Z`);
-  tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
-  const tomorrow = tomorrowDate.toISOString().slice(0, 10);
   const [url, setUrl] = useState("");
   const [meetingUrl, setMeetingUrl] = useState("");
   const [races, setRaces] = useState<RaceOption[]>([]);
@@ -560,14 +557,12 @@ function AdminPageContent() {
           {meetingUrl.startsWith("turfomania://meetings/") && !showManualUrl && meetingDate === today && <button className="analyze-button quinte-button" type="button" onClick={() => void analyzeTurfomaniaQuinte()} disabled={loading}>
             {loading ? "Refreshing Quinté analysis..." : "Refresh today’s Quinté analysis"}<span aria-hidden="true">↗</span>
           </button>}
-          {meetingDate === tomorrow && !showManualUrl && <>
-            <button className="analyze-button quinte-button" type="button" onClick={() => void analyzeTomorrowQuinte()} disabled={loading}>
-              {loading ? "Preparing Quinté analysis..." : "Prepare tomorrow’s Quinté analysis"}<span aria-hidden="true">↗</span>
-            </button>
-            <p className="stored-notice">This prepares and caches tomorrow’s Quinté+ analysis for subscribers.</p>
-          </>}
           {error && <p className="error" role="alert">{error}</p>}
           </div>
+          <button className="analyze-button quinte-button" type="button" onClick={() => void analyzeTomorrowQuinte()} disabled={loading}>
+            {loading ? "Preparing Quinté analysis..." : "Prepare tomorrow’s Quinté analysis"}<span aria-hidden="true">↗</span>
+          </button>
+          <p className="stored-notice">Admin action: prepares and caches tomorrow’s Quinté+ analysis for subscribers.</p>
         </form>
 
         <section className="results-panel" aria-live="polite">
