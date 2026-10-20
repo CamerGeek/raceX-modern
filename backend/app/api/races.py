@@ -445,7 +445,20 @@ def analyze_today_turfomania_quinte(
     request: TodayQuinteAnalysisRequest,
     _: dict[str, Any] = Depends(require_subscriber_features),
 ) -> TurfomaniaQuinteAnalysisResponse:
-    return _analyze_today_turfomania_quinte(request, allow_tomorrow_analysis=True)
+    return _analyze_today_turfomania_quinte(request)
+
+
+@router.post(
+    "/turfomania/quinte/tomorrow/analyze",
+    response_model=TurfomaniaQuinteAnalysisResponse,
+)
+def analyze_tomorrow_turfomania_quinte(
+    _: dict[str, Any] = Depends(require_admin),
+) -> TurfomaniaQuinteAnalysisResponse:
+    return _analyze_today_turfomania_quinte(
+        TodayQuinteAnalysisRequest(date=_paris_today() + timedelta(days=1)),
+        allow_tomorrow_analysis=True,
+    )
 
 
 @router.post("/turfomania/quinte/today/public")
@@ -514,6 +527,15 @@ def _analyze_today_turfomania_quinte(
         )
         if cached:
             return cached
+
+        if (
+            meeting_date == paris_today + timedelta(days=1)
+            and not allow_tomorrow_analysis
+        ):
+            raise HTTPException(
+                status_code=404,
+                detail="Tomorrow's Quinté+ analysis is not available yet. Please check back after an administrator prepares it.",
+            )
 
         if allow_tomorrow_analysis and meeting_date == paris_today + timedelta(days=1):
             meeting_ref = {

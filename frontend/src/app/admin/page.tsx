@@ -141,7 +141,16 @@ function modelCheckFromVisibleRankings(analysis: Analysis): Horse[] | null {
 
 function AdminPageContent() {
   const { apiFetch } = useAuth();
-  const today = new Date().toISOString().slice(0, 10);
+  const todayParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const today = `${todayParts.find((part) => part.type === "year")?.value}-${todayParts.find((part) => part.type === "month")?.value}-${todayParts.find((part) => part.type === "day")?.value}`;
+  const tomorrowDate = new Date(`${today}T00:00:00Z`);
+  tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
+  const tomorrow = tomorrowDate.toISOString().slice(0, 10);
   const [url, setUrl] = useState("");
   const [meetingUrl, setMeetingUrl] = useState("");
   const [races, setRaces] = useState<RaceOption[]>([]);
@@ -430,6 +439,43 @@ function AdminPageContent() {
     }
   }
 
+  async function analyzeTomorrowQuinte() {
+    setLoading(true);
+    setError("");
+    setAnalysis(null);
+    setScrapeResult(null);
+    try {
+      const response = await apiFetch(`${apiUrl}/api/v1/races/turfomania/quinte/tomorrow/analyze`, {
+        method: "POST",
+      });
+      const payload = await response.json() as Analysis & { detail?: string };
+      if (!response.ok) throw new Error(payload.detail ?? "Tomorrow's Quinté+ analysis failed");
+      const race: RaceOption = {
+        id: payload.race_id ?? "",
+        race_key: field(payload.rows[0] ?? {}, ["REF_COURSE"], "Q+"),
+        url: "https://www.turfomania.fr/quinte/demain/",
+        race_type: payload.race_type,
+        q_plus: true,
+      };
+      if (race.id) {
+        setRaces((previous) => [...previous.filter((item) => item.id !== race.id), race]);
+        setSelectedRace(race.id);
+      }
+      setUrl(race.url);
+      setRaceType(payload.race_type);
+      setTypeSource("automatic");
+      setAnalysis(payload);
+      setSelectionExpanded(false);
+      setReportTab("overview");
+      setSimulationRows([]);
+      setCombinations([]);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Tomorrow's Quinté+ analysis failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function loadBettingTab(tab: "simulation" | "combinations", forceRefresh = false) {
     const race = races.find((item) => item.id === selectedRace);
     if (!race) return;
@@ -511,11 +557,14 @@ function AdminPageContent() {
 
           <button className="analyze-button" type="submit" disabled={loading || detectingType || !meetingUrl && !url}>{loading ? "Saving meeting..." : storedMeeting && !forceRefresh ? "Load saved meeting" : "Download & save meeting"}<span aria-hidden="true">↗</span></button>
           {selectedRace && <button className="analyze-button" type="button" onClick={() => void analyzeSelectedRace(undefined, true)} disabled={loading || detectingType}>{loading ? "Analyzing race..." : "Re-run analysis"}<span aria-hidden="true">↗</span></button>}
-          {meetingUrl.startsWith("turfomania://meetings/") && !showManualUrl && <>
-            <button className="analyze-button quinte-button" type="button" onClick={() => void analyzeTurfomaniaQuinte()} disabled={loading || meetingDate !== today}>
+          {meetingUrl.startsWith("turfomania://meetings/") && !showManualUrl && meetingDate === today && <button className="analyze-button quinte-button" type="button" onClick={() => void analyzeTurfomaniaQuinte()} disabled={loading}>
             {loading ? "Refreshing Quinté analysis..." : "Refresh today’s Quinté analysis"}<span aria-hidden="true">↗</span>
+          </button>}
+          {meetingDate === tomorrow && !showManualUrl && <>
+            <button className="analyze-button quinte-button" type="button" onClick={() => void analyzeTomorrowQuinte()} disabled={loading}>
+              {loading ? "Preparing Quinté analysis..." : "Prepare tomorrow’s Quinté analysis"}<span aria-hidden="true">↗</span>
             </button>
-            {meetingDate !== today && <p className="stored-notice">The generic Turfomania Quinté page only provides the current day’s race.</p>}
+            <p className="stored-notice">This prepares and caches tomorrow’s Quinté+ analysis for subscribers.</p>
           </>}
           {error && <p className="error" role="alert">{error}</p>}
           </div>

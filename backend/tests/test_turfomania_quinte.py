@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from datetime import date
+
 import pandas as pd
 import pytest
+from fastapi import HTTPException
 
 import app.api.races as races_api
 import app.services.turfomania_quinte as quinte_module
@@ -161,7 +164,10 @@ def test_quinte_analysis_endpoint_persists_and_returns_race_id(monkeypatch: pyte
     assert result.source == "turfomania"
 
 
-def test_today_quinte_analysis_reuses_cached_response(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_subscriber_tomorrow_quinte_analysis_reuses_shared_cache(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(races_api, "_paris_today", lambda: date(2026, 10, 2))
     meeting = {**MEETING, "meeting_date": "2026-10-03"}
     cached = races_api.TurfomaniaQuinteAnalysisResponse(
         race_id="race-today",
@@ -264,10 +270,7 @@ def test_tomorrow_quinte_analysis_scrapes_and_caches_for_next_day(
         ),
     )
 
-    result = races_api._analyze_today_turfomania_quinte(
-        races_api.TodayQuinteAnalysisRequest(date="2026-10-04"),
-        allow_tomorrow_analysis=True,
-    )
+    result = races_api.analyze_tomorrow_turfomania_quinte()
 
     assert result.race_id == "race-tomorrow"
     assert scraped_urls == [races_api.QUINTE_TOMORROW_URL]
@@ -275,3 +278,26 @@ def test_tomorrow_quinte_analysis_scrapes_and_caches_for_next_day(
     assert persisted["meeting_name"] == "LONGCHAMP"
     assert client.inserted[0][0] == "analysis_runs"
     assert client.inserted[0][1]["summary"]["homepage_cache_version"] == races_api.HOMEPAGE_QUINTE_CACHE_VERSION
+
+
+def test_subscriber_tomorrow_request_does_not_start_analysis(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Client:
+        def list(self, table: str, **_: object) -> list[dict]:
+            if table == "meetings":
+                return []
+            raise AssertionError(f"unexpected list table: {table}")
+
+    monkeypatch.setattr(races_api, "_paris_today", lambda: date(2026, 10, 3))
+    monkeypatch.setattr(races_api, "SupabaseClientWrapper", Client)
+    monkeypatch.setattr(
+        races_api,
+        "scrape_turfomania_quinte",
+        lambda *_args, **_kwargs: pytest.fail("subscriber requests must not scrape tomorrow's race"),
+    )
+
+    with pytest.raises(HTTPException, match="not available yet"):
+        races_api.analyze_today_turfomania_quinte(
+            races_api.TodayQuinteAnalysisRequest(date="2026-10-04")
+        )
