@@ -219,10 +219,17 @@ class ObstaclesPredictor:
             df["FT"] = perf.map(lambda x: x.get("global", 0))
             letter = df["DESCRIPTIF"].map(_discipline_letter) \
                 if "DESCRIPTIF" in df.columns else pd.Series("", index=df.index)
+            df["DISCIPLINE"] = letter
+            form_column = letter.map({"h": "FH", "s": "FS", "c": "FC"})
+            df["FORM_DISCIPLINE"] = [
+                scores.get({"FH": "h", "FS": "s", "FC": "c"}.get(column), 0) or np.nan
+                for scores, column in zip(perf, form_column)
+            ]
             df["S_COEFF"] = [
                 success_coefficient(m, l) if isinstance(m, str) and m.strip() else 0.0
                 for m, l in zip(df["HORSE_MUSIC"], letter)
             ]
+            df["MUSIC_AVAILABLE"] = df["HORSE_MUSIC"].astype(str).str.strip().ne("").astype(int)
             df = extract_incident_features(df)
 
         if "IC" not in df.columns:
@@ -257,7 +264,11 @@ class ObstaclesPredictor:
         prepared, X, X_deep, race_info = self.prepare_race(data)
 
         out = pd.DataFrame(index=prepared.index)
-        for col in ("NUMERO", "CHEVAL", "JOCKEY", "COTE_RAW", "DISTANCE"):
+        for col in (
+            "NUMERO", "CHEVAL", "JOCKEY", "COTE_RAW", "DISTANCE",
+            "DISCIPLINE", "FORM_DISCIPLINE", "S_COEFF", "MUSIC_AVAILABLE",
+            "INCIDENT_COUNT", "HAS_FALLEN", "HAS_STOPPED",
+        ):
             if col in prepared.columns:
                 out[col] = prepared[col]
         out = out.rename(columns={"COTE_RAW": "COTE"})

@@ -184,6 +184,41 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
         .sort((first, second) => second.score - first.score)
         .slice(0, 4)
     : [];
+  const obstacleFormRows = isObstacles
+    ? (analysis.model_predictions?.rows ?? [])
+        .map((horse, index) => {
+          const rawScore = firstValue(horse, ["FORM_DISCIPLINE"]).trim().replace(",", ".");
+          const score = rawScore ? Number(rawScore) : null;
+          const rawSuccess = firstValue(horse, ["S_COEFF"]).trim().replace(",", ".");
+          const success = rawSuccess ? Number(rawSuccess) : null;
+          return { horse, index, score, success };
+        })
+        .filter((item): item is { horse: Horse; index: number; score: number; success: number | null } =>
+          item.score !== null && Number.isFinite(item.score),
+        )
+        .sort((first, second) => first.score - second.score || first.index - second.index)
+        .slice(0, 4)
+    : [];
+  const obstacleDisciplineCode = firstValue(analysis.model_predictions?.rows[0] ?? {}, ["DISCIPLINE"]);
+  const obstacleDisciplineLabel = ({
+    h: "haies",
+    s: "steeple",
+    c: "cross",
+  } as Record<string, string>)[obstacleDisciplineCode] ?? "obstacles";
+  const obstacleIncidentRows = isObstacles
+    ? (analysis.model_predictions?.rows ?? [])
+        .filter((horse) =>
+          Number(firstValue(horse, ["MUSIC_AVAILABLE"])) > 0
+          && (Number(firstValue(horse, ["INCIDENT_COUNT"])) > 0
+            || Number(firstValue(horse, ["HAS_FALLEN"])) > 0
+            || Number(firstValue(horse, ["HAS_STOPPED"])) > 0),
+        )
+        .slice(0, 4)
+    : [];
+  const obstacleMusicAvailable = isObstacles
+    && (analysis.model_predictions?.rows ?? []).some(
+      (horse) => Number(firstValue(horse, ["MUSIC_AVAILABLE"])) > 0,
+    );
   const bestPosts = analysis.overview?.best_starting_posts ?? [];
   const track = analysis.overview?.track ?? "";
   const distance = analysis.overview?.distance ?? 0;
@@ -245,6 +280,49 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
                 </li>
               ))}
             </ol>
+          </article>
+        )}
+        {isObstacles && obstacleFormRows.length > 0 && (
+          <article className="subscriber-discipline-card">
+            <h3>Forme en {obstacleDisciplineLabel}</h3>
+            <p>Indice pondéré des performances dans cette spécialité : plus bas est favorable.</p>
+            <ol>
+              {obstacleFormRows.map(({ horse, score, success }, index) => (
+                <li key={`obstacle-form-${horseNumber(horse)}-${index}`}>
+                  <strong>{horseNumber(horse)}</strong>
+                  <span>{horseName(horse)}</span>
+                  <b>
+                    {formatMetric(String(score))}
+                    {success !== null && Number.isFinite(success) ? ` · réussite ${formatMetric(String(success))}` : ""}
+                  </b>
+                </li>
+              ))}
+            </ol>
+          </article>
+        )}
+        {isObstacles && obstacleMusicAvailable && (
+          <article className="subscriber-discipline-card">
+            <h3>Incidents dans la musique</h3>
+            <p>Chutes et arrêts relevés dans les performances récentes disponibles.</p>
+            {obstacleIncidentRows.length > 0 ? (
+              <ol>
+                {obstacleIncidentRows.map((horse, index) => {
+                  const incidents = [
+                    Number(firstValue(horse, ["HAS_FALLEN"])) > 0 ? "chute" : "",
+                    Number(firstValue(horse, ["HAS_STOPPED"])) > 0 ? "arrêt" : "",
+                  ].filter(Boolean);
+                  return (
+                    <li key={`obstacle-incident-${horseNumber(horse)}-${index}`}>
+                      <strong>{horseNumber(horse)}</strong>
+                      <span>{horseName(horse)}</span>
+                      <b>{incidents.join(" · ") || `${firstValue(horse, ["INCIDENT_COUNT"])} signalement(s)`}</b>
+                    </li>
+                  );
+                })}
+              </ol>
+            ) : (
+              <p className="free-analysis-status">Aucun signal de chute ou d’arrêt détecté dans les musiques disponibles.</p>
+            )}
           </article>
         )}
         {isFlat && bestPosts.length > 0 && (
