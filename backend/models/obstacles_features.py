@@ -328,19 +328,28 @@ def extract_incident_features(df):
     out = df.copy()
     music = out["HORSE_MUSIC"].fillna("").astype(str).str.strip()
 
-    def incident_counts(value):
-        counts = {"falls": 0, "stops": 0}
+    def incident_markers(value):
+        markers = []
         for token in re.findall(r"[A-Z0-9]+", value.upper()):
-            marker = re.sub(r"[HSC]", "", token)
-            if "T" in marker:
-                counts["falls"] += 1
-            if "A" in marker:
-                counts["stops"] += 1
-        return counts
+            if not re.fullmatch(r"(?:\d{1,2}[HSC]?[AT][HSC]?|[AT][HSC]?)", token):
+                continue
+            if "T" in token:
+                markers.append("fall")
+            elif "A" in token:
+                markers.append("stop")
+        return markers
+
+    def incident_counts(value):
+        markers = incident_markers(value)
+        return {"falls": markers.count("fall"), "stops": markers.count("stop")}
 
     incidents = music.map(incident_counts)
     out["FALL_COUNT"] = incidents.map(lambda counts: counts["falls"])
     out["STOP_COUNT"] = incidents.map(lambda counts: counts["stops"])
+
+    def last_race_incident(x):
+        parts = x.split()
+        return int(len(parts) > 1 and ("T" in parts[0].upper() or "A" in parts[1].upper()))
 
     def first(x):
         return x.split()[0].upper() if len(x) > 0 else ""
@@ -350,11 +359,6 @@ def extract_incident_features(df):
     out["INCIDENT_COUNT"] = music.map(
         lambda x: first(x).count("T") + first(x).count("A") if len(x) > 0 else 0
     )
-
-    def last_race_incident(x):
-        parts = x.split()
-        return int(len(parts) > 1 and ("T" in parts[0].upper() or "A" in parts[1].upper()))
-
     out["LAST_RACE_INCIDENT"] = music.map(last_race_incident)
     return out
 

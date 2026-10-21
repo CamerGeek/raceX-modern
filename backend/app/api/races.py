@@ -51,8 +51,8 @@ router = APIRouter(prefix="/races", tags=["races"])
 logger = logging.getLogger(__name__)
 
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
-HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v2"
-RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v1"
+HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v3"
+RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v2"
 BETTING_CACHE_VERSION = "betting-analysis-v1"
 
 
@@ -537,6 +537,11 @@ def _analyze_today_turfomania_quinte(
                 detail="Tomorrow's Quinté+ analysis is not available yet. Please check back after an administrator prepares it.",
             )
 
+        if meetings:
+            refreshed = _reanalyze_saved_homepage_quinte(client, meetings)
+            if refreshed:
+                return refreshed
+
         if allow_tomorrow_analysis and meeting_date == paris_today + timedelta(days=1):
             meeting_ref = {
                 "source": "turfomania",
@@ -588,6 +593,41 @@ def _analyze_today_turfomania_quinte(
             status_code=502,
             detail=f"Turfomania Quinté analysis failed: {exc}",
         ) from exc
+
+
+def _reanalyze_saved_homepage_quinte(
+    client: SupabaseClientWrapper,
+    meetings: list[dict[str, Any]],
+) -> TurfomaniaQuinteAnalysisResponse | None:
+    for meeting in meetings:
+        races = client.list(
+            "races",
+            filters=[("meeting_id", "eq", meeting["id"])],
+            limit=500,
+        )
+        for race in races:
+            summary = race.get("summary") or {}
+            if race.get("source") != "turfomania" or not summary.get("q_plus"):
+                continue
+            race_type = race.get("race_type")
+            if not _runner_table_for_race(race_type):
+                continue
+
+            frame, saved_race = _saved_frame(client, race["id"])
+            response = _analysis_response(
+                frame,
+                race_type=saved_race["race_type"],
+                source="turfomania",
+                include_handicap=True,
+                max_horses=8,
+            )
+            result = TurfomaniaQuinteAnalysisResponse(
+                **response.model_dump(),
+                race_id=race["id"],
+            )
+            _store_homepage_quinte_analysis(client, result)
+            return result
+    return None
 
 
 def _cached_homepage_quinte_for_date(

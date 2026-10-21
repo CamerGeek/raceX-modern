@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 import app.api.races as races_api
 import app.services.turfomania_quinte as quinte_module
-from app.schemas.races import AnalysisResponse, TurfomaniaQuinteAnalysisRequest
+from app.schemas.races import AnalysisResponse, ModelPredictionResponse, TurfomaniaQuinteAnalysisRequest
 from app.services.turfomania_quinte import scrape_turfomania_quinte, turfomania_quinte_race_type
 
 MEETING = {
@@ -220,6 +220,84 @@ def test_subscriber_tomorrow_quinte_analysis_reuses_shared_cache(
 
     assert first.race_id == "race-today"
     assert second.model_dump() == first.model_dump()
+
+
+def test_subscriber_quinte_rebuilds_stale_cached_obstacle_incident_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    music = "(22j) 1s 4s Ah Ah (25) 6h Ts 4s 2s 6s 1h 2s (24) 5h"
+    meeting = {**MEETING, "meeting_date": "2026-10-03"}
+    race = {
+        "id": "race-obstacles",
+        "meeting_id": meeting["id"],
+        "source": "turfomania",
+        "race_type": "obstacles",
+        "summary": {"q_plus": True},
+    }
+
+    class Client:
+        inserted: list[tuple[str, dict]] = []
+
+        def list(self, table: str, **_: object) -> list[dict]:
+            if table == "meetings":
+                return [meeting]
+            if table == "races":
+                return [race]
+            if table == "analysis_runs":
+                return [{
+                    "created_at": "2026-10-03T09:00:00+00:00",
+                    "summary": {
+                        "homepage_cache_version": "daily-quinte-composite-v2",
+                        "homepage_analysis": {"model_predictions": {"rows": []}},
+                    },
+                }]
+            if table == "flat_race_runners":
+                return [{"raw_data": {"N°": "4", "CHEVAL": "Runner", "MUSIQUE": music}}]
+            raise AssertionError(f"unexpected list table: {table}")
+
+        def select_one(self, table: str, **_: object) -> dict | None:
+            if table == "races":
+                return race
+            if table == "flat_race_runners":
+                return {"updated_at": "2026-10-03T10:00:00+00:00"}
+            raise AssertionError(f"unexpected select table: {table}")
+
+        def insert(self, table: str, payload: dict) -> dict:
+            self.inserted.append((table, payload))
+            return {}
+
+    client = Client()
+    monkeypatch.setattr(races_api, "_paris_today", lambda: date(2026, 10, 3))
+    monkeypatch.setattr(races_api, "SupabaseClientWrapper", lambda: client)
+
+    def analyze_saved_frame(frame: pd.DataFrame, **kwargs: object) -> AnalysisResponse:
+        assert frame.loc[0, "MUSIQUE"] == music
+        assert kwargs["race_type"] == "obstacles"
+        return AnalysisResponse(
+            race_type="obstacles",
+            source="turfomania",
+            row_count=1,
+            columns=["N°", "CHEVAL"],
+            rows=[{"N°": "4", "CHEVAL": "Runner", "MUSIQUE": music}],
+            model_version="updated-model",
+            prognosis=[],
+            model_predictions=ModelPredictionResponse(
+                status="ready",
+                rows=[{"NUMERO": 4, "MUSIC_AVAILABLE": 1, "STOP_COUNT": 2, "FALL_COUNT": 1}],
+            ),
+        )
+
+    monkeypatch.setattr(races_api, "_analysis_response", analyze_saved_frame)
+
+    result = races_api.analyze_today_turfomania_quinte(
+        races_api.TodayQuinteAnalysisRequest(date="2026-10-03")
+    )
+
+    assert result.race_id == "race-obstacles"
+    assert result.model_predictions is not None
+    assert result.model_predictions.rows[0]["STOP_COUNT"] == 2
+    assert result.model_predictions.rows[0]["FALL_COUNT"] == 1
+    assert client.inserted[0][1]["summary"]["homepage_cache_version"] == races_api.HOMEPAGE_QUINTE_CACHE_VERSION
 
 
 def test_tomorrow_quinte_analysis_scrapes_and_caches_for_next_day(

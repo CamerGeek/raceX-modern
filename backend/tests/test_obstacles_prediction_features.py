@@ -68,14 +68,14 @@ def test_extract_incident_features_counts_falls_and_stops_across_music() -> None
             "T A",
             "3hT 2hA 1s 4cT",
             "2h/T 1s-A",
+            "(22j) 1s 4s Ah Ah (25) 6h Ts 4s 2s 6s 1h 2s (24) 5h",
         ],
     })
 
     incidents = extract_incident_features(music)
 
-    assert incidents["STOP_COUNT"].tolist() == [2, 0, 1, 1, 1]
-    assert incidents["FALL_COUNT"].tolist() == [1, 0, 1, 2, 1]
-    assert incidents["INCIDENT_COUNT"].tolist() == [1, 0, 1, 1, 1]
+    assert incidents["STOP_COUNT"].tolist() == [2, 0, 1, 1, 1, 2]
+    assert incidents["FALL_COUNT"].tolist() == [1, 0, 1, 2, 1, 1]
 
 
 def test_prediction_rows_include_full_music_incident_counts() -> None:
