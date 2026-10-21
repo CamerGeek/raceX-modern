@@ -54,6 +54,33 @@ function scoreOf(row: Horse) {
   return raw && Number.isFinite(score) ? score : null;
 }
 
+function plotTwistCandidates(rows: Horse[]) {
+  const rankedRows = rows
+    .map((horse, index) => ({ horse, index, score: scoreOf(horse) }))
+    .filter((item): item is { horse: Horse; index: number; score: number } =>
+      item.score !== null,
+    )
+    .sort((first, second) => second.score - first.score || first.index - second.index);
+  if (rankedRows.length <= 8) return [];
+
+  const scores = rankedRows.map(({ score }) => score);
+  const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  const middle = Math.floor(scores.length / 2);
+  const median = scores.length % 2 === 0
+    ? (scores[middle - 1] + scores[middle]) / 2
+    : scores[middle];
+
+  return rankedRows
+    .map((item, index) => ({
+      ...item,
+      rank: index + 1,
+      nearMean: Math.abs(item.score - mean) <= 0.05,
+      nearMedian: Math.abs(item.score - median) <= 0.05,
+    }))
+    .filter((item) => item.rank > 8 && (item.nearMean || item.nearMedian))
+    .slice(0, 4);
+}
+
 function displayScore(score: number | null) {
   return score === null ? "—" : score.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 }
@@ -207,11 +234,17 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
   } as Record<string, string>)[obstacleDisciplineCode] ?? "obstacles";
   const obstacleIncidentRows = isObstacles
     ? (analysis.model_predictions?.rows ?? [])
-        .filter((horse) =>
-          Number(firstValue(horse, ["MUSIC_AVAILABLE"])) > 0
-          && (Number(firstValue(horse, ["INCIDENT_COUNT"])) > 0
-            || Number(firstValue(horse, ["HAS_FALLEN"])) > 0
-            || Number(firstValue(horse, ["HAS_STOPPED"])) > 0),
+        .map((horse, index) => ({
+          horse,
+          index,
+          falls: Number(firstValue(horse, ["FALL_COUNT"])) || 0,
+          stops: Number(firstValue(horse, ["STOP_COUNT"])) || 0,
+        }))
+        .filter(({ falls, stops }) => falls > 0 || stops > 0)
+        .sort((first, second) =>
+          second.stops - first.stops
+          || second.falls - first.falls
+          || first.index - second.index,
         )
         .slice(0, 4)
     : [];
@@ -302,26 +335,22 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
         )}
         {isObstacles && obstacleMusicAvailable && (
           <article className="subscriber-discipline-card">
-            <h3>Incidents dans la musique</h3>
-            <p>Chutes et arrêts relevés dans les performances récentes disponibles.</p>
+            <h3>Historique des incidents</h3>
+            <p>Comptage sur la musique disponible : T = chute, A = arrêt. Des arrêts répétés sont un signal de prudence, pas une garantie de résultat.</p>
             {obstacleIncidentRows.length > 0 ? (
               <ol>
-                {obstacleIncidentRows.map((horse, index) => {
-                  const incidents = [
-                    Number(firstValue(horse, ["HAS_FALLEN"])) > 0 ? "chute" : "",
-                    Number(firstValue(horse, ["HAS_STOPPED"])) > 0 ? "arrêt" : "",
-                  ].filter(Boolean);
+                {obstacleIncidentRows.map(({ horse, falls, stops }, index) => {
                   return (
                     <li key={`obstacle-incident-${horseNumber(horse)}-${index}`}>
                       <strong>{horseNumber(horse)}</strong>
                       <span>{horseName(horse)}</span>
-                      <b>{incidents.join(" · ") || `${firstValue(horse, ["INCIDENT_COUNT"])} signalement(s)`}</b>
+                      <b>{stops} arrêt(s) · {falls} chute(s)</b>
                     </li>
                   );
                 })}
               </ol>
             ) : (
-              <p className="free-analysis-status">Aucun signal de chute ou d’arrêt détecté dans les musiques disponibles.</p>
+              <p className="free-analysis-status">Aucune chute ni aucun arrêt détecté dans les musiques disponibles.</p>
             )}
           </article>
         )}
@@ -447,6 +476,7 @@ function SubscriberDashboard() {
       if (second.score === null) return -1;
       return second.score - first.score || first.index - second.index;
     });
+  const plotTwistRows = analysis ? plotTwistCandidates(analysis.rows) : [];
   const contenders = ranked.slice(0, 8);
   const leadingHorse = contenders[0]?.horse;
   const leaderScore = contenders[0]?.score ?? null;
@@ -588,6 +618,31 @@ function SubscriberDashboard() {
             prognosis={analysis.prognosis}
             modelPredictions={analysis.model_predictions}
           />
+
+          <section className="subscriber-discipline-card subscriber-plot-twist" aria-labelledby="subscriber-plot-twist-title">
+            <h3 id="subscriber-plot-twist-title">Plot twist · chevaux à surveiller</h3>
+            <p>
+              Partants hors du top 8 composite dont le score se situe à ±0,05 de la moyenne ou de la médiane.
+              C’est un repère complémentaire, pas une garantie de performance.
+            </p>
+            {plotTwistRows.length > 0 ? (
+              <ol>
+                {plotTwistRows.map(({ horse, score, rank, nearMean, nearMedian }, index) => (
+                  <li key={`plot-twist-${horseNumber(horse)}-${index}`}>
+                    <strong>{horseNumber(horse)}</strong>
+                    <span>{horseName(horse)} · rang {rank}</span>
+                    <b>
+                      {displayScore(score)}
+                      {" · "}
+                      {nearMean && nearMedian ? "moyenne · médiane" : nearMean ? "moyenne" : "médiane"}
+                    </b>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="free-analysis-status">Aucun partant hors top 8 ne correspond à ce repère pour cette course.</p>
+            )}
+          </section>
 
           <section className="subscriber-composite-scores public-widget" aria-labelledby="subscriber-composite-scores-title">
             <div className="subscriber-section-heading">

@@ -324,6 +324,12 @@ h2 { font-size: 2.4rem; font-weight: 500; margin: .4rem 0 0; }
 .prognosis-miss-signal li { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .45rem; padding: .45rem .6rem; border: 1px solid #efc8bd; border-radius: .4rem; background: rgba(255, 255, 255, .75); font: .75rem ui-sans-serif, system-ui, sans-serif; }
 .prognosis-miss-signal li strong { color: #a43c2c; }
 .prognosis-miss-signal li span { overflow: hidden; text-overflow: ellipsis; }
+.plot-twist-signal { border-color: #c8d9ce; border-left-color: var(--green); background: linear-gradient(110deg, #f1f8f2, #fbfdf9); }
+.plot-twist-signal .prognosis-miss-heading > span { color: var(--green); }
+.plot-twist-signal .prognosis-miss-heading h3 { color: var(--deep); }
+.plot-twist-signal ul { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.plot-twist-signal li { grid-template-columns: auto minmax(0, 1fr); border-color: #d8e5da; }
+.plot-twist-signal li strong { color: var(--green); }
 .race-meta a { color: var(--green); margin-left: auto; text-decoration: none; }
 .report-tabs { display: flex; gap: 0; overflow-x: auto; margin: 1.2rem 0 1.5rem; border-bottom: 1px solid var(--line); }
 .report-tabs button { flex: 0 0 auto; border: 0; border-bottom: 2px solid transparent; padding: .75rem .9rem; color: var(--muted); background: transparent; cursor: pointer; font: 700 .68rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; }
@@ -575,6 +581,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   .subscriber-composite-scores .subscriber-section-heading > div > p:last-child { margin-top: .15rem; font-size: .58rem; }
   .subscriber-discipline-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .35rem; }
   .subscriber-discipline-card { padding: .5rem; border-radius: .3rem; box-shadow: none; break-inside: avoid; }
+  .subscriber-plot-twist { margin: .45rem 0; }
   .subscriber-discipline-card h3 { font-size: .72rem; }
   .subscriber-discipline-card > p { margin: .15rem 0 .3rem; font-size: .54rem; }
   .subscriber-discipline-card ol { gap: .2rem; }

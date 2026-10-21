@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -9,6 +10,7 @@ if str(MODELS_PATH) not in sys.path:
     sys.path.insert(0, str(MODELS_PATH))
 
 from obstacles_features import FEATURE_COLUMNS
+from obstacles_features import extract_incident_features
 from predict_obstacles import ObstaclesPredictor
 
 
@@ -56,3 +58,46 @@ def test_prepare_race_exposes_recent_obstacle_incidents() -> None:
     assert prepared.loc[0, "HAS_FALLEN"] == 1
     assert prepared.loc[0, "HAS_STOPPED"] == 0
     assert prepared.loc[0, "INCIDENT_COUNT"] == 1
+
+
+def test_extract_incident_features_counts_falls_and_stops_across_music() -> None:
+    music = pd.DataFrame({
+        "HORSE_MUSIC": [
+            "Ah Th 4h Ah",
+            "2h 3s",
+            "T A",
+            "3hT 2hA 1s 4cT",
+            "2h/T 1s-A",
+        ],
+    })
+
+    incidents = extract_incident_features(music)
+
+    assert incidents["STOP_COUNT"].tolist() == [2, 0, 1, 1, 1]
+    assert incidents["FALL_COUNT"].tolist() == [1, 0, 1, 2, 1]
+    assert incidents["INCIDENT_COUNT"].tolist() == [1, 0, 1, 1, 1]
+
+
+def test_prediction_rows_include_full_music_incident_counts() -> None:
+    class Classifier:
+        def predict_proba(self, features: pd.DataFrame) -> np.ndarray:
+            return np.tile([0.5, 0.5], (len(features), 1))
+
+    predictor = ObstaclesPredictor.__new__(ObstaclesPredictor)
+    predictor.feature_columns = FEATURE_COLUMNS
+    predictor.place = Classifier()
+    predictor.dark = Classifier()
+    predictor.rank = Classifier()
+    predictor.rank_classes = [1, 2]
+    predictor.deep = None
+    race = pd.DataFrame([{
+        "N°": 4,
+        "CHEVAL": "Runner",
+        "DESCRIPTIF": "Prix des Haies",
+        "MUSIQUE": "3hT 2hA 1s 4cT",
+    }])
+
+    result = predictor.predict_race(race)
+
+    assert result["table"].loc[0, "STOP_COUNT"] == 1
+    assert result["table"].loc[0, "FALL_COUNT"] == 2

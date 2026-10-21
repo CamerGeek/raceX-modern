@@ -328,6 +328,20 @@ def extract_incident_features(df):
     out = df.copy()
     music = out["HORSE_MUSIC"].fillna("").astype(str).str.strip()
 
+    def incident_counts(value):
+        counts = {"falls": 0, "stops": 0}
+        for token in re.findall(r"[A-Z0-9]+", value.upper()):
+            marker = re.sub(r"[HSC]", "", token)
+            if "T" in marker:
+                counts["falls"] += 1
+            if "A" in marker:
+                counts["stops"] += 1
+        return counts
+
+    incidents = music.map(incident_counts)
+    out["FALL_COUNT"] = incidents.map(lambda counts: counts["falls"])
+    out["STOP_COUNT"] = incidents.map(lambda counts: counts["stops"])
+
     def first(x):
         return x.split()[0].upper() if len(x) > 0 else ""
 

@@ -76,6 +76,41 @@ function deepScore(row: Horse) {
   return numberField(row, ["place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score"]);
 }
 
+function compositeScore(row: Horse) {
+  const raw = field(row, ["Composite", "COMPOSITE_SCORE", "SCORE", "CS_norm", "Score"], "")
+    .trim()
+    .replace(",", ".");
+  const score = Number(raw);
+  return raw && Number.isFinite(score) ? score : null;
+}
+
+function plotTwistCandidates(rows: Horse[]) {
+  const rankedRows = rows
+    .map((horse, index) => ({ horse, index, score: compositeScore(horse) }))
+    .filter((item): item is { horse: Horse; index: number; score: number } =>
+      item.score !== null,
+    )
+    .sort((first, second) => second.score - first.score || first.index - second.index);
+  if (rankedRows.length <= 8) return [];
+
+  const scores = rankedRows.map(({ score }) => score);
+  const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  const middle = Math.floor(scores.length / 2);
+  const median = scores.length % 2 === 0
+    ? (scores[middle - 1] + scores[middle]) / 2
+    : scores[middle];
+
+  return rankedRows
+    .map((item, index) => ({
+      ...item,
+      rank: index + 1,
+      nearMean: Math.abs(item.score - mean) <= 0.05,
+      nearMedian: Math.abs(item.score - median) <= 0.05,
+    }))
+    .filter((item) => item.rank > 8 && (item.nearMean || item.nearMedian))
+    .slice(0, 4);
+}
+
 function horseNumbers(rows: Horse[]) {
   return rows.map((row) => field(row, ["N°", "N", "Numero"], "-")).filter((number) => number !== "-");
 }
@@ -181,6 +216,7 @@ function AdminPageContent() {
   const modelCheck = analysis
     ? analysis.model_check ?? modelCheckFromVisibleRankings(analysis)
     : null;
+  const plotTwistRows = analysis ? plotTwistCandidates(analysis.rows) : [];
   const topHorse = rankedHorses[0];
   const topScore = topHorse ? numberField(topHorse, ["SCORE", "COMPOSITE_SCORE", "Composite", "Score"]) : 0;
   const topOdds = topHorse ? field(topHorse, ["COTE", "Cote", "Odds"]) : "-";
@@ -586,6 +622,28 @@ function AdminPageContent() {
                     return <li key={`${number}-${index}`}><strong>{number}</strong></li>;
                   })}</ul>
                   : <p className="prognosis-miss-empty">None in this prognosis</p>}
+            </section>
+            <section className="prognosis-miss-signal plot-twist-signal" aria-labelledby="admin-plot-twist-title">
+              <div className="prognosis-miss-heading">
+                <span>COMPOSITE · OUTSIDE TOP 8</span>
+                <h3 id="admin-plot-twist-title">Plot twist · horses to watch</h3>
+                <p>Up to four runners ranked below 8 whose composite score is within ±0.05 of the field mean or median.</p>
+              </div>
+              {plotTwistRows.length > 0
+                ? <ul>{plotTwistRows.map(({ horse, score, rank, nearMean, nearMedian }, index) => {
+                  const benchmark = nearMean && nearMedian
+                    ? "Mean · median"
+                    : nearMean
+                      ? "Mean"
+                      : "Median";
+                  return (
+                    <li key={`admin-plot-twist-${field(horse, ["N°", "N", "Numero", "NUMERO"], String(index))}-${index}`}>
+                      <strong>{field(horse, ["N°", "N", "Numero", "NUMERO"], "-")}</strong>
+                      <span>{field(horse, ["CHEVAL", "Cheval", "NOM", "NAME"], "Unknown")} · rank {rank} · score {score.toFixed(2)} · {benchmark}</span>
+                    </li>
+                  );
+                })}</ul>
+                : <p className="prognosis-miss-empty">No runners outside the top 8 match this mean/median score range.</p>}
             </section>
             {analysis.race_type === "flat" && analysis.overview && <div className="quick-feel-grid">
               <div className="quick-feel-card"><span>PROGNOSIS</span><strong>{horseNumbers(analysis.overview.prognosis).join(" · ") || "-"}</strong></div>

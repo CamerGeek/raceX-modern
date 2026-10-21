@@ -268,6 +268,7 @@ class ObstaclesPredictor:
             "NUMERO", "CHEVAL", "JOCKEY", "COTE_RAW", "DISTANCE",
             "DISCIPLINE", "FORM_DISCIPLINE", "S_COEFF", "MUSIC_AVAILABLE",
             "INCIDENT_COUNT", "HAS_FALLEN", "HAS_STOPPED",
+            "FALL_COUNT", "STOP_COUNT",
         ):
             if col in prepared.columns:
                 out[col] = prepared[col]
