@@ -29,6 +29,7 @@ from app.services.auth_service import require_admin, require_subscriber_features
 from app.services.turfomania_download import _infer_race_type, parse_turfomania_meeting_url
 from app.services.turfomania_quinte import (
     QUINTE_TOMORROW_URL,
+    find_turfomania_quinte_meeting,
     scrape_turfomania_quinte,
     turfomania_quinte_race_type,
 )
@@ -524,6 +525,7 @@ def _analyze_today_turfomania_quinte(
             client,
             meeting_date,
             meetings=meetings,
+            created_on=paris_today if meeting_date == paris_today else None,
         )
         if cached:
             return cached
@@ -536,6 +538,35 @@ def _analyze_today_turfomania_quinte(
                 status_code=404,
                 detail="Tomorrow's Quinté+ analysis is not available yet. Please check back after an administrator prepares it.",
             )
+
+        if meeting_date == paris_today:
+            meeting, frame = find_turfomania_quinte_meeting(meetings)
+            race_type = turfomania_quinte_race_type(frame)
+            persisted = persist_scraped_meeting(
+                frame,
+                meeting_date=meeting_date,
+                meeting_name=meeting.get("name"),
+                meeting_url=None,
+                race_type=race_type,
+                source="turfomania",
+                client=client,
+                meeting=meeting,
+            )
+            if not persisted["races"]:
+                raise ValueError("No Quinté race was persisted")
+            response = _analysis_response(
+                frame,
+                race_type=race_type,
+                source="turfomania",
+                include_handicap=True,
+                max_horses=8,
+            )
+            result = TurfomaniaQuinteAnalysisResponse(
+                **response.model_dump(),
+                race_id=persisted["races"][0]["id"],
+            )
+            _store_homepage_quinte_analysis(client, result)
+            return result
 
         if meetings:
             refreshed = _reanalyze_saved_homepage_quinte(client, meetings)
@@ -635,6 +666,7 @@ def _cached_homepage_quinte_for_date(
     meeting_date: date,
     *,
     meetings: list[dict[str, Any]] | None = None,
+    created_on: date | None = None,
 ) -> TurfomaniaQuinteAnalysisResponse | None:
     meeting_rows = meetings if meetings is not None else client.list(
         "meetings",
@@ -657,6 +689,7 @@ def _cached_homepage_quinte_for_date(
                     race["id"],
                     race.get("race_type"),
                     require_fresh=False,
+                    created_on=created_on,
                 )
                 if cached:
                     return cached
@@ -684,6 +717,7 @@ def _cached_homepage_quinte_analysis(
     race_type: str,
     *,
     require_fresh: bool = True,
+    created_on: date | None = None,
 ) -> TurfomaniaQuinteAnalysisResponse | None:
     cached_runs = client.list(
         "analysis_runs",
@@ -702,6 +736,12 @@ def _cached_homepage_quinte_analysis(
     for cached_run in cached_runs:
         summary = cached_run.get("summary") or {}
         if summary.get("homepage_cache_version") != HOMEPAGE_QUINTE_CACHE_VERSION:
+            continue
+        cached_at = _parse_cache_timestamp(cached_run.get("created_at"))
+        if created_on and (
+            cached_at is None
+            or cached_at.astimezone(ZoneInfo("Europe/Paris")).date() != created_on
+        ):
             continue
         if require_fresh and not _homepage_cache_is_fresh(cached_run, latest_runner):
             continue

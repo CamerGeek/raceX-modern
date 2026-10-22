@@ -222,7 +222,7 @@ def test_subscriber_tomorrow_quinte_analysis_reuses_shared_cache(
     assert second.model_dump() == first.model_dump()
 
 
-def test_subscriber_quinte_rebuilds_stale_cached_obstacle_incident_rows(
+def test_race_day_quinte_refreshes_yesterdays_cached_analysis(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     music = "(22j) 1s 4s Ah Ah (25) 6h Ts 4s 2s 6s 1h 2s (24) 5h"
@@ -245,9 +245,9 @@ def test_subscriber_quinte_rebuilds_stale_cached_obstacle_incident_rows(
                 return [race]
             if table == "analysis_runs":
                 return [{
-                    "created_at": "2026-10-03T09:00:00+00:00",
+                    "created_at": "2026-10-02T20:00:00+00:00",
                     "summary": {
-                        "homepage_cache_version": "daily-quinte-composite-v2",
+                        "homepage_cache_version": races_api.HOMEPAGE_QUINTE_CACHE_VERSION,
                         "homepage_analysis": {"model_predictions": {"rows": []}},
                     },
                 }]
@@ -270,7 +270,24 @@ def test_subscriber_quinte_rebuilds_stale_cached_obstacle_incident_rows(
     monkeypatch.setattr(races_api, "_paris_today", lambda: date(2026, 10, 3))
     monkeypatch.setattr(races_api, "SupabaseClientWrapper", lambda: client)
 
-    def analyze_saved_frame(frame: pd.DataFrame, **kwargs: object) -> AnalysisResponse:
+    current_frame = _frame(race_date="03/10/2026")
+    current_frame["MUSIQUE"] = music
+    current_frame["RACE_CONDITIONS"] = "Haies - 3600 mètres"
+    monkeypatch.setattr(
+        races_api,
+        "find_turfomania_quinte_meeting",
+        lambda meetings: (meeting, current_frame),
+    )
+    persisted: dict[str, object] = {}
+
+    def persist(frame: pd.DataFrame, **kwargs: object) -> dict:
+        assert frame.loc[0, "MUSIQUE"] == music
+        persisted.update(kwargs)
+        return {"races": [{"id": "race-obstacles"}]}
+
+    monkeypatch.setattr(races_api, "persist_scraped_meeting", persist)
+
+    def analyze_current_frame(frame: pd.DataFrame, **kwargs: object) -> AnalysisResponse:
         assert frame.loc[0, "MUSIQUE"] == music
         assert kwargs["race_type"] == "obstacles"
         return AnalysisResponse(
@@ -287,7 +304,7 @@ def test_subscriber_quinte_rebuilds_stale_cached_obstacle_incident_rows(
             ),
         )
 
-    monkeypatch.setattr(races_api, "_analysis_response", analyze_saved_frame)
+    monkeypatch.setattr(races_api, "_analysis_response", analyze_current_frame)
 
     result = races_api.analyze_today_turfomania_quinte(
         races_api.TodayQuinteAnalysisRequest(date="2026-10-03")
@@ -297,7 +314,67 @@ def test_subscriber_quinte_rebuilds_stale_cached_obstacle_incident_rows(
     assert result.model_predictions is not None
     assert result.model_predictions.rows[0]["STOP_COUNT"] == 2
     assert result.model_predictions.rows[0]["FALL_COUNT"] == 1
+    assert persisted["meeting"] == meeting
     assert client.inserted[0][1]["summary"]["homepage_cache_version"] == races_api.HOMEPAGE_QUINTE_CACHE_VERSION
+
+
+def test_race_day_quinte_reuses_cache_created_today(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    meeting = {**MEETING, "meeting_date": "2026-10-03"}
+    race = {
+        "id": "race-today",
+        "meeting_id": meeting["id"],
+        "source": "turfomania",
+        "race_type": "flat",
+        "summary": {"q_plus": True},
+    }
+    cached = races_api.TurfomaniaQuinteAnalysisResponse(
+        race_id=race["id"],
+        race_type="flat",
+        source="turfomania",
+        row_count=1,
+        columns=["N°", "CHEVAL"],
+        rows=[{"N°": "1", "CHEVAL": "TEST HORSE"}],
+        model_version="same-day",
+        prognosis=[],
+    )
+    analysis_run = {
+        "created_at": "2026-10-03T09:00:00+00:00",
+        "summary": {
+            "homepage_cache_version": races_api.HOMEPAGE_QUINTE_CACHE_VERSION,
+            "homepage_analysis": cached.model_dump(mode="json"),
+        },
+    }
+
+    class Client:
+        def list(self, table: str, **_: object) -> list[dict]:
+            if table == "meetings":
+                return [meeting]
+            if table == "races":
+                return [race]
+            if table == "analysis_runs":
+                return [analysis_run]
+            raise AssertionError(f"unexpected list table: {table}")
+
+        def select_one(self, table: str, **_: object) -> dict | None:
+            if table == "flat_race_runners":
+                return {"updated_at": "2026-10-03T08:00:00+00:00"}
+            raise AssertionError(f"unexpected select table: {table}")
+
+    monkeypatch.setattr(races_api, "_paris_today", lambda: date(2026, 10, 3))
+    monkeypatch.setattr(races_api, "SupabaseClientWrapper", Client)
+    monkeypatch.setattr(
+        races_api,
+        "find_turfomania_quinte_meeting",
+        lambda *_: pytest.fail("same-day cache should avoid another scrape"),
+    )
+
+    result = races_api.analyze_today_turfomania_quinte(
+        races_api.TodayQuinteAnalysisRequest(date="2026-10-03")
+    )
+
+    assert result.model_version == "same-day"
 
 
 def test_tomorrow_quinte_analysis_scrapes_and_caches_for_next_day(
