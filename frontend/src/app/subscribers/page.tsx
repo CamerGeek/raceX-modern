@@ -11,15 +11,15 @@ type Horse = Record<string, string | number | boolean | null>;
 type AnalysisSignal = { label: string; value: string; detail: string };
 type AnalysisSection = { title: string; columns: string[]; rows: Horse[] };
 type FlatOverview = {
-  prognosis: Horse[];
-  summary: Horse[];
-  upset_potential: Horse[];
-  consistency_score: Horse[];
-  odds_divergence: Horse[];
-  best_starting_posts: string[];
-  track: string;
-  distance: number;
-  race_details: string;
+  prognosis?: Horse[];
+  summary?: Horse[];
+  upset_potential?: Horse[];
+  consistency_score?: Horse[];
+  odds_divergence?: Horse[];
+  best_starting_posts?: string[];
+  track?: string;
+  distance?: number;
+  race_details?: string;
 };
 type Analysis = {
   race_id: string;
@@ -152,7 +152,7 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
   const isFlat = analysis.race_type === "flat";
   const isTrot = analysis.race_type === "trot";
   const isObstacles = analysis.race_type === "obstacles";
-  const disciplineCards = isFlat
+  const disciplineCards = isFlat || isObstacles
     ? [
         {
           title: "Régularité des signaux",
@@ -269,7 +269,7 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
               ? "Régularité, écart au marché et avantage des stalles lorsque ces données sont disponibles."
               : isTrot
               ? "Performance, forme et chevaux les moins exposés à la disqualification."
-              : "Classement établi par les modèles dédiés aux courses d’obstacles."}
+              : "Régularité des signaux, outsiders à surveiller et classements du modèle obstacles."}
           </p>
         </div>
       </div>

@@ -15,6 +15,61 @@ def test_flat_overview_uses_odds_divergence_for_upset_potential(monkeypatch) -> 
     assert overview["consistency_score"] == [{"signal": "consistent"}]
 
 
+def test_obstacle_market_signal_overview_includes_consistency_and_outsiders(monkeypatch) -> None:
+    consistency = pd.DataFrame([{"N": "2", "consistency_score": 4}])
+    divergence = pd.DataFrame([{"N": "5", "Divergence": 3}])
+    monkeypatch.setattr(races, "analyze_consistency_score", lambda *_: consistency)
+    monkeypatch.setattr(races, "analyze_odds_divergence", lambda *_: divergence)
+
+    overview = races._market_signal_overview(
+        pd.DataFrame([{"N°": "2"}]),
+        pd.DataFrame([{"N°": "2", "Composite": 0.8}]),
+    )
+
+    assert overview["consistency_score"] == [{"N": "2", "consistency_score": 4}]
+    assert overview["odds_divergence"] == [{"N": "5", "Divergence": 3}]
+    assert overview["upset_potential"] == overview["odds_divergence"]
+
+
+def test_obstacle_analysis_response_includes_market_signal_overview(monkeypatch) -> None:
+    expected_overview = {
+        "consistency_score": [{"N": "2"}],
+        "odds_divergence": [{"N": "5"}],
+        "upset_potential": [{"N": "5"}],
+    }
+    monkeypatch.setattr(
+        races,
+        "analyze_race",
+        lambda *_args, **_kwargs: (pd.DataFrame([{"N°": "2"}]), pd.DataFrame(), None),
+    )
+    monkeypatch.setattr(races, "_display_frame", lambda frame, *_args: frame)
+    monkeypatch.setattr(races, "_prognosis_rows", lambda *_args: [])
+    monkeypatch.setattr(races, "_legacy_sections", lambda *_args: [])
+    monkeypatch.setattr(races, "_analysis_signals", lambda *_args: [])
+    monkeypatch.setattr(
+        races,
+        "predict_model_race",
+        lambda *_args: {
+            "status": "ready",
+            "model_version": "test",
+            "bet_list": [],
+            "rows": [],
+        },
+    )
+    monkeypatch.setattr(races, "_model_check_disagreements", lambda *_args: None)
+    monkeypatch.setattr(races, "_market_signal_overview", lambda *_args: expected_overview)
+
+    response = races._analysis_response(
+        pd.DataFrame([{"N°": "2"}]),
+        race_type="obstacles",
+        source="turfomania",
+        include_handicap=True,
+        max_horses=8,
+    )
+
+    assert response.overview == expected_overview
+
+
 def test_model_check_lists_prognosis_horses_missing_from_either_top_eight() -> None:
     prognosis = [{"N°": "10.0"}, {"N°": "2"}, {"N°": "9"}]
     predictions = {

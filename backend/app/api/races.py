@@ -52,7 +52,7 @@ router = APIRouter(prefix="/races", tags=["races"])
 logger = logging.getLogger(__name__)
 
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
-HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v3"
+HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v4"
 RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v2"
 BETTING_CACHE_VERSION = "betting-analysis-v1"
 
@@ -317,7 +317,13 @@ def _analysis_response(
     display_frame = _display_frame(frame, analyzed, race_type)
     prognosis_rows = _prognosis_rows(prognosis, analyzed, race_type)
     sections = _legacy_sections(display_frame, analyzed, race_type, include_handicap)
-    overview = _flat_overview(frame, analyzed, prognosis_rows) if race_type == "flat" else {}
+    overview = (
+        _flat_overview(frame, analyzed, prognosis_rows)
+        if race_type == "flat"
+        else _market_signal_overview(frame, analyzed)
+        if race_type == "obstacles"
+        else {}
+    )
     model_predictions = predict_model_race(frame, race_type, source)
     model_check = _model_check_disagreements(
         prognosis_rows, display_frame, model_predictions, len(frame)
@@ -1069,8 +1075,7 @@ def _flat_overview(frame: pd.DataFrame, composite: pd.DataFrame, prognosis: list
             return []
         return dataframe_records(table.head(8))
 
-    consistency = analyze_consistency_score(frame, composite)
-    divergence = analyze_odds_divergence(frame, composite)
+    market_signals = _market_signal_overview(frame, composite)
     hippodrome = str(frame["HIPPODROME"].iloc[0]) if "HIPPODROME" in frame.columns and not frame.empty else ""
     distance_text = ""
     for column in ("DISTANCE", "DIST.", "DIST"):
@@ -1087,11 +1092,24 @@ def _flat_overview(frame: pd.DataFrame, composite: pd.DataFrame, prognosis: list
     return {
         "prognosis": prognosis_rows,
         "summary": horse_rows(composite),
-        "upset_potential": horse_rows(divergence),
-        "consistency_score": horse_rows(consistency),
-        "odds_divergence": horse_rows(divergence),
+        **market_signals,
         "best_starting_posts": best_posts,
         "track": hippodrome,
         "distance": distance,
         "race_details": str(frame["DESCRIPTIF"].iloc[0]) if "DESCRIPTIF" in frame.columns and not frame.empty else "",
+    }
+
+
+def _market_signal_overview(frame: pd.DataFrame, composite: pd.DataFrame) -> dict[str, object]:
+    def horse_rows(table: pd.DataFrame | None) -> list[dict]:
+        if table is None or table.empty:
+            return []
+        return dataframe_records(table.head(8))
+
+    consistency = horse_rows(analyze_consistency_score(frame, composite))
+    divergence = horse_rows(analyze_odds_divergence(frame, composite))
+    return {
+        "upset_potential": divergence,
+        "consistency_score": consistency,
+        "odds_divergence": divergence,
     }
