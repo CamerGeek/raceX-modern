@@ -2,7 +2,6 @@ from datetime import date
 
 import pandas as pd
 import pytest
-from fastapi import HTTPException
 
 from app.api import races
 from app.schemas.races import ModelPredictionResponse, TurfomaniaQuinteAnalysisResponse
@@ -80,7 +79,7 @@ def test_display_frame_aligns_computed_scores_by_runner_number() -> None:
     ]
 
 
-def test_stale_homepage_analysis_is_served_without_recomputation(monkeypatch) -> None:
+def test_stale_homepage_analysis_is_not_returned_from_cache() -> None:
     cached = TurfomaniaQuinteAnalysisResponse(
         race_id="race-id",
         race_type="flat",
@@ -118,16 +117,69 @@ def test_stale_homepage_analysis_is_served_without_recomputation(monkeypatch) ->
                 return {"updated_at": "2026-10-09T07:55:10+00:00"}
             raise AssertionError(f"unexpected select table: {table}")
 
-    monkeypatch.setattr(races, "SupabaseClientWrapper", Client)
-    monkeypatch.setattr(races, "_analysis_response", lambda *_args, **_kwargs: pytest.fail("read requests must not analyze"))
-    monkeypatch.setattr(races, "scrape_turfomania_quinte", lambda *_args: pytest.fail("read requests must not scrape"))
-
-    result = races._analyze_today_turfomania_quinte(TodayQuinteAnalysisRequest(date=date(2026, 10, 9)))
-
-    assert result.model_dump() == cached.model_dump()
+    assert races._cached_homepage_quinte_for_date(
+        Client(),
+        date(2026, 10, 9),
+        meetings=[{"id": "meeting-id"}],
+    ) is None
 
 
-def test_today_quinte_cache_miss_does_not_start_analysis(monkeypatch) -> None:
+def test_date_cache_returns_newest_analysis_across_duplicate_meetings() -> None:
+    def cached_response(race_id: str, model_version: str) -> TurfomaniaQuinteAnalysisResponse:
+        return TurfomaniaQuinteAnalysisResponse(
+            race_id=race_id,
+            race_type="flat",
+            source="turfomania",
+            row_count=1,
+            columns=["N°"],
+            rows=[{"N°": "1"}],
+            model_version=model_version,
+            prognosis=[],
+        )
+
+    responses = {
+        "race-old": cached_response("race-old", "older"),
+        "race-new": cached_response("race-new", "newest"),
+    }
+
+    class Client:
+        def list(self, table, *, filters, **kwargs):
+            if table == "races":
+                meeting_id = filters[0][2]
+                race_id = "race-old" if meeting_id == "meeting-old" else "race-new"
+                return [{
+                    "id": race_id,
+                    "source": "turfomania",
+                    "race_type": "flat",
+                    "summary": {"q_plus": True},
+                }]
+            if table == "analysis_runs":
+                race_id = filters[0][2]
+                created_at = "2026-10-09T09:00:00+00:00" if race_id == "race-old" else "2026-10-09T10:00:00+00:00"
+                return [{
+                    "created_at": created_at,
+                    "summary": {
+                        "homepage_cache_version": races.HOMEPAGE_QUINTE_CACHE_VERSION,
+                        "homepage_analysis": responses[race_id].model_dump(mode="json"),
+                    },
+                }]
+            raise AssertionError(f"unexpected list table: {table}")
+
+        def select_one(self, table, *, filters, **kwargs):
+            assert table == "flat_race_runners"
+            return {"updated_at": "2026-10-09T08:00:00+00:00"}
+
+    result = races._cached_homepage_quinte_for_date(
+        Client(),
+        date(2026, 10, 9),
+        meetings=[{"id": "meeting-old"}, {"id": "meeting-new"}],
+    )
+
+    assert result is not None
+    assert result.model_version == "newest"
+
+
+def test_today_quinte_cache_miss_returns_no_cached_analysis() -> None:
     class Client:
         def list(self, table, *, filters, **kwargs):
             if table == "meetings":
@@ -146,9 +198,8 @@ def test_today_quinte_cache_miss_does_not_start_analysis(monkeypatch) -> None:
         def select_one(self, *_args, **_kwargs):
             return {"updated_at": "2026-10-09T07:55:10+00:00"}
 
-    monkeypatch.setattr(races, "SupabaseClientWrapper", Client)
-    monkeypatch.setattr(races, "_analysis_response", lambda *_args, **_kwargs: pytest.fail("cache miss must not analyze"))
-    monkeypatch.setattr(races, "scrape_turfomania_quinte", lambda *_args: pytest.fail("cache miss must not scrape"))
-
-    with pytest.raises(HTTPException, match="No prepared Quinté analysis"):
-        races._analyze_today_turfomania_quinte(TodayQuinteAnalysisRequest(date=date(2026, 10, 9)))
+    assert races._cached_homepage_quinte_for_date(
+        Client(),
+        date(2026, 10, 9),
+        meetings=[{"id": "meeting-id"}],
+    ) is None

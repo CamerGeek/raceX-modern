@@ -318,7 +318,7 @@ def test_race_day_quinte_refreshes_yesterdays_cached_analysis(
     assert client.inserted[0][1]["summary"]["homepage_cache_version"] == races_api.HOMEPAGE_QUINTE_CACHE_VERSION
 
 
-def test_race_day_quinte_reuses_cache_created_today(
+def test_race_day_quinte_reuses_cache_prepared_the_previous_day(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     meeting = {**MEETING, "meeting_date": "2026-10-03"}
@@ -340,7 +340,7 @@ def test_race_day_quinte_reuses_cache_created_today(
         prognosis=[],
     )
     analysis_run = {
-        "created_at": "2026-10-03T09:00:00+00:00",
+        "created_at": "2026-10-02T20:00:00+00:00",
         "summary": {
             "homepage_cache_version": races_api.HOMEPAGE_QUINTE_CACHE_VERSION,
             "homepage_analysis": cached.model_dump(mode="json"),
@@ -359,7 +359,7 @@ def test_race_day_quinte_reuses_cache_created_today(
 
         def select_one(self, table: str, **_: object) -> dict | None:
             if table == "flat_race_runners":
-                return {"updated_at": "2026-10-03T08:00:00+00:00"}
+                return {"updated_at": "2026-10-02T19:55:00+00:00"}
             raise AssertionError(f"unexpected select table: {table}")
 
     monkeypatch.setattr(races_api, "_paris_today", lambda: date(2026, 10, 3))

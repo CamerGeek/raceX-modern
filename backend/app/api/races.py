@@ -525,7 +525,6 @@ def _analyze_today_turfomania_quinte(
             client,
             meeting_date,
             meetings=meetings,
-            created_on=paris_today if meeting_date == paris_today else None,
         )
         if cached:
             return cached
@@ -666,7 +665,6 @@ def _cached_homepage_quinte_for_date(
     meeting_date: date,
     *,
     meetings: list[dict[str, Any]] | None = None,
-    created_on: date | None = None,
 ) -> TurfomaniaQuinteAnalysisResponse | None:
     meeting_rows = meetings if meetings is not None else client.list(
         "meetings",
@@ -676,6 +674,9 @@ def _cached_homepage_quinte_for_date(
         ],
         limit=100,
     )
+    cached_candidates: list[
+        tuple[datetime, TurfomaniaQuinteAnalysisResponse]
+    ] = []
     for meeting in meeting_rows:
         for race in client.list(
             "races",
@@ -684,16 +685,17 @@ def _cached_homepage_quinte_for_date(
         ):
             summary = race.get("summary") or {}
             if race.get("source") == "turfomania" and summary.get("q_plus"):
-                cached = _cached_homepage_quinte_analysis(
+                cached = _homepage_quinte_cache_entry(
                     client,
                     race["id"],
                     race.get("race_type"),
-                    require_fresh=False,
-                    created_on=created_on,
+                    require_fresh=True,
                 )
                 if cached:
-                    return cached
-    return None
+                    cached_candidates.append(cached)
+    if not cached_candidates:
+        return None
+    return max(cached_candidates, key=lambda candidate: candidate[0])[1]
 
 
 @router.get("/turfomania/quinte/today/odds")
@@ -717,8 +719,23 @@ def _cached_homepage_quinte_analysis(
     race_type: str,
     *,
     require_fresh: bool = True,
-    created_on: date | None = None,
 ) -> TurfomaniaQuinteAnalysisResponse | None:
+    cached_entry = _homepage_quinte_cache_entry(
+        client,
+        race_id,
+        race_type,
+        require_fresh=require_fresh,
+    )
+    return cached_entry[1] if cached_entry else None
+
+
+def _homepage_quinte_cache_entry(
+    client: SupabaseClientWrapper,
+    race_id: str,
+    race_type: str,
+    *,
+    require_fresh: bool,
+) -> tuple[datetime, TurfomaniaQuinteAnalysisResponse] | None:
     cached_runs = client.list(
         "analysis_runs",
         filters=[("race_id", "eq", race_id)],
@@ -738,16 +755,13 @@ def _cached_homepage_quinte_analysis(
         if summary.get("homepage_cache_version") != HOMEPAGE_QUINTE_CACHE_VERSION:
             continue
         cached_at = _parse_cache_timestamp(cached_run.get("created_at"))
-        if created_on and (
-            cached_at is None
-            or cached_at.astimezone(ZoneInfo("Europe/Paris")).date() != created_on
-        ):
+        if cached_at is None:
             continue
         if require_fresh and not _homepage_cache_is_fresh(cached_run, latest_runner):
             continue
         cached_response = summary.get("homepage_analysis")
         if isinstance(cached_response, dict):
-            return TurfomaniaQuinteAnalysisResponse.model_validate(cached_response)
+            return cached_at, TurfomaniaQuinteAnalysisResponse.model_validate(cached_response)
     return None
 
 
