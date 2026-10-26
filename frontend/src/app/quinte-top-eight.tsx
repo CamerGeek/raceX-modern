@@ -114,7 +114,7 @@ export default function QuinteTopEight() {
           <p className="public-kicker">ANALYSE GRATUITE DU JOUR</p>
           <h2 id="free-analysis-title">Top 8 par score composite</h2>
           <p className="free-analysis-description">
-            Classement calculé à partir des partants et des signaux de la course.
+            Sans poids direct pour les cotes; l’IC reste inclus pour les courses de plat.
           </p>
         </div>
         {analysis && <span className="free-analysis-count">{analysis.row_count} partants</span>}

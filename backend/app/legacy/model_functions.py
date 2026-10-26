@@ -1566,7 +1566,7 @@ def map_horse_counts(df):
     return df
 
 def compute_trot_composite_score(row, trot_weights=None):
-    """Compute a trotting-specific composite score (0-100).
+    """Compute a market-independent trotting composite score (0-100).
     
     Uses trotting-specific metrics:
     - FA (harness fitness) or FM (mounted fitness)
@@ -1574,7 +1574,6 @@ def compute_trot_composite_score(row, trot_weights=None):
     - Average rank - lower is better
     - Recent average rank - lower is better
     - Trend slope - negative is better (improving trend)
-    - Odds (Cote) - lower odds = better favorite
     - Aggressiveness (0-4) - trainer shoeing strategy indicator
     
     Returns score 0-100 where higher is better.
@@ -1682,17 +1681,6 @@ def compute_trot_composite_score(row, trot_weights=None):
             except (ValueError, TypeError):
                 pass
 
-        # Odds
-        if pd.notna(row.get('COTE')):
-            try:
-                cote = float(row['COTE'])
-                import math
-                cote_log = math.log(max(1, cote))
-                cote_score = max(0, 1 - cote_log / 4.0)
-                component_values['cote'] = cote_score
-            except (ValueError, TypeError):
-                pass
-
         # Aggressiveness
         if pd.notna(row.get('aggressiveness')):
             try:
@@ -1719,7 +1707,6 @@ def compute_trot_composite_score(row, trot_weights=None):
             'recent_avg_rank': 0.10,
             'trend': 0.10,
             'disq': 0.05,
-            'cote': 0.10,
             'aggressiveness': 0.05,
             's_coeff': 0.10
         }

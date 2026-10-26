@@ -52,7 +52,7 @@ router = APIRouter(prefix="/races", tags=["races"])
 logger = logging.getLogger(__name__)
 
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
-HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v4"
+HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v6"
 RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v2"
 BETTING_CACHE_VERSION = "betting-analysis-v1"
 

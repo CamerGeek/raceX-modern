@@ -3013,8 +3013,7 @@ class SettingsDialog(QDialog):
 
     def _reset_to_defaults(self):
         """Reset all metric weights to their default values."""
-        # Default percentages: IC(20%), S_COEFF(20%), IF(15%), n_weight(10%), COTE(20%), Corde(10%), VALEUR(5%)
-        default_perc = {'IC': 20, 'S_COEFF': 20, 'IF': 15, 'n_weight': 10, 'COTE': 20, 'Corde': 10, 'VALEUR': 5}
+        default_perc = {'IC': 25, 'S_COEFF': 25, 'IF': 19, 'n_weight': 12, 'Corde': 13, 'VALEUR': 6}
         
         # Block signals to prevent proportional rebalancing during reset
         for metric in self.metric_weights.keys():
@@ -3070,13 +3069,12 @@ def normalize_composite_columns(df):
     
     # Build list of columns to normalize
     normalize_map = {
-        'IF': ['IF', 'If'],
         'IC': ['IC', 'Ic'],
+        'IF': ['IF', 'If'],
         'S_COEFF': ['S_COEFF', 's_COEFF'],
         'n_weight': ['n_weight', 'N_WEIGHT'],
         'POIDS': ['POIDS', 'Poids', 'weight'],
         'VALEUR': ['VALEUR', 'Valeur'],
-        'COTE': ['COTE', 'Cote'],
         # NOTE: Corde is NOT included here because it's computed separately via compute_corde_score()
         # which already properly handles the logic: lower post number = better = higher score
     }
@@ -3203,8 +3201,9 @@ def _ensure_handicap_features(race_df):
 
 
 def compute_composite_score(race_df, weights=None):
-    """Compute a composite score (0-1) from selected metrics.
-    We normalize metrics to 0-1 where higher is better and apply weights.
+    """Compute a composite score (0-1) without a standalone odds component.
+    Flat-race IC remains included and is market-derived; other metrics are
+    normalized to 0-1 where higher is better and combined using race weights.
     
     For trotting races, includes DQ_Risk (inverted: lower risk = higher score).
     
@@ -3223,11 +3222,11 @@ def compute_composite_score(race_df, weights=None):
         # Set default weights if not provided
         if weights is None:
             if is_trot:
-                # Trotting: S_COEFF(20%), COTE(15%), DQ_Risk(20%), Fitness(15%), Slope(15%), REC(10%), Shoeing(5%)
-                weights = {'S_COEFF':0.20, 'COTE':0.15, 'DQ_Risk_Inverted':0.20, 'Fitness':0.15, 'Slope':0.15, 'REC':0.10, 'Shoeing_Agg':0.05}
+                # Trotting: S_COEFF(4/17), DQ_Risk(4/17), Fitness(3/17), Slope(3/17), REC(2/17), Shoeing(1/17)
+                weights = {'S_COEFF':4/17, 'DQ_Risk_Inverted':4/17, 'Fitness':3/17, 'Slope':3/17, 'REC':2/17, 'Shoeing_Agg':1/17}
             else:
-                # Flat: traditional weights
-                weights = {'IC':0.20, 'S_COEFF':0.20, 'IF':0.15, 'n_weight':0.10, 'COTE':0.20, 'Corde':0.10, 'VALEUR':0.05}
+                # Flat: retain IC, excluding the standalone COTE weight.
+                weights = {'IC':0.25, 'S_COEFF':0.25, 'IF':0.1875, 'n_weight':0.125, 'Corde':0.125, 'VALEUR':0.0625}
         
         if has_prenorm:
             # Fast path: use pre-normalized columns
@@ -3238,18 +3237,16 @@ def compute_composite_score(race_df, weights=None):
             norm['n_weight'] = race_df['_norm_n_weight']
             norm['VALEUR'] = race_df['_norm_VALEUR']
             norm['Corde'] = race_df.get('_norm_Corde', pd.Series(0.5, index=race_df.index))
-            norm['COTE'] = race_df.get('_norm_COTE', pd.Series(0.5, index=race_df.index))
         else:
             # Slow path: compute normalization on-the-fly (original logic)
             metrics = {}
             # prefer column variants
-            metrics['IF'] = 'IF' if 'IF' in race_df.columns else ('If' if 'If' in race_df.columns else None)
             metrics['IC'] = 'IC' if 'IC' in race_df.columns else ('Ic' if 'Ic' in race_df.columns else None)
+            metrics['IF'] = 'IF' if 'IF' in race_df.columns else ('If' if 'If' in race_df.columns else None)
             metrics['S_COEFF'] = 'S_COEFF' if 'S_COEFF' in race_df.columns else ('s_COEFF' if 's_COEFF' in race_df.columns else None)
             metrics['n_weight'] = 'n_weight' if 'n_weight' in race_df.columns else ('N_WEIGHT' if 'N_WEIGHT' in race_df.columns else None)
             metrics['VALEUR'] = 'VALEUR' if 'VALEUR' in race_df.columns else ('Valeur' if 'Valeur' in race_df.columns else None)
             metrics['Corde'] = 'Corde' if 'Corde' in race_df.columns else ('CORDE' if 'CORDE' in race_df.columns else None)
-            metrics['COTE'] = 'COTE' if 'COTE' in race_df.columns else ('Cote' if 'Cote' in race_df.columns else None)
 
             # Build norm table
             norm = pd.DataFrame(index=race_df.index)
@@ -3263,7 +3260,7 @@ def compute_composite_score(race_df, weights=None):
             except Exception:
                 pass
         
-        # Normalize S_COEFF and COTE for trotting (these are the main metrics available)
+        # Normalize trotting-specific core metrics.
         if is_trot:
             # S_COEFF: higher is better
             if 'S_COEFF' in race_df.columns:
@@ -3277,21 +3274,6 @@ def compute_composite_score(race_df, weights=None):
                             norm['S_COEFF'] = 0.5
                 except Exception:
                     norm['S_COEFF'] = 0.5
-            
-            # COTE: lower is better (inverted)
-            cote_col = 'COTE' if 'COTE' in race_df.columns else ('Cote' if 'Cote' in race_df.columns else None)
-            if cote_col:
-                try:
-                    cote_vals = pd.to_numeric(race_df[cote_col], errors='coerce')
-                    if not cote_vals.dropna().empty:
-                        cote_inv = -cote_vals  # invert: lower odds = better
-                        cmin, cmax = cote_inv.min(), cote_inv.max()
-                        if cmax > cmin:
-                            norm['COTE'] = ((cote_inv - cmin) / (cmax - cmin)).fillna(0.5)
-                        else:
-                            norm['COTE'] = 0.5
-                except Exception:
-                    norm['COTE'] = 0.5
             
             # Fitness (FA/FM): lower is better (inverted)
             fa_col = 'FA' if 'FA' in race_df.columns else None
@@ -3790,8 +3772,7 @@ class TrottingAnalysisWindow(BaseAnalysisWindow):
     def compute_trotting_composite(self):
         """
         Compute trotting-specific composite score for each horse.
-        Uses the main compute_composite_score function with trotting weights:
-        S_COEFF(20%), COTE(15%), DQ_Risk(20%), Fitness(15%), Slope(15%), REC(10%), Shoeing(5%)
+        Uses the market-independent trotting weights from compute_composite_score.
         Returns DataFrame with N°, CHEVAL, Composite Score, and ranking.
         """
         try:
@@ -5587,13 +5568,13 @@ class RaceScraperApp(QMainWindow):
         self.analysis_title.setFont(title_font)
         analysis_layout.addWidget(self.analysis_title)
 
-        # Load persisted metric weights from QSettings (no inline sliders)
+        # Load persisted market-independent metric weights from QSettings.
         self.last_filtered_df = None
         self.current_composite_df = None
         # NOTE: QSettings already initialized above at __init__ start
-        default_perc = {'IC':20, 'S_COEFF':20, 'IF':15, 'n_weight':10, 'COTE':20, 'Corde':10, 'VALEUR':5}
+        default_perc = {'IC':25, 'S_COEFF':25, 'IF':19, 'n_weight':12, 'Corde':13, 'VALEUR':6}
         self.metric_weights = {}
-        for metric in ['IC','S_COEFF','IF','n_weight','COTE','Corde','VALEUR']:
+        for metric in ['IC','S_COEFF','IF','n_weight','Corde','VALEUR']:
             try:
                 saved = int(self.settings.value(metric, default_perc.get(metric, 10)))
             except Exception:
@@ -7814,7 +7795,7 @@ class RaceScraperApp(QMainWindow):
                 # Re-apply filters to refresh analysis with updated odds
                 try:
                     self.apply_filters()
-        # If analysis is visible, refresh composite with new odds
+        # Refresh analysis after odds change; odds remain separate from the composite.
                     if hasattr(self, 'last_filtered_df') and self.last_filtered_df is not None and self.analysis_widget.isVisible():
                         self.refresh_composite_and_heatmap(self.last_filtered_df)
                         
@@ -8554,7 +8535,7 @@ class RaceScraperApp(QMainWindow):
     def open_settings_dialog(self):
         try:
             # Build initial weights dict from current sliders/metric_weights
-            initial = self.metric_weights.copy() if hasattr(self, 'metric_weights') else {'IC':0.20, 'S_COEFF':0.20, 'IF':0.15, 'n_weight':0.10, 'COTE':0.20, 'Corde':0.10, 'VALEUR':0.05}
+            initial = self.metric_weights.copy() if hasattr(self, 'metric_weights') else {'IC':0.25, 'S_COEFF':0.25, 'IF':0.19, 'n_weight':0.12, 'Corde':0.13, 'VALEUR':0.06}
             dlg = SettingsDialog(self, metric_weights=initial)
             # Apply dialog styling
             self.apply_dialog_style(dlg)
@@ -11507,15 +11488,15 @@ PRIORITE: Un cheval dans ≥4 sources → Auto-inclusion forte
 
 📊 METRIQUES CLES
 ──────────────────────────────────────────────────
-• IC (20%): Indice de Classe - Plus bas = meilleur
-• S_COEFF (20%): Succes/Coefficient de victoire
-• IF (15%): Indice de Forme - Plus bas = meilleur
-• n_weight (10%): Stabilite du poids
-• COTE (20%): Cote PMU - Plus bas = favori
-• Corde (10%): Position de depart favorable
-• VALEUR (5%): Valeur relative du cheval
+Score composite sans poids direct pour COTE:
+• IC (25%): Indice conserve pour les courses de plat; derive du poids et de la cote
+• S_COEFF (25%): Succes/Coefficient de victoire
+• IF (19%): Indice de Forme
+• n_weight (12%): Stabilite du poids
+• Corde (13%): Position de depart favorable
+• VALEUR (6%): Valeur relative du cheval
 
-LES 3 METRIQUES DOMINENT: IC, S_COEFF, COTE (60% ensemble)
+COTE reste egalement visible comme signal du marche, sans poids direct dans le composite.
 
 🔍 STRATEGIE D'ANALYSE
 ──────────────────────────────────────────────────
@@ -11530,13 +11511,13 @@ LES 3 METRIQUES DOMINENT: IC, S_COEFF, COTE (60% ensemble)
 ✅ POSITIFS:
    • Cheval dans 5+ sources d'analyse
    • Tendance positive + Weight Stable
-   • Cote basse = confiance PMU
+   • Comparez la cote au composite, sans les confondre
    • Composite score > 0.70
 
 ⚠️ NEGATIFS:
    • Seul favori dans la course (trop de doutes)
    • IC mauvais + poids instable
-   • Cote tres haute avec score moyen
+   • Desaccord entre cote et score composite
    • Absence de source d'analyse
 
 💰 GESTION DU RISQUE
@@ -11579,23 +11560,21 @@ CAS 5: Tendance positive + Light Weight + 4+ sources
         metrics_text = """📊 METRIQUES EXPLIQUEES - Comprendre Chaque Score
 
 ════════════════════════════════════════════════════════════════════
-1. IC (Indice de Classe) - 20%
+1. IC (Indice de Classe) - 25% du composite plat; derive de la cote
 ════════════════════════════════════════════════════════════════════
 📋 Definition:
    IC = Poids - Cote PMU
-   Represente la charge que le cheval porte a handicap
+   Signal derive des cotes, conserve dans le composite plat
 
 📈 Interpretation:
-   • IC BAS (ex: -2) = Meilleur! Peu de poids malgre la cote
-   • IC MOYEN (ex: 0-2) = Normal pour le handicap
-   • IC ELEVE (ex: 5+) = Cheval lourd pour sa qualite
+   • IC bas ou eleve doit etre interprete avec le poids et la cote
 
 💡 Utilisation:
    "Plus bas IC = plus facile pour le cheval"
    Cherchez les chevaux avec IC negatif ou tres bas
 
 ════════════════════════════════════════════════════════════════════
-2. S_COEFF (Succes Coefficient) - 20%
+2. S_COEFF (Succes Coefficient) - 25% du composite plat
 ════════════════════════════════════════════════════════════════════
 📋 Definition:
    S_COEFF = Taux de succes/victoires du cheval
@@ -11611,7 +11590,7 @@ CAS 5: Tendance positive + Light Weight + 4+ sources
    Privilegiez les chevaux avec coefficient > 0.60
 
 ════════════════════════════════════════════════════════════════════
-3. IF (Indice de Forme) - 15%
+3. IF (Indice de Forme) - 19% du composite plat
 ════════════════════════════════════════════════════════════════════
 📋 Definition:
    IF = Score de condition physique actuelle
@@ -11627,7 +11606,7 @@ CAS 5: Tendance positive + Light Weight + 4+ sources
    Les chevaux positifs en forme sont les meilleurs paris
 
 ════════════════════════════════════════════════════════════════════
-4. n_weight (Weight Change) - 10%
+4. n_weight (Weight Change) - 12% du composite plat
 ════════════════════════════════════════════════════════════════════
 📋 Definition:
    n_weight = Poids actuel - Poids precedente course
@@ -11643,11 +11622,11 @@ CAS 5: Tendance positive + Light Weight + 4+ sources
    Les chevaux avec weight change proche de 0 sont plus predictibles
 
 ════════════════════════════════════════════════════════════════════
-5. COTE (PMU Odds) - 20%
+5. COTE (PMU Odds) - signal du marche sans poids direct dans le composite
 ════════════════════════════════════════════════════════════════════
 📋 Definition:
    COTE = Cote de pari du PMU
-   Represente la confiance du marche (parieurs)
+   Represente la confiance du marche (parieurs); peut evoluer au fil du temps
 
 📈 Interpretation:
    • COTE BASSE (1.2-2.5) = Favori, confiance PMU
@@ -11655,11 +11634,10 @@ CAS 5: Tendance positive + Light Weight + 4+ sources
    • COTE HAUTE (5.0+) = Outsider, peu de confiance
 
 💡 Utilisation:
-   "Basse cote = consensus sur le favori"
-   Combinez avec d'autres metriques pour confirmer
+   Consultez la cote et son evolution separement du score composite
 
 ════════════════════════════════════════════════════════════════════
-6. Corde (Track Position) - 10%
+6. Corde (Track Position) - 13% du composite plat
 ════════════════════════════════════════════════════════════════════
 📋 Definition:
    Corde = Position de depart sur la piste
@@ -11675,27 +11653,26 @@ CAS 5: Tendance positive + Light Weight + 4+ sources
    Les donnees Zone-Turf identifient ces avantages
 
 ════════════════════════════════════════════════════════════════════
-7. VALEUR (Horse Value) - 5%
+7. VALEUR (Horse Value) - 6% du composite plat
 ════════════════════════════════════════════════════════════════════
 📋 Definition:
    VALEUR = Valeur relative du cheval vs competition
-   Combine tous les facteurs pour un score unique
+   Signal de niveau utilise dans le score composite
 
 📈 Interpretation:
-   • VALEUR HAUTE (0.7-1.0) = Bon rapport qualite/cote
+   • VALEUR haute = valeur handicap elevee
    • VALEUR MOYENNE (0.4-0.7) = Normal
    • VALEUR BASSE (0.0-0.4) = Mauvais rapport
 
 💡 Utilisation:
-   "Score synthetique de valeur du cheval"
-   Utilisez pour confirmer d'autres metriques
+   Cette valeur de handicap est un signal distinct de la cote PMU
 
 ════════════════════════════════════════════════════════════════════
 COMPOSITE SCORE (Synthese)
 ════════════════════════════════════════════════════════════════════
 📋 Definition:
-   Composite = Moyenne pondere de toutes les metriques
-   Score 0-1 representant la valeur globale du cheval
+   Composite = Moyenne ponderee des metriques de course sans poids direct pour COTE
+   L'IC derive des cotes reste inclus dans le composite des courses de plat
 
 📈 Interpretation:
    • SCORE 0.80-1.0 = Favori de qualite
@@ -11746,7 +11723,7 @@ Votre outil d'intelligence et d'analyse des courses hippiques
 ✨ Fonctionnalites principales:
 ─────────────────────────────────────────────────
 ✓ Extraction des donnees de courses depuis Zone-Turf
-✓ Analyse complete avec 7 metriques (IC, S_COEFF, IF, n_weight, COTE, Corde, VALEUR)
+✓ Score composite independant du marche; IC et COTE presentes separement
 ✓ 10 sources d'analyse combinables (priorite ≥4 sources)
 ✓ Generation automatique de pronostics + combinaisons
 ✓ Export PDF et impression

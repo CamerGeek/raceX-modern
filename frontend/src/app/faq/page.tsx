@@ -60,9 +60,9 @@ const questions = [
       "Il s’agit d’un classement distinct du Pronostic : le modèle d’apprentissage automatique classe les chevaux par score Deep décroissant et affiche jusqu’à huit chevaux. Ces scores servent à classer les partants ; ce ne sont pas des probabilités de victoire ou de placé calibrées.",
   },
   {
-    question: "Que signifient les votes et le Consensus des votes ?",
+    question: "Que signifie le Priority Tier du modèle ?",
     answer:
-      "Un vote n’est pas un vote d’utilisateur : c’est un signal de modèle. Un cheval reçoit un vote pour chaque source où il figure parmi les trois meilleurs scores de placé, les trois meilleurs scores de victoire, les quatre meilleurs scores « dark horse » ou, si disponible, les trois meilleurs scores Deep. En course plate, les pronostics fournis avec les données de course peuvent aussi compter comme une source. Le Consensus affiche tous les chevaux ayant au moins un vote, du plus grand nombre de votes au plus petit. Les listes Prognosis, Model Shortlist et Consensus mesurent donc des signaux différents.",
+      "Le Priority Tier indique l’ordre dans lequel les règles de sélection du modèle retiennent les chevaux ; Tier 1 est prioritaire. Au trot et en obstacles, Tier 1 correspond à au moins trois votes de sources de modèles, Tier 2 à deux votes, puis les places restantes sont complétées par le score moyen de placé. En plat, Tier 1 regroupe les chevaux ayant au moins trois votes, Tier 2 les deux meilleurs par S_COEFF (ou par score moyen de placé si S_COEFF manque), Tier 3 le meilleur score « dark horse », Tier 4 les autres chevaux ayant deux votes, et Tier 5 complète selon le score moyen de placé. La sélection est plafonnée à six chevaux. Les tiers sont une règle de shortlist, pas des probabilités ni une prédiction garantie de l’ordre d’arrivée. Un cheval sans tier n’a pas été retenu dans cette sélection.",
   },
   {
     question: "Les analyses RaceX garantissent-elles un gain ?",
