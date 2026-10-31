@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import QuinteOddsChart from "../quinte-odds-chart";
-import QuinteRecommendations, { type QuinteModelPredictions } from "../quinte-recommendations";
+import QuinteRecommendations, {
+  getModelShortlistRows,
+  type QuinteModelPredictions,
+} from "../quinte-recommendations";
 import SiteNavigation from "../site-navigation";
 import AccessGate from "../access-gate";
 import { useAuth } from "../auth-context";
@@ -465,10 +468,6 @@ function SubscriberDashboard() {
     window.print();
   }
 
-  const ranked = (analysis?.rows ?? [])
-    .map((horse) => ({ horse, score: scoreOf(horse) }))
-    .filter((item): item is { horse: Horse; score: number } => item.score !== null)
-    .sort((first, second) => second.score - first.score);
   const completeCompositeScores = (analysis?.rows ?? [])
     .map((horse, index) => ({ horse, index, score: scoreOf(horse) }))
     .sort((first, second) => {
@@ -477,9 +476,13 @@ function SubscriberDashboard() {
       return second.score - first.score || first.index - second.index;
     });
   const plotTwistRows = analysis ? plotTwistCandidates(analysis.rows) : [];
-  const contenders = ranked.slice(0, 8);
-  const leadingHorse = contenders[0]?.horse;
-  const leaderScore = contenders[0]?.score ?? null;
+  const modelShortlistRows = getModelShortlistRows(analysis?.model_predictions ?? null);
+  const leadingHorse = modelShortlistRows[0];
+  const leaderScoreText = leadingHorse
+    ? firstValue(leadingHorse, ["place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score"])
+    : "";
+  const leaderScoreValue = Number(leaderScoreText.trim().replace(",", "."));
+  const leaderScore = leaderScoreText && Number.isFinite(leaderScoreValue) ? leaderScoreValue : null;
   const leaderOdds = leadingHorse ? firstValue(leadingHorse, oddsFields) : "";
   const leaderForm = leadingHorse ? firstValue(leadingHorse, formFields) : "";
   const lowestOdds = (analysis?.rows ?? [])
@@ -593,23 +596,23 @@ function SubscriberDashboard() {
             <section className="subscriber-featured public-widget" aria-labelledby="subscriber-pick-title">
               <div className="subscriber-featured-copy">
                 <p className="public-kicker">POINT FORT DU MODÈLE</p>
-                <h2 id="subscriber-pick-title">Meilleur score composite</h2>
+                <h2 id="subscriber-pick-title">Premier cheval du Model Shortlist</h2>
                 <p className="subscriber-featured-horse">
                   N° {firstValue(leadingHorse, numberFields) || "—"}{" "}
                   <strong>{firstValue(leadingHorse, nameFields) || "Cheval sans nom"}</strong>
                 </p>
                 <p className="subscriber-rationale">
-                  Ce cheval arrive en tête du classement composite parmi les partants analysés.
-                  {leaderScore !== null && <> Son score est de <strong>{displayScore(leaderScore)}</strong>.</>}
+                  Ce cheval est classé premier dans le Model Shortlist selon son deep score décroissant.
+                  {leaderScore !== null && <> Son deep score est de <strong>{displayScore(leaderScore)}</strong>.</>}
                   {leaderOdds && <> Cote relevée : <strong>{leaderOdds}</strong>.</>}
                   {leaderForm && <> Musique : <strong>{leaderForm}</strong>.</>}
                 </p>
                 <p className="subscriber-caveat">Classement indicatif fondé sur les données disponibles, sans garantie de résultat.</p>
               </div>
               <div className="subscriber-featured-stats">
-                <div><span>SCORE COMPOSITE</span><strong>{displayScore(leaderScore)}</strong></div>
+                <div><span>DEEP SCORE</span><strong>{displayScore(leaderScore)}</strong></div>
                 <div><span>FAVORI DU MARCHÉ</span><strong>{lowestOdds === undefined ? "—" : lowestOdds.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</strong></div>
-                <div><span>CHEVAUX AU CLASSEMENT</span><strong>{contenders.length}</strong></div>
+                <div><span>CHEVAUX SHORTLISTÉS</span><strong>{modelShortlistRows.length}</strong></div>
               </div>
             </section>
           )}

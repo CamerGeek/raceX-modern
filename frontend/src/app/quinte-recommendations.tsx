@@ -30,7 +30,7 @@ function numberList(rows: Horse[]) {
     .slice(0, 8);
 }
 
-function modelShortlist(predictions: QuinteModelPredictions | null) {
+export function getModelShortlistRows(predictions: QuinteModelPredictions | null) {
   if (predictions?.status !== "ready") return [];
 
   return predictions.rows
@@ -44,9 +44,13 @@ function modelShortlist(predictions: QuinteModelPredictions | null) {
     })
     .filter((item): item is { row: Horse; index: number; score: number } => item.score !== null)
     .sort((first, second) => second.score - first.score || first.index - second.index)
-    .map(({ row }) => horseNumber(row))
-    .filter(Boolean)
+    .map(({ row }) => row)
+    .filter((row) => Boolean(horseNumber(row)))
     .slice(0, 8);
+}
+
+function modelShortlist(predictions: QuinteModelPredictions | null) {
+  return getModelShortlistRows(predictions).map(horseNumber);
 }
 
 function priorityTierShortlist(predictions: QuinteModelPredictions | null) {
