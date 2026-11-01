@@ -310,6 +310,34 @@ input[type=url]:focus, input[type=date]:focus, select:focus { border-color: var(
 .section-heading { display: flex; justify-content: space-between; align-items: start; border-bottom: 1px solid var(--line); padding-bottom: 1.2rem; }
 h2 { font-size: 2.4rem; font-weight: 500; margin: .4rem 0 0; }
 .count { color: var(--muted); font: .75rem ui-sans-serif, system-ui, sans-serif; }
+.admin-report-actions { display: flex; align-items: center; gap: .75rem; }
+.admin-print-button { min-height: 2.4rem; padding: .55rem .85rem; border: 1px solid var(--green); border-radius: .45rem; background: var(--green); color: #fff; cursor: pointer; font: 700 .72rem ui-sans-serif, system-ui, sans-serif; }
+.admin-print-document { display: none; }
+.admin-print-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-bottom: .65rem; border-bottom: 3px double #103b32; }
+.admin-print-header p { margin: 0 0 .2rem; color: #c96f3b; font: 700 .58rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .14em; }
+.admin-print-header h1 { margin: 0; color: #103b32; font: 500 1.4rem Georgia, 'Times New Roman', serif; }
+.admin-print-header span { display: block; margin-top: .2rem; color: #65736d; font: 700 .68rem ui-sans-serif, system-ui, sans-serif; }
+.admin-print-header img { width: 9rem; height: auto; object-fit: contain; }
+.admin-print-details { margin: .65rem 0; color: #34443d; font: .68rem/1.4 ui-sans-serif, system-ui, sans-serif; }
+.admin-print-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; margin: .65rem 0; }
+.admin-print-summary div { display: grid; gap: .2rem; padding: .45rem .55rem; border: 1px solid #d7d8ca; }
+.admin-print-summary span { color: #65736d; font: 700 .5rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .08em; }
+.admin-print-summary strong { color: #103b32; font: 700 .72rem ui-sans-serif, system-ui, sans-serif; }
+.admin-print-priority .quinte-pick-card { margin-bottom: .55rem; padding: .5rem .65rem; border: 1px solid #d7d8ca; border-top: 2px solid #1d594b; background: #fff; }
+.admin-print-priority .quinte-pick-card .public-kicker,
+.admin-print-priority .quinte-pick-card .quinte-pick-description { display: none; }
+.admin-print-priority .quinte-pick-card h2 { font: 700 .75rem ui-sans-serif, system-ui, sans-serif; }
+.admin-print-priority .priority-tier-list { display: flex; flex-wrap: wrap; gap: .3rem .8rem; margin-top: .35rem; }
+.admin-print-priority .priority-tier-list li { justify-content: flex-start; gap: .3rem; padding: .1rem 0; background: transparent; }
+.admin-print-priority .priority-tier-list strong,
+.admin-print-priority .priority-tier-list span { color: #103b32; font-size: .62rem; }
+.admin-print-runners { margin-top: .55rem; }
+.admin-print-runners h2 { margin: 0 0 .35rem; color: #103b32; font: 700 .78rem ui-sans-serif, system-ui, sans-serif; }
+.admin-print-runners table { width: 100%; border-collapse: collapse; font: .62rem/1.25 ui-sans-serif, system-ui, sans-serif; }
+.admin-print-runners th { padding: .3rem .35rem; background: #103b32; color: #fff; text-align: left; }
+.admin-print-runners td { padding: .22rem .35rem; border-bottom: 1px solid #d7d8ca; white-space: normal; }
+.admin-print-runners tbody tr { break-inside: avoid; }
+.admin-print-footer { margin-top: .6rem; padding-top: .35rem; border-top: 1px solid #aeb9b0; color: #65736d; font: .55rem/1.35 ui-sans-serif, system-ui, sans-serif; }
 .race-meta { display: flex; flex-wrap: wrap; gap: 1rem; padding: 1rem 0; color: var(--muted); font: .72rem ui-sans-serif, system-ui, sans-serif; text-transform: uppercase; letter-spacing: .06em; }
 .race-details { margin: 1rem 0 .25rem; padding: .9rem 1rem; border: 1px solid var(--card-line); border-left: 3px solid var(--cyan); border-radius: .55rem; background: var(--card-wash); }
 .race-details span { color: var(--orange); font: 700 .65rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .1em; }
@@ -539,6 +567,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 @media print {
   @page { size: A4; margin: 13mm 12mm; }
   body { background: #fff; color: #18221f; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .admin-shell { max-width: none; padding: 0; }
+  .admin-shell > .site-navigation,
+  .admin-shell > .masthead,
+  .admin-shell > .workspace { display: none !important; }
+  .admin-shell > .admin-print-document { display: block !important; }
   .site-footer, .subscriber-shell > .site-navigation, .subscriber-header,
   .subscriber-race-date-switch,   .subscriber-details, .odds-chart-panel,
   .subscriber-state { display: none !important; }

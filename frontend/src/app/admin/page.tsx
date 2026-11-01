@@ -223,6 +223,20 @@ function AdminPageContent() {
   const selectedMeetingLabel = Object.entries(meetings).find(([, meeting]) => meeting === meetingUrl)?.[0] ?? "Selected meeting";
   const selectedRaceLabel = races.find((race) => race.id === selectedRace)?.race_key ?? "Race report";
   const isTurfomaniaMeeting = meetingUrl.startsWith("turfomania://meetings/");
+  const printRows = analysis
+    ? [...analysis.rows].sort((first, second) => (compositeScore(second) ?? -Infinity) - (compositeScore(first) ?? -Infinity))
+    : [];
+  const printVenue = analysis ? field(analysis.rows[0] ?? {}, ["HIPPODROME", "HIPPO", "TRACK"], "") : "";
+
+  function printActiveRace() {
+    if (!analysis) return;
+    const previousTitle = document.title;
+    document.title = `RaceX-${selectedRaceLabel}-${meetingDate}`;
+    window.addEventListener("afterprint", () => {
+      document.title = previousTitle;
+    }, { once: true });
+    window.print();
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -533,7 +547,7 @@ function AdminPageContent() {
   }
 
   return (
-    <main className="shell">
+    <main className="shell admin-shell">
       <SiteNavigation currentPage="analysis" />
       <header className="masthead">
         <div className="brand-line">
@@ -602,7 +616,7 @@ function AdminPageContent() {
         </form>
 
         <section className="results-panel" aria-live="polite">
-          <div className="section-heading"><div><div className="eyebrow">PROGNOSIS / {analysis ? analysis.race_type.toUpperCase() : "WAITING"}</div><h2>{analysis ? "Race report" : "Short list"}</h2></div>{analysis && <span className="count">{analysis.row_count} runners read</span>}</div>
+          <div className="section-heading"><div><div className="eyebrow">PROGNOSIS / {analysis ? analysis.race_type.toUpperCase() : "WAITING"}</div><h2>{analysis ? "Race report" : "Short list"}</h2></div>{analysis && <div className="admin-report-actions"><span className="count">{analysis.row_count} runners read</span><button type="button" className="admin-print-button" onClick={printActiveRace}>Print / Save PDF</button></div>}</div>
           {!analysis && !scrapeResult && !loading && <div className="empty-state"><span className="starting-mark">01</span><p>Select a date and meeting to begin.</p></div>}
           {loading && <div className="empty-state"><span className="starting-mark pulse">...</span><p>Scraping and preparing the race report.</p></div>}
           {scrapeResult && <div className="saved-state"><span className="starting-mark">✓</span><h3>Meeting saved</h3><p>{scrapeResult.race_count} races and {scrapeResult.runner_count} runners stored in <strong>{scrapeResult.runner_table}</strong>.</p><span>{scrapeResult.columns.length} source columns preserved</span></div>}
@@ -704,6 +718,50 @@ function AdminPageContent() {
           </>}
         </section>
       </section>
+      {analysis && (
+        <article className="admin-print-document">
+          <header className="admin-print-header">
+            <div>
+              <p>RACEX · RACE ANALYSIS</p>
+              <h1>{selectedMeetingLabel} · {selectedRaceLabel}</h1>
+              <span>{meetingDate} · {analysis.race_type.toUpperCase()}{printVenue ? ` · ${printVenue}` : ""}</span>
+            </div>
+            <Image src="/racex-logo.png" alt="RaceX" width={180} height={60} />
+          </header>
+          {analysis.race_details && <p className="admin-print-details">{analysis.race_details}</p>}
+          <section className="admin-print-summary">
+            <div><span>RUNNERS</span><strong>{analysis.row_count}</strong></div>
+            <div><span>TOP SELECTION</span><strong>{topHorse ? `${field(topHorse, ["N°", "N", "Numero", "NUMERO"])} · ${field(topHorse, ["CHEVAL", "Cheval", "HORSE"])}` : "—"}</strong></div>
+            <div><span>MODEL</span><strong>{analysis.model_version}</strong></div>
+          </section>
+          {analysis.model_predictions && (
+            <div className="admin-print-priority">
+              <PriorityTierPickCard predictions={analysis.model_predictions} />
+            </div>
+          )}
+          <section className="admin-print-runners">
+            <h2>Composite ranking · all runners</h2>
+            <table>
+              <thead><tr><th>Rank</th><th>No.</th><th>Horse</th><th>Odds</th><th>Recent form</th><th>Composite score</th></tr></thead>
+              <tbody>
+                {printRows.map((horse, index) => (
+                  <tr key={`print-runner-${field(horse, ["N°", "N", "Numero", "NUMERO"], String(index))}-${index}`}>
+                    <td>{compositeScore(horse) === null ? "—" : index + 1}</td>
+                    <td>{field(horse, ["N°", "N", "Numero", "NUMERO"])}</td>
+                    <td>{field(horse, ["CHEVAL", "Cheval", "HORSE", "NAME"])}</td>
+                    <td>{field(horse, ["COTE", "Cote", "ODDS"])}</td>
+                    <td>{field(horse, ["MUSIQUE", "DERNIÈRES PERF.", "FORME", "FORM"])}</td>
+                    <td>{compositeScore(horse) === null ? "—" : formatValue(compositeScore(horse))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+          <footer className="admin-print-footer">
+            RaceX analysis is indicative and based on available data at the time of generation. Scores and odds may change and do not guarantee a result.
+          </footer>
+        </article>
+      )}
     </main>
   );
 }
