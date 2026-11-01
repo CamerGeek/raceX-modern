@@ -5,7 +5,12 @@ import { FormEvent, useEffect, useState } from "react";
 import SiteNavigation from "../site-navigation";
 import AccessGate from "../access-gate";
 import { useAuth } from "../auth-context";
-import { PriorityTierPickCard } from "../quinte-recommendations";
+import QuinteRecommendations, {
+  getModelShortlistRows,
+  PriorityTierPickCard,
+  ShodHorsesCard,
+  type PlotTwistItem,
+} from "../quinte-recommendations";
 
 type Horse = Record<string, string | number | boolean | null>;
 type AnalysisSection = { title: string; columns: string[]; rows: Horse[] };
@@ -84,7 +89,7 @@ function compositeScore(row: Horse) {
   return raw && Number.isFinite(score) ? score : null;
 }
 
-function plotTwistCandidates(rows: Horse[]) {
+function plotTwistCandidates(rows: Horse[]): PlotTwistItem[] {
   const rankedRows = rows
     .map((horse, index) => ({ horse, index, score: compositeScore(horse) }))
     .filter((item): item is { horse: Horse; index: number; score: number } =>
@@ -227,6 +232,13 @@ function AdminPageContent() {
     ? [...analysis.rows].sort((first, second) => (compositeScore(second) ?? -Infinity) - (compositeScore(first) ?? -Infinity))
     : [];
   const printVenue = analysis ? field(analysis.rows[0] ?? {}, ["HIPPODROME", "HIPPO", "TRACK"], "") : "";
+  const printModelRows = getModelShortlistRows(analysis?.model_predictions ?? null);
+  const printLeadingHorse = printModelRows[0];
+  const printLeaderScore = printLeadingHorse ? field(printLeadingHorse, ["place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score"], "") : "";
+  const printOdds = (analysis?.rows ?? [])
+    .map((horse) => Number(field(horse, ["COTE", "Cote", "ODDS"], "").trim().replace(",", ".")))
+    .filter((odds) => Number.isFinite(odds) && odds > 0);
+  const printFavoriteOdds = printOdds.length ? Math.min(...printOdds) : null;
 
   function printActiveRace() {
     if (!analysis) return;
@@ -720,45 +732,111 @@ function AdminPageContent() {
       </section>
       {analysis && (
         <article className="admin-print-document">
-          <header className="admin-print-header">
-            <div>
-              <p>RACEX · RACE ANALYSIS</p>
-              <h1>{selectedMeetingLabel} · {selectedRaceLabel}</h1>
-              <span>{meetingDate} · {analysis.race_type.toUpperCase()}{printVenue ? ` · ${printVenue}` : ""}</span>
+          <header className="subscriber-print-masthead">
+            <div className="subscriber-print-brand">
+              <svg
+                aria-label="RaceX"
+                role="img"
+                viewBox="0 0 512 512"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <rect width="512" height="512" rx="112" fill="#103b32" />
+                <path d="M75 105h362v58H303L124 349h142v58H75v-58l179-186H75z" fill="#f3f0e8" />
+                <path d="M310 224 437 407h-75l-90-130-91 130h-72l127-181-112-161h75l75 108 76-108h72z" fill="#2ac7ff" />
+              </svg>
+              <div>
+                <p className="subscriber-eyebrow">RACEX · ANALYSE DE LA COURSE</p>
+                <h1>Le journal des courses</h1>
+                <p>{meetingDate}{printVenue ? ` · ${printVenue}` : ""} · {analysis.race_type === "flat" ? "Plat" : analysis.race_type === "obstacles" ? "Obstacles" : "Trot"}</p>
+              </div>
             </div>
-            <Image src="/racex-logo.png" alt="RaceX" width={180} height={60} />
+            <span>{selectedMeetingLabel} · {selectedRaceLabel} · Modèle {analysis.model_version}</span>
           </header>
-          {analysis.race_details && <p className="admin-print-details">{analysis.race_details}</p>}
-          <section className="admin-print-summary">
-            <div><span>RUNNERS</span><strong>{analysis.row_count}</strong></div>
-            <div><span>TOP SELECTION</span><strong>{topHorse ? `${field(topHorse, ["N°", "N", "Numero", "NUMERO"])} · ${field(topHorse, ["CHEVAL", "Cheval", "HORSE"])}` : "—"}</strong></div>
-            <div><span>MODEL</span><strong>{analysis.model_version}</strong></div>
+          <section className="subscriber-race-summary" aria-label="Résumé de la course">
+            <div><span>COURSE</span><strong>{selectedRaceLabel}</strong></div>
+            {printVenue && <div><span>HIPPODROME</span><strong>{printVenue}</strong></div>}
+            <div><span>PARTANTS ANALYSÉS</span><strong>{analysis.row_count}</strong></div>
+            <div><span>DISCIPLINE</span><strong>{analysis.race_type === "flat" ? "Plat" : analysis.race_type === "obstacles" ? "Obstacles" : "Trot"}</strong></div>
           </section>
-          {analysis.model_predictions && (
-            <div className="admin-print-priority">
-              <PriorityTierPickCard predictions={analysis.model_predictions} />
+          {printLeadingHorse && (
+            <section className="subscriber-featured public-widget" aria-labelledby="admin-print-pick-title">
+              <div className="subscriber-featured-copy">
+                <p className="public-kicker">POINT FORT DU MODÈLE</p>
+                <h2 id="admin-print-pick-title">Favori du moment selon le Modèle d’IA</h2>
+                <p className="subscriber-featured-horse">
+                  N° {field(printLeadingHorse, ["N°", "N", "Numero", "NUMERO"], "—")}{" "}
+                  <strong>{field(printLeadingHorse, ["CHEVAL", "Cheval", "NOM", "NAME"], "Cheval sans nom")}</strong>
+                </p>
+                <p className="subscriber-rationale">
+                  Ce cheval est classé premier dans le Model Shortlist selon son deep score décroissant.
+                  {printLeaderScore && <> Son deep score est de <strong>{formatValue(Number(printLeaderScore.replace(",", ".")))}</strong>.</>}
+                  {field(printLeadingHorse, ["COTE", "Cote", "ODDS"], "") && <> Cote relevée : <strong>{field(printLeadingHorse, ["COTE", "Cote", "ODDS"])}</strong>.</>}
+                  {field(printLeadingHorse, ["MUSIQUE", "DERNIÈRES PERF.", "FORME", "FORM"], "") && <> Musique : <strong>{field(printLeadingHorse, ["MUSIQUE", "DERNIÈRES PERF.", "FORME", "FORM"])}</strong>.</>}
+                </p>
+                <p className="subscriber-caveat">Classement indicatif fondé sur les données disponibles, sans garantie de résultat.</p>
+              </div>
+              <div className="subscriber-featured-stats">
+                <div><span>DEEP SCORE</span><strong>{printLeaderScore ? formatValue(Number(printLeaderScore.replace(",", "."))) : "—"}</strong></div>
+                <div><span>FAVORI DU MARCHÉ</span><strong>{printFavoriteOdds === null ? "—" : printFavoriteOdds.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</strong></div>
+                <div><span>CHEVAUX SHORTLISTÉS</span><strong>{printModelRows.length}</strong></div>
+              </div>
+            </section>
+          )}
+          <QuinteRecommendations
+            modelPredictions={analysis.model_predictions ?? null}
+            plotTwistRows={plotTwistRows}
+          />
+          {analysis.race_type === "trot" && (
+            <div className="subscriber-insights-grid subscriber-insights-grid-single">
+              <ShodHorsesCard rows={analysis.rows} />
             </div>
           )}
-          <section className="admin-print-runners">
-            <h2>Composite ranking · all runners</h2>
-            <table>
-              <thead><tr><th>Rank</th><th>No.</th><th>Horse</th><th>Odds</th><th>Recent form</th><th>Composite score</th></tr></thead>
-              <tbody>
-                {printRows.map((horse, index) => (
-                  <tr key={`print-runner-${field(horse, ["N°", "N", "Numero", "NUMERO"], String(index))}-${index}`}>
-                    <td>{compositeScore(horse) === null ? "—" : index + 1}</td>
-                    <td>{field(horse, ["N°", "N", "Numero", "NUMERO"])}</td>
-                    <td>{field(horse, ["CHEVAL", "Cheval", "HORSE", "NAME"])}</td>
-                    <td>{field(horse, ["COTE", "Cote", "ODDS"])}</td>
-                    <td>{field(horse, ["MUSIQUE", "DERNIÈRES PERF.", "FORME", "FORM"])}</td>
-                    <td>{compositeScore(horse) === null ? "—" : formatValue(compositeScore(horse))}</td>
+          <section className="subscriber-composite-scores public-widget" aria-labelledby="admin-print-composite-title">
+            <div className="subscriber-section-heading">
+              <div>
+                <p className="public-kicker">CLASSEMENT COMPLET</p>
+                <h2 id="admin-print-composite-title">Scores composites de tous les partants</h2>
+                <p>Classés du score composite le plus élevé au plus faible.</p>
+              </div>
+            </div>
+            <div className="subscriber-composite-table-wrap">
+              <table className="subscriber-composite-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Rang</th>
+                    <th scope="col">N°</th>
+                    <th scope="col">Cheval</th>
+                    <th scope="col">Cote</th>
+                    <th scope="col">Forme récente</th>
+                    <th scope="col">Score composite</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {printRows.map((horse, index) => (
+                    <tr key={`print-runner-${field(horse, ["N°", "N", "Numero", "NUMERO"], String(index))}-${index}`}>
+                      <td>{compositeScore(horse) === null ? "—" : index + 1}</td>
+                      <td>{field(horse, ["N°", "N", "Numero", "NUMERO"])}</td>
+                      <td>{field(horse, ["CHEVAL", "Cheval", "HORSE", "NAME"])}</td>
+                      <td>{field(horse, ["COTE", "Cote", "ODDS"])}</td>
+                      <td>{field(horse, ["MUSIQUE", "DERNIÈRES PERF.", "FORME", "FORM"])}</td>
+                      <td>{compositeScore(horse) === null ? "—" : formatValue(compositeScore(horse))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
-          <footer className="admin-print-footer">
-            RaceX analysis is indicative and based on available data at the time of generation. Scores and odds may change and do not guarantee a result.
+          <footer className="subscriber-print-footer">
+            <p>
+              Analyse indicative fondée sur les données disponibles au moment du chargement. Les scores,
+              pronostics et cotes peuvent évoluer et ne garantissent aucun résultat ; ce document ne
+              constitue pas un conseil de mise.
+            </p>
+            <span>
+              © {new Date().getFullYear()} RaceX · Développé par Georges BODIONG
+              <br />
+              deebodiong@gmail.com · +22660354400 / +22674911538
+            </span>
           </footer>
         </article>
       )}
