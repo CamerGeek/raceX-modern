@@ -620,6 +620,8 @@ function SubscriberDashboard() {
           <QuinteRecommendations
             prognosis={analysis.prognosis}
             modelPredictions={analysis.model_predictions}
+            raceType={analysis.race_type}
+            rows={analysis.rows}
           />
 
           <section className="subscriber-discipline-card subscriber-plot-twist" aria-labelledby="subscriber-plot-twist-title">
