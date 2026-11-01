@@ -9,8 +9,6 @@ export type QuinteModelPredictions = {
 type QuinteRecommendationsProps = {
   prognosis: Horse[];
   modelPredictions: QuinteModelPredictions | null;
-  raceType: "flat" | "trot" | "obstacles";
-  rows: Horse[];
 };
 
 const horseNumberFields = ["NUMERO", "N°", "N", "Numero", "N?", "NUM"];
@@ -23,13 +21,6 @@ function horseNumber(row: Horse) {
   );
   if (!key) return "";
   return String(row[key]).trim().replace(/\.0$/, "");
-}
-
-function horseName(row: Horse) {
-  const key = ["CHEVAL", "Cheval", "NOM", "NAME"].find((field) =>
-    row[field] !== null && row[field] !== undefined && row[field] !== "",
-  );
-  return key ? String(row[key]).trim() : "Cheval sans nom";
 }
 
 function numberList(rows: Horse[]) {
@@ -58,15 +49,50 @@ export function getModelShortlistRows(predictions: QuinteModelPredictions | null
     .slice(0, 8);
 }
 
+function hasShodDef(row: Horse) {
+  const defField = Object.keys(row).find((field) =>
+    ["DEF.", "DEF"].includes(field.trim().toUpperCase()),
+  );
+  if (!defField) return false;
+  const def = row[defField];
+  if (def === null || (typeof def === "number" && Number.isNaN(def))) return true;
+  if (typeof def !== "string") return false;
+  const normalizedDef = def.trim().toLowerCase();
+  return normalizedDef === "" || normalizedDef === "-" || normalizedDef === "nan";
+}
+
 function shodHorseRows(rows: Horse[]) {
-  return rows.filter((row) => {
-    const defField = ["DEF.", "DEF", "Def"].find((field) =>
-      Object.prototype.hasOwnProperty.call(row, field),
-    );
-    if (!defField) return false;
-    const def = row[defField];
-    return def === null || (typeof def === "string" && def.trim() === "");
-  }).filter((row) => Boolean(horseNumber(row)));
+  return rows.filter((row) => hasShodDef(row) && Boolean(horseNumber(row)));
+}
+
+export function ShodHorsesCard({ rows }: { rows: Horse[] }) {
+  const shodHorses = shodHorseRows(rows);
+  const allHorsesShod = rows.length > 0 && rows.every(hasShodDef);
+
+  return (
+    <section className="public-widget quinte-pick-card" aria-label="Chevaux ferrés">
+      <div>
+        <p className="public-kicker">INDICATION FERRURE</p>
+        <h2>Chevaux ferrés</h2>
+        <p className="quinte-pick-description">
+          Partants ferrés selon DEF. (valeur vide, « - » ou nan).
+        </p>
+      </div>
+      {allHorsesShod ? (
+        <p className="free-analysis-status">Tous les chevaux de cette course sont ferrés.</p>
+      ) : shodHorses.length > 0 ? (
+        <ol className="free-analysis-list" aria-label="Chevaux ferrés">
+          {shodHorses.map((horse, index) => (
+            <li key={`${horseNumber(horse)}-${index}`}>
+              <strong>{horseNumber(horse)}</strong>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="free-analysis-status">Aucun partant ferré identifié pour cette course.</p>
+      )}
+    </section>
+  );
 }
 
 function modelShortlist(predictions: QuinteModelPredictions | null) {
@@ -157,12 +183,9 @@ export function PriorityTierPickCard({
 export default function QuinteRecommendations({
   prognosis,
   modelPredictions,
-  raceType,
-  rows,
 }: QuinteRecommendationsProps) {
   const flashNumbers = numberList(prognosis);
   const modelNumbers = modelShortlist(modelPredictions);
-  const shodHorses = raceType === "trot" ? shodHorseRows(rows) : [];
   const modelMessage = modelPredictions?.status === "ready"
     ? "Le modèle n’a pas fourni de chevaux classables."
     : modelPredictions?.message ?? "Le Model Shortlist n’est pas disponible pour cette course.";
@@ -182,29 +205,6 @@ export default function QuinteRecommendations({
         emptyMessage={modelMessage}
       />
       <PriorityTierPickCard predictions={modelPredictions} />
-      {raceType === "trot" && (
-        <section className="public-widget quinte-pick-card" aria-label="Chevaux ferrés">
-          <div>
-            <p className="public-kicker">INDICATION FERRURE</p>
-            <h2>Chevaux ferrés</h2>
-            <p className="quinte-pick-description">
-              Partants avec DEF. non renseigné (valeur nulle).
-            </p>
-          </div>
-          {shodHorses.length > 0 ? (
-            <ol className="priority-tier-list" aria-label="Chevaux ferrés">
-              {shodHorses.map((horse, index) => (
-                <li key={`${horseNumber(horse)}-${index}`}>
-                  <strong>N° {horseNumber(horse)}</strong>
-                  <span>{horseName(horse)}</span>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="free-analysis-status">Aucun partant ferré identifié pour cette course.</p>
-          )}
-        </section>
-      )}
     </div>
   );
 }

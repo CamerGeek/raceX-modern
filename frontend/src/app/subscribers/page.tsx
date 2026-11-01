@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import QuinteOddsChart from "../quinte-odds-chart";
 import QuinteRecommendations, {
   getModelShortlistRows,
+  ShodHorsesCard,
   type QuinteModelPredictions,
 } from "../quinte-recommendations";
 import SiteNavigation from "../site-navigation";
@@ -620,34 +621,35 @@ function SubscriberDashboard() {
           <QuinteRecommendations
             prognosis={analysis.prognosis}
             modelPredictions={analysis.model_predictions}
-            raceType={analysis.race_type}
-            rows={analysis.rows}
           />
 
-          <section className="subscriber-discipline-card subscriber-plot-twist" aria-labelledby="subscriber-plot-twist-title">
-            <h3 id="subscriber-plot-twist-title">Plot twist · chevaux à surveiller</h3>
-            <p>
-              Partants hors du top 8 composite dont le score se situe à ±0,05 de la moyenne ou de la médiane.
-              C’est un repère complémentaire, pas une garantie de performance.
-            </p>
-            {plotTwistRows.length > 0 ? (
-              <ol>
-                {plotTwistRows.map(({ horse, score, rank, nearMean, nearMedian }, index) => (
-                  <li key={`plot-twist-${horseNumber(horse)}-${index}`}>
-                    <strong>{horseNumber(horse)}</strong>
-                    <span>{horseName(horse)} · rang {rank}</span>
-                    <b>
-                      {displayScore(score)}
-                      {" · "}
-                      {nearMean && nearMedian ? "moyenne · médiane" : nearMean ? "moyenne" : "médiane"}
-                    </b>
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className="free-analysis-status">Aucun partant hors top 8 ne correspond à ce repère pour cette course.</p>
-            )}
-          </section>
+          <div className={`subscriber-insights-grid${analysis.race_type === "trot" ? "" : " subscriber-insights-grid-single"}`}>
+            {analysis.race_type === "trot" && <ShodHorsesCard rows={analysis.rows} />}
+            <section className="subscriber-discipline-card subscriber-plot-twist" aria-labelledby="subscriber-plot-twist-title">
+              <h3 id="subscriber-plot-twist-title">Plot twist · chevaux à surveiller</h3>
+              <p>
+                Partants hors du top 8 composite dont le score se situe à ±0,05 de la moyenne ou de la médiane.
+                C’est un repère complémentaire, pas une garantie de performance.
+              </p>
+              {plotTwistRows.length > 0 ? (
+                <ol>
+                  {plotTwistRows.map(({ horse, score, rank, nearMean, nearMedian }, index) => (
+                    <li key={`plot-twist-${horseNumber(horse)}-${index}`}>
+                      <strong>{horseNumber(horse)}</strong>
+                      <span>{horseName(horse)} · rang {rank}</span>
+                      <b>
+                        {displayScore(score)}
+                        {" · "}
+                        {nearMean && nearMedian ? "moyenne · médiane" : nearMean ? "moyenne" : "médiane"}
+                      </b>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="free-analysis-status">Aucun partant hors top 8 ne correspond à ce repère pour cette course.</p>
+              )}
+            </section>
+          </div>
 
           <section className="subscriber-composite-scores public-widget" aria-labelledby="subscriber-composite-scores-title">
             <div className="subscriber-section-heading">
