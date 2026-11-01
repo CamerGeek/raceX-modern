@@ -8,6 +8,15 @@ export type QuinteModelPredictions = {
 
 type QuinteRecommendationsProps = {
   modelPredictions: QuinteModelPredictions | null;
+  plotTwistRows: PlotTwistItem[];
+};
+
+export type PlotTwistItem = {
+  horse: Horse;
+  score: number;
+  rank: number;
+  nearMean: boolean;
+  nearMedian: boolean;
 };
 
 const horseNumberFields = ["NUMERO", "N°", "N", "Numero", "N?", "NUM"];
@@ -20,6 +29,13 @@ function horseNumber(row: Horse) {
   );
   if (!key) return "";
   return String(row[key]).trim().replace(/\.0$/, "");
+}
+
+function horseName(row: Horse) {
+  const key = ["CHEVAL", "Cheval", "NOM", "NAME"].find((field) =>
+    row[field] !== null && row[field] !== undefined && row[field] !== "",
+  );
+  return key ? String(row[key]) : "Cheval sans nom";
 }
 
 export function getModelShortlistRows(predictions: QuinteModelPredictions | null) {
@@ -82,6 +98,39 @@ export function ShodHorsesCard({ rows }: { rows: Horse[] }) {
         </ol>
       ) : (
         <p className="free-analysis-status">Aucun partant ferré identifié pour cette course.</p>
+      )}
+    </section>
+  );
+}
+
+function displayScore(score: number) {
+  return score.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+}
+
+function PlotTwistCard({ rows }: { rows: PlotTwistItem[] }) {
+  return (
+    <section className="subscriber-discipline-card subscriber-plot-twist" aria-labelledby="subscriber-plot-twist-title">
+      <h3 id="subscriber-plot-twist-title">Plot twist · chevaux à surveiller</h3>
+      <p>
+        Partants hors du top 8 composite dont le score se situe à ±0,05 de la moyenne ou de la médiane.
+        C’est un repère complémentaire, pas une garantie de performance.
+      </p>
+      {rows.length > 0 ? (
+        <ol>
+          {rows.map(({ horse, score, rank, nearMean, nearMedian }, index) => (
+            <li key={`plot-twist-${horseNumber(horse)}-${index}`}>
+              <strong>{horseNumber(horse)}</strong>
+              <span>{horseName(horse)} · rang {rank}</span>
+              <b>
+                {displayScore(score)}
+                {" · "}
+                {nearMean && nearMedian ? "moyenne · médiane" : nearMean ? "moyenne" : "médiane"}
+              </b>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="free-analysis-status">Aucun partant hors top 8 ne correspond à ce repère pour cette course.</p>
       )}
     </section>
   );
@@ -183,6 +232,7 @@ export function PriorityTierPickCard({
 
 export default function QuinteRecommendations({
   modelPredictions,
+  plotTwistRows,
 }: QuinteRecommendationsProps) {
   const modelNumbers = modelShortlist(modelPredictions);
   const modelMessage = modelPredictions?.status === "ready"
@@ -198,6 +248,7 @@ export default function QuinteRecommendations({
         emptyMessage={modelMessage}
       />
       <PriorityTierPickCard predictions={modelPredictions} />
+      <PlotTwistCard rows={plotTwistRows} />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import QuinteOddsChart from "../quinte-odds-chart";
 import QuinteRecommendations, {
   getModelShortlistRows,
   ShodHorsesCard,
+  type PlotTwistItem,
   type QuinteModelPredictions,
 } from "../quinte-recommendations";
 import SiteNavigation from "../site-navigation";
@@ -58,7 +59,7 @@ function scoreOf(row: Horse) {
   return raw && Number.isFinite(score) ? score : null;
 }
 
-function plotTwistCandidates(rows: Horse[]) {
+function plotTwistCandidates(rows: Horse[]): PlotTwistItem[] {
   const rankedRows = rows
     .map((horse, index) => ({ horse, index, score: scoreOf(horse) }))
     .filter((item): item is { horse: Horse; index: number; score: number } =>
@@ -620,35 +621,14 @@ function SubscriberDashboard() {
 
           <QuinteRecommendations
             modelPredictions={analysis.model_predictions}
+            plotTwistRows={plotTwistRows}
           />
 
-          <div className={`subscriber-insights-grid${analysis.race_type === "trot" ? "" : " subscriber-insights-grid-single"}`}>
-            {analysis.race_type === "trot" && <ShodHorsesCard rows={analysis.rows} />}
-            <section className="subscriber-discipline-card subscriber-plot-twist" aria-labelledby="subscriber-plot-twist-title">
-              <h3 id="subscriber-plot-twist-title">Plot twist · chevaux à surveiller</h3>
-              <p>
-                Partants hors du top 8 composite dont le score se situe à ±0,05 de la moyenne ou de la médiane.
-                C’est un repère complémentaire, pas une garantie de performance.
-              </p>
-              {plotTwistRows.length > 0 ? (
-                <ol>
-                  {plotTwistRows.map(({ horse, score, rank, nearMean, nearMedian }, index) => (
-                    <li key={`plot-twist-${horseNumber(horse)}-${index}`}>
-                      <strong>{horseNumber(horse)}</strong>
-                      <span>{horseName(horse)} · rang {rank}</span>
-                      <b>
-                        {displayScore(score)}
-                        {" · "}
-                        {nearMean && nearMedian ? "moyenne · médiane" : nearMean ? "moyenne" : "médiane"}
-                      </b>
-                    </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="free-analysis-status">Aucun partant hors top 8 ne correspond à ce repère pour cette course.</p>
-              )}
-            </section>
-          </div>
+          {analysis.race_type === "trot" && (
+            <div className="subscriber-insights-grid subscriber-insights-grid-single">
+              <ShodHorsesCard rows={analysis.rows} />
+            </div>
+          )}
 
           <section className="subscriber-composite-scores public-widget" aria-labelledby="subscriber-composite-scores-title">
             <div className="subscriber-section-heading">
