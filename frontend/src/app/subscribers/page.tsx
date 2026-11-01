@@ -619,7 +619,6 @@ function SubscriberDashboard() {
           )}
 
           <QuinteRecommendations
-            prognosis={analysis.prognosis}
             modelPredictions={analysis.model_predictions}
           />
 

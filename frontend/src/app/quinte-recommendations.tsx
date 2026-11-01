@@ -7,7 +7,6 @@ export type QuinteModelPredictions = {
 };
 
 type QuinteRecommendationsProps = {
-  prognosis: Horse[];
   modelPredictions: QuinteModelPredictions | null;
 };
 
@@ -21,13 +20,6 @@ function horseNumber(row: Horse) {
   );
   if (!key) return "";
   return String(row[key]).trim().replace(/\.0$/, "");
-}
-
-function numberList(rows: Horse[]) {
-  return rows
-    .map(horseNumber)
-    .filter((number): number is string => Boolean(number))
-    .slice(0, 8);
 }
 
 export function getModelShortlistRows(predictions: QuinteModelPredictions | null) {
@@ -153,6 +145,15 @@ export function PriorityTierPickCard({
   predictions: QuinteModelPredictions | null;
 }) {
   const horses = priorityTierShortlist(predictions);
+  const tiers = horses.reduce<{ tier: number; numbers: string[] }[]>((groups, horse) => {
+    const group = groups.find((item) => item.tier === horse.tier);
+    if (group) {
+      group.numbers.push(horse.number);
+    } else {
+      groups.push({ tier: horse.tier, numbers: [horse.number] });
+    }
+    return groups;
+  }, []);
   const message = predictions?.status === "ready"
     ? "Aucun cheval n’a de niveau de priorité disponible."
     : predictions?.message ?? "Les niveaux de priorité du modèle ne sont pas disponibles pour cette course.";
@@ -164,12 +165,12 @@ export function PriorityTierPickCard({
         <h2>Priorité du modèle</h2>
         <p className="quinte-pick-description">Chevaux classés par niveau de priorité du modèle, Tier 1 en premier.</p>
       </div>
-      {horses.length > 0 ? (
+      {tiers.length > 0 ? (
         <ol className="priority-tier-list" aria-label="Chevaux classés par niveau de priorité">
-          {horses.map(({ number, tier }, index) => (
-            <li key={`${number}-${index}`}>
-              <strong>{number}</strong>
-              <span>Tier {tier}</span>
+          {tiers.map(({ tier, numbers }) => (
+            <li key={tier}>
+              <strong>Tier {tier}:</strong>
+              <span>{numbers.join(" ")}</span>
             </li>
           ))}
         </ol>
@@ -181,10 +182,8 @@ export function PriorityTierPickCard({
 }
 
 export default function QuinteRecommendations({
-  prognosis,
   modelPredictions,
 }: QuinteRecommendationsProps) {
-  const flashNumbers = numberList(prognosis);
   const modelNumbers = modelShortlist(modelPredictions);
   const modelMessage = modelPredictions?.status === "ready"
     ? "Le modèle n’a pas fourni de chevaux classables."
@@ -192,12 +191,6 @@ export default function QuinteRecommendations({
 
   return (
     <div className="quinte-picks-grid">
-      <PickCard
-        title="Prono Flash"
-        description="Ordre de la sélection issue d'un pronostic de la course généré automatiquement."
-        numbers={flashNumbers}
-        emptyMessage="Notre Prono Flash n’est pas disponible pour cette course."
-      />
       <PickCard
         title="Model Shortlist(Choix du modele d'IA)"
         description="Jusqu’à 8 numéros classés par deep score décroissant."
