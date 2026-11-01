@@ -596,7 +596,7 @@ function SubscriberDashboard() {
             <section className="subscriber-featured public-widget" aria-labelledby="subscriber-pick-title">
               <div className="subscriber-featured-copy">
                 <p className="public-kicker">POINT FORT DU MODÈLE</p>
-                <h2 id="subscriber-pick-title">Premier cheval du Model Shortlist</h2>
+                <h2 id="subscriber-pick-title">Favori du moment selon le Modèle d’IA</h2>
                 <p className="subscriber-featured-horse">
                   N° {firstValue(leadingHorse, numberFields) || "—"}{" "}
                   <strong>{firstValue(leadingHorse, nameFields) || "Cheval sans nom"}</strong>
