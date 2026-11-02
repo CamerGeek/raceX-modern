@@ -80,6 +80,10 @@ button, input, select { font: inherit; }
 .account-help, .account-basic-note { margin: 0; color: var(--muted); font: .68rem/1.5 ui-sans-serif, system-ui, sans-serif; }
 .account-message { color: var(--green); font: .8rem/1.5 ui-sans-serif, system-ui, sans-serif; }
 .account-error { color: #a43c2c; font: .8rem/1.5 ui-sans-serif, system-ui, sans-serif; }
+.account-confirmation { display: grid; justify-items: start; gap: .75rem; }
+.account-confirmation .public-kicker, .account-confirmation h2, .account-confirmation p { margin: 0; }
+.account-confirmation > p:not(.public-kicker) { color: var(--muted); font: .82rem/1.55 ui-sans-serif, system-ui, sans-serif; }
+.account-confirmation strong { color: var(--deep); }
 .account-status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .6rem; margin: 1rem 0; }
 .account-status-grid div { display: grid; gap: .35rem; padding: .8rem; border: 1px solid var(--line); border-radius: .45rem; background: #fffefa; }
 .account-status-grid span { color: var(--muted); font: 700 .58rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .08em; }

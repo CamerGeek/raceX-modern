@@ -40,6 +40,7 @@ function AccountPageContent() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [signupConfirmationEmail, setSignupConfirmationEmail] = useState<string | null>(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<"weekly" | "monthly" | "annual">("monthly");
   const [paymentReturn, setPaymentReturn] = useState(false);
@@ -134,11 +135,15 @@ function AccountPageContent() {
     try {
       if (mode === "signup") {
         const result = await signUp(email, password, parsedPhone?.internationalNumber ?? "");
-        setMessage(result.hasSession
-          ? "Votre compte est créé. Votre accès démo de 7 jours est activé."
-          : result.identityCreated
-            ? "Votre demande d’inscription a été acceptée. Si la confirmation par e-mail est activée, consultez votre boîte de réception et vos courriers indésirables."
-            : "Supabase n’a pas confirmé la création d’un nouveau compte. Si vous avez déjà un compte, essayez de vous connecter ou réinitialisez le mot de passe. Sinon, vérifiez que l’inscription par e-mail est activée dans Supabase.");
+        if (result.hasSession) {
+          setSignupConfirmationEmail(null);
+          setMessage("Votre compte est créé. Votre accès démo de 7 jours est activé.");
+        } else if (result.identityCreated) {
+          setSignupConfirmationEmail(email.trim());
+        } else {
+          setSignupConfirmationEmail(null);
+          setMessage("Supabase n’a pas confirmé la création d’un nouveau compte. Si vous avez déjà un compte, essayez de vous connecter ou réinitialisez le mot de passe. Sinon, vérifiez que l’inscription par e-mail est activée dans Supabase.");
+        }
       } else {
         await signIn(email, password);
         setMessage("Connexion réussie. Chargement de votre niveau d’accès…");
@@ -171,45 +176,68 @@ function AccountPageContent() {
 
       {!loading && !session && (
         <section className="public-widget account-card">
-          <div className="account-mode-switch" aria-label="Choisir une action">
-            <button type="button" className={mode === "signup" ? "selected" : ""} onClick={() => { setMode("signup"); setError(""); setMessage(""); }}>
-              Créer un compte
-            </button>
-            <button type="button" className={mode === "login" ? "selected" : ""} onClick={() => { setMode("login"); setError(""); setMessage(""); }}>
-              Se connecter
-            </button>
-          </div>
-          <h2>{mode === "signup" ? "Commencez vos 7 jours de démo" : "Ravi de vous revoir"}</h2>
-          <p className="account-card-copy">
-            {mode === "signup"
-              ? "La création du compte active automatiquement l’accès aux fonctions abonnés pour 7 jours."
-              : "Connectez-vous pour retrouver les droits associés à votre compte."}
-          </p>
-          <form className="account-form" onSubmit={submit}>
-            <label htmlFor="account-email">Adresse e-mail</label>
-            <input id="account-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
-            {mode === "signup" && (
-              <>
-                <PhoneField
-                  country={phoneCountry}
-                  idPrefix="account-phone"
-                  label="Numéro de téléphone"
-                  locale={phoneLocale}
-                  number={phone}
-                  onCountryChange={setPhoneCountryOverride}
-                  onNumberChange={setPhone}
-                />
-              </>
-            )}
-            <label htmlFor="account-password">Mot de passe</label>
-            <input id="account-password" type="password" minLength={8} autoComplete={mode === "signup" ? "new-password" : "current-password"} required value={password} onChange={(event) => setPassword(event.target.value)} />
-            <p className="account-help">8 caractères minimum.</p>
-            <button className="subscriber-refresh" type="submit" disabled={busy || !configured}>
-              {busy ? "Veuillez patienter…" : mode === "signup" ? "Créer mon compte" : "Se connecter"}
-            </button>
-          </form>
-          {message && <p className="account-message" role="status">{message}</p>}
-          {error && <p className="account-error" role="alert">{error}</p>}
+          {signupConfirmationEmail ? (
+            <div className="account-confirmation" role="status" aria-labelledby="account-confirmation-title">
+              <p className="public-kicker">INSCRIPTION ENREGISTRÉE</p>
+              <h2 id="account-confirmation-title">Vérifiez votre boîte e-mail</h2>
+              <p>
+                Un e-mail de confirmation a été envoyé à <strong>{signupConfirmationEmail}</strong>.
+                Ouvrez-le et cliquez sur le lien pour activer votre compte.
+              </p>
+              <p className="account-help">Pensez aussi à vérifier vos courriers indésirables. Après confirmation, connectez-vous à RaceX.</p>
+              <button
+                type="button"
+                className="subscriber-refresh"
+                onClick={() => {
+                  setSignupConfirmationEmail(null);
+                  setMode("login");
+                  setPassword("");
+                }}
+              >
+                J’ai confirmé mon adresse, me connecter
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="account-mode-switch" aria-label="Choisir une action">
+                <button type="button" className={mode === "signup" ? "selected" : ""} onClick={() => { setMode("signup"); setError(""); setMessage(""); }}>
+                  Créer un compte
+                </button>
+                <button type="button" className={mode === "login" ? "selected" : ""} onClick={() => { setMode("login"); setError(""); setMessage(""); }}>
+                  Se connecter
+                </button>
+              </div>
+              <h2>{mode === "signup" ? "Commencez vos 7 jours de démo" : "Ravi de vous revoir"}</h2>
+              <p className="account-card-copy">
+                {mode === "signup"
+                  ? "La création du compte active automatiquement l’accès aux fonctions abonnés pour 7 jours."
+                  : "Connectez-vous pour retrouver les droits associés à votre compte."}
+              </p>
+              <form className="account-form" onSubmit={submit}>
+                <label htmlFor="account-email">Adresse e-mail</label>
+                <input id="account-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
+                {mode === "signup" && (
+                  <PhoneField
+                    country={phoneCountry}
+                    idPrefix="account-phone"
+                    label="Numéro de téléphone"
+                    locale={phoneLocale}
+                    number={phone}
+                    onCountryChange={setPhoneCountryOverride}
+                    onNumberChange={setPhone}
+                  />
+                )}
+                <label htmlFor="account-password">Mot de passe</label>
+                <input id="account-password" type="password" minLength={8} autoComplete={mode === "signup" ? "new-password" : "current-password"} required value={password} onChange={(event) => setPassword(event.target.value)} />
+                <p className="account-help">8 caractères minimum.</p>
+                <button className="subscriber-refresh" type="submit" disabled={busy || !configured}>
+                  {busy ? "Veuillez patienter…" : mode === "signup" ? "Créer mon compte" : "Se connecter"}
+                </button>
+              </form>
+              {message && <p className="account-message" role="status">{message}</p>}
+              {error && <p className="account-error" role="alert">{error}</p>}
+            </>
+          )}
         </section>
       )}
 
