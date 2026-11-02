@@ -28,3 +28,33 @@ services:
         sync: false
       - key: SUPABASE_KEY
         sync: false
+  - type: cron
+    name: racex-prepare-today-quinte
+    runtime: docker
+    rootDir: backend
+    schedule: "0 7,8 * * *"
+    dockerCommand: python -m app.tasks.prepare_today_quinte
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: MODEL_VERSION
+        value: initial-migration
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+  - type: cron
+    name: racex-prepare-tomorrow-quinte
+    runtime: docker
+    rootDir: backend
+    schedule: "30 7,8 * * *"
+    dockerCommand: python -m app.tasks.prepare_tomorrow_quinte
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: MODEL_VERSION
+        value: initial-migration
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false

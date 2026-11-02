@@ -54,7 +54,7 @@ Supabase and deployment setup is documented in [SUPABASE_SETUP_CHECKLIST.md](SUP
 
 - Deploy `frontend` as a Vercel Next.js project.
 - Deploy `backend` as a Render Docker web service.
-- Administrators prepare the next day's Turfomania Quinté+ analysis from the admin dashboard. The result is stored in the shared analysis cache; subscribers can view it from their dashboard but cannot trigger its preparation.
+- The backend prepares the Turfomania Quinté+ analysis for today at 9:00 and tomorrow at 9:30 Europe/Paris time. Render cron schedules use UTC, so each job checks both possible UTC hours and runs only at its matching Paris-local time; this keeps the schedule correct across daylight-saving changes. Administrators can also trigger today's or tomorrow's analysis from the admin dashboard at any time. Scheduled and manual runs use the shared analysis cache.
 - Vercel and Render provide HTTPS at the deployment edge; keep their HTTPS redirects enabled. The frontend also sends HSTS and baseline browser security headers.
 - The frontend's canonical URL, sitemap, and robots file currently use `https://frontend-camer-geek.vercel.app`. Update `frontend/src/app/site-config.ts` if the production domain changes.
 - Configure a CAPTCHA provider in Supabase Auth before enabling public account registration at scale. RaceX does not currently load third-party analytics or advertising trackers, so it does not show a non-essential cookie-consent banner.
