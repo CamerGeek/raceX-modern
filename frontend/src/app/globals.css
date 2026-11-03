@@ -14,6 +14,7 @@ button, input, select { font: inherit; }
 .subscriber-race-date-switch { display: flex; gap: .35rem; margin: 0 0 1rem; padding: .25rem; width: fit-content; border: 1px solid var(--line); border-radius: .5rem; background: rgba(251, 250, 245, .8); }
 .subscriber-race-date-switch button { min-height: 2.35rem; padding: .45rem .8rem; border: 0; border-radius: .35rem; background: transparent; color: var(--muted); cursor: pointer; font: 700 .72rem ui-sans-serif, system-ui, sans-serif; }
 .subscriber-race-date-switch button.selected { background: var(--green); color: white; }
+.subscriber-analysis-notice { margin: -.35rem 0 1rem; color: var(--muted); font: .78rem/1.5 ui-sans-serif, system-ui, sans-serif; }
 .subscriber-updated { color: var(--muted); font: .7rem ui-sans-serif, system-ui, sans-serif; }
 .subscriber-refresh { min-height: 2.5rem; padding: .55rem .9rem; border: 1px solid var(--green); border-radius: .45rem; background: var(--green); color: #fff; cursor: pointer; font: 700 .75rem ui-sans-serif, system-ui, sans-serif; }
 .subscriber-refresh:disabled { opacity: .65; cursor: wait; }

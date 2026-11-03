@@ -547,6 +547,11 @@ function SubscriberDashboard() {
           Quinté+ de demain
         </button>
       </div>
+      {selectedDayOffset === 0 && (
+        <p className="subscriber-analysis-notice">
+          L’analyse du Quinté+ du jour, plus fiable que celle préparée la veille, est disponible à partir de 9 h (heure de Paris). Appuyez sur « Actualiser » après 9 h pour la consulter.
+        </p>
+      )}
 
       {loading && <section className="subscriber-state" role="status">Chargement de l’analyse enregistrée…</section>}
       {!loading && error && (
