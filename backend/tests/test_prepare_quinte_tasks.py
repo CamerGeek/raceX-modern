@@ -26,8 +26,8 @@ def _response() -> TurfomaniaQuinteAnalysisResponse:
 @pytest.mark.parametrize(
     ("utc_now", "expected_date"),
     [
-        (datetime(2026, 7, 1, 7, 0, tzinfo=UTC), "2026-07-01"),
-        (datetime(2026, 12, 1, 8, 0, tzinfo=UTC), "2026-12-01"),
+        (datetime(2026, 7, 1, 7, 4, tzinfo=UTC), "2026-07-01"),
+        (datetime(2026, 12, 1, 8, 4, tzinfo=UTC), "2026-12-01"),
     ],
 )
 def test_prepare_today_runs_at_nine_paris_and_uses_shared_analysis(
@@ -37,8 +37,9 @@ def test_prepare_today_runs_at_nine_paris_and_uses_shared_analysis(
 ) -> None:
     captured: dict[str, object] = {}
 
-    def analyze(request):
+    def analyze(request, *, force_refresh: bool):
         captured["request"] = request
+        captured["force_refresh"] = force_refresh
         return _response()
 
     monkeypatch.setattr(prepare_today_quinte, "_analyze_today_turfomania_quinte", analyze)
@@ -46,8 +47,9 @@ def test_prepare_today_runs_at_nine_paris_and_uses_shared_analysis(
     result = prepare_today_quinte.prepare_today_quinte(now=utc_now)
 
     assert captured["request"].meeting_date is None
+    assert captured["force_refresh"] is True
     assert result == {
-        "status": "cached",
+        "status": "refreshed",
         "meeting_date": expected_date,
         "race_id": "race-quinte",
     }
@@ -56,8 +58,8 @@ def test_prepare_today_runs_at_nine_paris_and_uses_shared_analysis(
 @pytest.mark.parametrize(
     ("utc_now", "expected_date"),
     [
-        (datetime(2026, 7, 1, 7, 30, tzinfo=UTC), "2026-07-02"),
-        (datetime(2026, 12, 1, 8, 30, tzinfo=UTC), "2026-12-02"),
+        (datetime(2026, 7, 1, 7, 34, tzinfo=UTC), "2026-07-02"),
+        (datetime(2026, 12, 1, 8, 34, tzinfo=UTC), "2026-12-02"),
     ],
 )
 def test_prepare_tomorrow_runs_at_nine_thirty_paris(

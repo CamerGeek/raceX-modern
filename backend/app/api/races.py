@@ -513,6 +513,7 @@ def _analyze_today_turfomania_quinte(
     request: TodayQuinteAnalysisRequest,
     *,
     allow_tomorrow_analysis: bool = False,
+    force_refresh: bool = False,
 ) -> TurfomaniaQuinteAnalysisResponse:
     client = SupabaseClientWrapper()
     paris_today = _paris_today()
@@ -532,7 +533,7 @@ def _analyze_today_turfomania_quinte(
             meeting_date,
             meetings=meetings,
         )
-        if cached:
+        if cached and not force_refresh:
             return cached
 
         if (

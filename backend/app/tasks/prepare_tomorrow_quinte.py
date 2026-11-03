@@ -25,7 +25,7 @@ def prepare_tomorrow_quinte(*, now: datetime | None = None) -> dict[str, str]:
         raise ValueError("now must include a timezone")
     local_now = local_now.astimezone(PARIS_TIMEZONE)
 
-    if (local_now.hour, local_now.minute) != (9, 30):
+    if local_now.hour != 9 or local_now.minute < 30:
         return {"status": "not_scheduled", "paris_time": local_now.isoformat()}
 
     meeting_date = local_now.date() + timedelta(days=1)

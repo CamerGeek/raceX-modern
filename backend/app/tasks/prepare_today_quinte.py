@@ -25,15 +25,18 @@ def prepare_today_quinte(*, now: datetime | None = None) -> dict[str, str]:
         raise ValueError("now must include a timezone")
     local_now = local_now.astimezone(PARIS_TIMEZONE)
 
-    if (local_now.hour, local_now.minute) != (9, 0):
+    if local_now.hour != 9:
         return {"status": "not_scheduled", "paris_time": local_now.isoformat()}
 
-    result = _analyze_today_turfomania_quinte(TodayQuinteAnalysisRequest())
+    result = _analyze_today_turfomania_quinte(
+        TodayQuinteAnalysisRequest(),
+        force_refresh=True,
+    )
     if not result.race_id:
         raise ValueError("Prepared Quinté analysis did not include a race ID")
 
     return {
-        "status": "cached",
+        "status": "refreshed",
         "meeting_date": local_now.date().isoformat(),
         "race_id": result.race_id,
     }
