@@ -244,6 +244,12 @@ def _parse_weight(text):
         return None
 
 
+def _is_non_partant_row(tr) -> bool:
+    row_class = " ".join(tr.get("class", []))
+    row_text = _clean(tr.get_text(" "))
+    return bool(re.search(r"\bnon[\s-]*partant(?:e)?\b", f"{row_class} {row_text}", re.IGNORECASE))
+
+
 def _parse_intish(text):
     digits = re.sub(r"\D", "", text or "")
     return int(digits) if digits else None
@@ -276,6 +282,9 @@ def parse_runners(soup: BeautifulSoup, race_type: str, meta: dict[str, Any]) -> 
             continue
         row: dict[str, Any] = dict(meta)
         row["TABLE_INDEX"] = index + 1
+        non_partant = _is_non_partant_row(tr)
+        if non_partant:
+            row["NON_PARTANT"] = True
         for role, td in zip(roles, tds):
             if role == "num":
                 row["N°"] = _parse_num(td)
@@ -313,7 +322,7 @@ def parse_runners(soup: BeautifulSoup, race_type: str, meta: dict[str, Any]) -> 
                 row["OEILL."] = _clean(td.get_text())
             elif role == "cote":
                 row["COTE"] = _parse_cote(td)
-        if row.get("N°") and row.get("CHEVAL"):
+        if row.get("N°") and (row.get("CHEVAL") or non_partant):
             rows.append(row)
     return rows
 

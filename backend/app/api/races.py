@@ -52,8 +52,8 @@ router = APIRouter(prefix="/races", tags=["races"])
 logger = logging.getLogger(__name__)
 
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
-HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v6"
-RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v2"
+HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v7"
+RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v3"
 BETTING_CACHE_VERSION = "betting-analysis-v1"
 
 
@@ -308,6 +308,11 @@ def _analysis_response(
     include_handicap: bool,
     max_horses: int,
 ) -> AnalysisResponse:
+    non_partant_numbers = _non_partant_numbers(frame)
+    if "NON_PARTANT" in frame.columns:
+        starter_mask = ~frame["NON_PARTANT"].map(_is_non_partant_value)
+        frame = frame.loc[starter_mask].drop(columns=["NON_PARTANT"]).copy()
+
     analyzed, prognosis, handicap = analyze_race(
         frame,
         race_type,
@@ -334,6 +339,7 @@ def _analysis_response(
         row_count=len(display_frame),
         columns=[str(column) for column in display_frame.columns],
         rows=dataframe_records(display_frame),
+        non_partant_numbers=non_partant_numbers,
         model_version="initial-migration",
         prognosis=prognosis_rows,
         model_check=model_check,
@@ -915,7 +921,32 @@ def _prognosis_rows(prognosis: pd.DataFrame, analyzed: pd.DataFrame, race_type: 
     rows = [indexed[str(value).removesuffix(".0")] for value in values if str(value).removesuffix(".0") in indexed]
     if race_type == "trot":
         return rows
-    return sorted(rows, key=lambda row: float(row.get("Composite", -1) or -1), reverse=True)
+    return sorted(rows, key=lambda row: float(row.get("Composite", -1) or -1), reverse=True    )
+
+
+def _is_non_partant_value(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return bool(re.search(r"\bnon[\s-]*partant(?:e)?\b", str(value), re.IGNORECASE))
+
+
+def _non_partant_numbers(frame: pd.DataFrame) -> list[str]:
+    if "NON_PARTANT" not in frame.columns:
+        return []
+
+    number_column = next(
+        (column for column in ("N°", "N", "Numero", "NUMERO", "NUM") if column in frame.columns),
+        None,
+    )
+    if number_column is None:
+        return []
+
+    numbers = {
+        str(value).strip().removesuffix(".0")
+        for value in frame.loc[frame["NON_PARTANT"].map(_is_non_partant_value), number_column]
+        if pd.notna(value) and str(value).strip()
+    }
+    return sorted(numbers, key=lambda value: (not value.isdigit(), int(value) if value.isdigit() else value))
 
 
 def _model_check_disagreements(

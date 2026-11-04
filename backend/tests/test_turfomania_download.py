@@ -39,6 +39,27 @@ def test_parse_runners_accepts_a_table_without_tbody_or_tableau_line_class() -> 
     }]
 
 
+def test_parse_runners_marks_non_partant_rows_without_losing_their_number() -> None:
+    soup = BeautifulSoup(
+        '''<table><tr><th>N°</th><th>Cheval</th><th>Cote</th></tr>
+        <tr class="non-partant"><td><span class="num">7</span></td>
+        <td><a href="/cheval/demo"><b>DEMO HORSE</b></a></td><td>3,5</td></tr>
+        <tr class="non-partant"><td><span class="num">9</span></td><td>NON PARTANT</td><td>-</td></tr>
+        <tr><td><span class="num">4</span></td>
+        <td><a href="/cheval/runner"><b>RUNNER</b></a></td><td>2,1</td></tr></table>''',
+        "html.parser",
+    )
+
+    rows = parse_runners(soup, "flat", {})
+
+    assert rows[0]["N°"] == "7"
+    assert rows[0]["NON_PARTANT"] is True
+    assert rows[1]["N°"] == "9"
+    assert rows[1]["NON_PARTANT"] is True
+    assert rows[2]["N°"] == "4"
+    assert "NON_PARTANT" not in rows[2]
+
+
 def test_parse_quinte_title_block_metadata() -> None:
     soup = BeautifulSoup(
         '''<div class="table-head-bloc-title">

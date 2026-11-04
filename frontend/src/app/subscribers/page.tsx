@@ -31,6 +31,7 @@ type Analysis = {
   race_type: "flat" | "trot" | "obstacles";
   row_count: number;
   rows: Horse[];
+  non_partant_numbers: string[];
   race_details: string;
   model_version: string;
   prognosis: Horse[];
@@ -597,6 +598,20 @@ function SubscriberDashboard() {
             {distance && <div><span>DISTANCE</span><strong>{distance}</strong></div>}
             <div><span>PARTANTS ANALYSÉS</span><strong>{analysis.row_count}</strong></div>
             <div><span>DISCIPLINE</span><strong>{analysis.race_type === "flat" ? "Plat" : analysis.race_type === "obstacles" ? "Obstacles" : "Trot"}</strong></div>
+          </section>
+
+          <section className="subscriber-non-partants public-widget" aria-labelledby="subscriber-non-partants-title">
+            <div>
+              <p className="public-kicker">STATUT AU MOMENT DU RELEVÉ</p>
+              <h2 id="subscriber-non-partants-title">Non-partants</h2>
+            </div>
+            {analysis.non_partant_numbers.length > 0 ? (
+              <ul aria-label="Numéros des chevaux non-partants">
+                {analysis.non_partant_numbers.map((number) => <li key={number}>{number}</li>)}
+              </ul>
+            ) : (
+              <p>Aucun non-partant détecté au moment du relevé.</p>
+            )}
           </section>
 
           {leadingHorse && (

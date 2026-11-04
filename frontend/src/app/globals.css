@@ -25,6 +25,12 @@ button, input, select { font: inherit; }
 .subscriber-race-summary div { display: grid; align-content: center; gap: .45rem; min-height: 5.1rem; padding: .85rem 1rem; border: 1px solid var(--line); border-radius: .6rem; background: rgba(251, 250, 245, .8); }
 .subscriber-race-summary span, .subscriber-featured-stats span { color: var(--muted); font: 700 .61rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .09em; }
 .subscriber-race-summary strong { color: var(--deep); font: 700 .9rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-non-partants { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; padding: .8rem 1rem; border-color: rgba(164, 60, 44, .25); background: #fff8f4; }
+.subscriber-non-partants .public-kicker { margin: 0 0 .2rem; color: #a43c2c; }
+.subscriber-non-partants h2 { margin: 0; color: #7d2c20; font: 700 .9rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-non-partants > p { margin: 0; color: var(--muted); font: .75rem/1.5 ui-sans-serif, system-ui, sans-serif; }
+.subscriber-non-partants ul { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0; padding: 0; list-style: none; }
+.subscriber-non-partants li { display: grid; place-items: center; min-width: 2rem; min-height: 2rem; padding: 0 .45rem; border-radius: .35rem; background: #a43c2c; color: #fff; font: 700 .8rem ui-sans-serif, system-ui, sans-serif; }
 .subscriber-featured { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(14rem, .7fr); gap: 1.5rem; margin-bottom: 1rem; padding: clamp(1.2rem, 3vw, 2rem); }
 .subscriber-featured-copy .public-kicker { margin: 0 0 .45rem; }
 .subscriber-featured h2, .subscriber-section-heading h2 { margin: 0; color: var(--deep); font-size: clamp(1.35rem, 3vw, 1.8rem); font-weight: 500; }
@@ -542,6 +548,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 @media (max-width: 600px) {
   .quinte-picks-grid { grid-template-columns: 1fr; }
   .subscriber-insights-grid { grid-template-columns: 1fr; }
+  .subscriber-non-partants { align-items: flex-start; flex-direction: column; }
 }
 .subscriber-print-masthead, .subscriber-print-footer { display: none; }
 @media print {
@@ -573,6 +580,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   .subscriber-race-summary div { min-height: 2.8rem; gap: .2rem; padding: .35rem .45rem; border-radius: 0; background: #fff; }
   .subscriber-race-summary span, .subscriber-featured-stats span { font-size: .52rem; }
   .subscriber-race-summary strong { font-size: .65rem; }
+  .subscriber-non-partants { gap: .5rem; margin-bottom: .45rem; padding: .5rem .6rem; }
+  .subscriber-non-partants h2 { font-size: .72rem; }
+  .subscriber-non-partants > p { font-size: .6rem; }
+  .subscriber-non-partants li { min-width: 1.5rem; min-height: 1.5rem; font-size: .65rem; }
   .subscriber-featured { grid-template-columns: minmax(0, 1.4fr) minmax(12rem, .7fr); gap: .65rem; margin-bottom: .5rem; padding: .6rem .75rem; border: 1px solid #d7d8ca; border-left: 4px solid #c96f3b; break-inside: avoid; }
   .subscriber-featured h2, .subscriber-section-heading h2 { font-size: 1.05rem; }
   .subscriber-featured-horse { margin: .45rem 0 .25rem; font-size: .9rem; }

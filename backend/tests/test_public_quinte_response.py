@@ -79,6 +79,17 @@ def test_display_frame_aligns_computed_scores_by_runner_number() -> None:
     ]
 
 
+def test_non_partant_numbers_are_normalized_and_numerically_sorted() -> None:
+    frame = pd.DataFrame([
+        {"N°": "12.0", "NON_PARTANT": True},
+        {"N°": 3, "NON_PARTANT": "NON PARTANT"},
+        {"N°": 1, "NON_PARTANT": False},
+        {"N°": "4", "NON_PARTANT": True},
+    ])
+
+    assert races._non_partant_numbers(frame) == ["3", "4", "12"]
+
+
 def test_stale_homepage_analysis_is_not_returned_from_cache() -> None:
     cached = TurfomaniaQuinteAnalysisResponse(
         race_id="race-id",
