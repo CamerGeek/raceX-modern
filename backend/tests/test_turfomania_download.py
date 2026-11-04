@@ -60,6 +60,22 @@ def test_parse_runners_marks_non_partant_rows_without_losing_their_number() -> N
     assert "NON_PARTANT" not in rows[2]
 
 
+def test_parse_runners_detects_nested_turfomania_nonpartant_badge() -> None:
+    soup = BeautifulSoup(
+        '''<table><tr><th>N°</th><th>Cheval</th></tr>
+        <tr><td><span class="num">6</span></td>
+        <td><a href="/cheval/demo"><b>DEMO HORSE</b></a>
+        <span class="nonpartant">NP</span></td></tr></table>''',
+        "html.parser",
+    )
+
+    rows = parse_runners(soup, "flat", {})
+
+    assert len(rows) == 1
+    assert rows[0]["N°"] == "6"
+    assert rows[0]["NON_PARTANT"] is True
+
+
 def test_parse_quinte_title_block_metadata() -> None:
     soup = BeautifulSoup(
         '''<div class="table-head-bloc-title">

@@ -245,9 +245,13 @@ def _parse_weight(text):
 
 
 def _is_non_partant_row(tr) -> bool:
-    row_class = " ".join(tr.get("class", []))
+    for element in (tr, *tr.find_all(True)):
+        element_class = " ".join(element.get("class", []))
+        if re.search(r"\bnon[\s_-]*partant(?:e)?\b", element_class, re.IGNORECASE):
+            return True
+
     row_text = _clean(tr.get_text(" "))
-    return bool(re.search(r"\bnon[\s-]*partant(?:e)?\b", f"{row_class} {row_text}", re.IGNORECASE))
+    return bool(re.search(r"\bnon[\s_-]*partant(?:e)?\b", row_text, re.IGNORECASE))
 
 
 def _parse_intish(text):
