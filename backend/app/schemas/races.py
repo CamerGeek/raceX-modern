@@ -59,6 +59,7 @@ class AnalysisResponse(RaceResponse):
     model_config = ConfigDict(protected_namespaces=())
 
     non_partant_numbers: list[str] = Field(default_factory=list)
+    expert_commentary: str | None = None
     model_version: str
     prognosis: list[dict[str, Any]]
     model_check: list[dict[str, Any]] | None = None

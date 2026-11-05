@@ -31,6 +31,10 @@ button, input, select { font: inherit; }
 .subscriber-non-partants > p { margin: 0; color: var(--muted); font: .75rem/1.5 ui-sans-serif, system-ui, sans-serif; }
 .subscriber-non-partants ul { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0; padding: 0; list-style: none; }
 .subscriber-non-partants li { display: grid; place-items: center; min-width: 2rem; min-height: 2rem; padding: 0 .45rem; border-radius: .35rem; background: #a43c2c; color: #fff; font: 700 .8rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-expert-pronostic { margin-bottom: 1rem; padding: 1rem 1.2rem; }
+.subscriber-expert-pronostic .public-kicker { margin: 0 0 .35rem; }
+.subscriber-expert-pronostic h2 { margin: 0; color: var(--deep); font-size: 1.2rem; font-weight: 500; }
+.subscriber-expert-pronostic > p:last-child { margin: .6rem 0 0; color: var(--ink); font: .82rem/1.65 ui-sans-serif, system-ui, sans-serif; white-space: pre-line; }
 .subscriber-featured { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(14rem, .7fr); gap: 1.5rem; margin-bottom: 1rem; padding: clamp(1.2rem, 3vw, 2rem); }
 .subscriber-featured-copy .public-kicker { margin: 0 0 .45rem; }
 .subscriber-featured h2, .subscriber-section-heading h2 { margin: 0; color: var(--deep); font-size: clamp(1.35rem, 3vw, 1.8rem); font-weight: 500; }
@@ -563,6 +567,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   .subscriber-race-date-switch,   .subscriber-details, .odds-chart-panel,
   .subscriber-state { display: none !important; }
   .subscriber-shell { max-width: none; padding: 0; }
+  .subscriber-expert-pronostic { display: none !important; }
   .subscriber-print-masthead {
     display: block;
     margin-bottom: .65rem;

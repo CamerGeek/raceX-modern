@@ -46,6 +46,7 @@ def test_scrape_quinte_accepts_matching_meeting(monkeypatch: pytest.MonkeyPatch)
         calls.append((url, race_type))
         return _frame()
 
+    monkeypatch.setattr(quinte_module, "fetch_race_html", lambda _url: "<html></html>")
     monkeypatch.setattr(quinte_module, "scrape_turfomania_race", fake_scrape)
 
     result = scrape_turfomania_quinte(MEETING)
@@ -55,6 +56,64 @@ def test_scrape_quinte_accepts_matching_meeting(monkeypatch: pytest.MonkeyPatch)
     assert result["STARTERS"].tolist() == [1]
     assert turfomania_quinte_race_type(result) == "flat"
     assert turfomania_quinte_race_type(result.drop(columns=["POIDS"])) == "trot"
+
+
+def test_find_quinte_meeting_uses_first_partants_link_from_more_links(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    html = '''<div class="onglets-bis-bloc course-more-links">
+    <div class="bis-cards">
+      <a class="bis-card" href="/pronostics/partants-jeudi-05-novembre-2026-prix.html?idcourse=689306">Partants</a>
+      <a class="bis-card" href="/pronostics/pronostics-jeudi-05-novembre-2026-prix.html?idcourse=689306">Pronostics</a>
+    </div></div>'''
+    urls: list[str] = []
+    commentary_urls: list[str] = []
+
+    monkeypatch.setattr(quinte_module, "fetch_race_html", lambda url: html)
+    monkeypatch.setattr(
+        quinte_module,
+        "_fetch_turfomania_expert_commentary",
+        lambda url: commentary_urls.append(url) or "Analyse des experts.",
+    )
+
+    def fake_scrape(url: str, race_type: str | None) -> pd.DataFrame:
+        urls.append(url)
+        assert race_type is None
+        return _frame()
+
+    monkeypatch.setattr(quinte_module, "scrape_turfomania_race", fake_scrape)
+
+    meeting, frame = quinte_module.find_turfomania_quinte_meeting([MEETING])
+
+    assert meeting == MEETING
+    assert urls == [
+        "https://www.turfomania.fr/pronostics/partants-jeudi-05-novembre-2026-prix.html?idcourse=689306"
+    ]
+    assert commentary_urls == [
+        "https://www.turfomania.fr/pronostics/pronostics-jeudi-05-novembre-2026-prix.html?idcourse=689306"
+    ]
+    assert frame["REF_COURSE"].tolist() == ["R1C4"]
+    assert frame.attrs["turfomania_expert_commentary"] == "Analyse des experts."
+
+
+def test_fetch_expert_commentary_extracts_prono_commentaire(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Response:
+        text = '<div class="prono-commentaire"><p>Notre avis.</p><p>Un second paragraphe.</p></div>'
+
+        def raise_for_status(self) -> None:
+            pass
+
+    class Session:
+        def get(self, *_args: object, **_kwargs: object) -> Response:
+            return Response()
+
+    monkeypatch.setattr(quinte_module, "_session", Session)
+
+    commentary = quinte_module._fetch_turfomania_expert_commentary(
+        "https://www.turfomania.fr/pronostics/pronostics-example.html?idcourse=123"
+    )
+
+    assert commentary == "Notre avis.\nUn second paragraphe."
 
 
 def test_scrape_tomorrow_quinte_uses_tomorrow_url_and_target_date(
@@ -71,6 +130,7 @@ def test_scrape_tomorrow_quinte_uses_tomorrow_url_and_target_date(
         calls.append((url, race_type))
         return _frame(race_date="04/10/2026")
 
+    monkeypatch.setattr(quinte_module, "fetch_race_html", lambda _url: "<html></html>")
     monkeypatch.setattr(quinte_module, "scrape_turfomania_race", fake_scrape)
 
     result = scrape_turfomania_quinte(

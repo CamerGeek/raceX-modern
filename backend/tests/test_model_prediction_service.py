@@ -81,6 +81,7 @@ def test_predict_race_skips_unsupported_race_type(monkeypatch) -> None:
 
 def test_analyze_includes_model_predictions(monkeypatch) -> None:
     frame = pd.DataFrame([{"N°": "4", "CHEVAL": "Runner"}])
+    frame.attrs["turfomania_expert_commentary"] = "Analyse des experts."
     prediction = {
         "status": "ready",
         "model_version": "2026-09-29",
@@ -100,6 +101,7 @@ def test_analyze_includes_model_predictions(monkeypatch) -> None:
     assert result.model_predictions is not None
     assert result.model_predictions.status == "ready"
     assert result.model_predictions.bet_list == [4]
+    assert result.expert_commentary == "Analyse des experts."
 
 
 def test_obstacles_analysis_generates_report_with_model_predictions(monkeypatch) -> None:

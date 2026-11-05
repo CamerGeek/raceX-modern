@@ -32,6 +32,7 @@ type Analysis = {
   row_count: number;
   rows: Horse[];
   non_partant_numbers: string[];
+  expert_commentary: string | null;
   race_details: string;
   model_version: string;
   prognosis: Horse[];
@@ -613,6 +614,14 @@ function SubscriberDashboard() {
               <p>Aucun non-partant détecté au moment du relevé.</p>
             )}
           </section>
+
+          {analysis.expert_commentary && (
+            <section className="subscriber-expert-pronostic public-widget" aria-labelledby="subscriber-expert-pronostic-title">
+              <p className="public-kicker">PRONOSTIC DES EXPERTS TURFOMANIA</p>
+              <h2 id="subscriber-expert-pronostic-title">Le commentaire des experts</h2>
+              <p>{analysis.expert_commentary}</p>
+            </section>
+          )}
 
           {leadingHorse && (
             <section className="subscriber-featured public-widget" aria-labelledby="subscriber-pick-title">

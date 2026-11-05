@@ -1,17 +1,22 @@
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 from datetime import date, datetime
 from typing import Any
+from urllib.parse import parse_qs, urljoin, urlparse
 
 import pandas as pd
+import requests
+from bs4 import BeautifulSoup
 
-from turfomania_race import scrape_turfomania_race
-from turfomania_reunions import detect_race_type_from_text
+from turfomania_race import fetch_race_html, scrape_turfomania_race
+from turfomania_reunions import HEADERS, TIMEOUT_SECONDS, _session, detect_race_type_from_text
 
 QUINTE_URL = "https://www.turfomania.fr/quinte/"
 QUINTE_TOMORROW_URL = "https://www.turfomania.fr/quinte/demain/"
+logger = logging.getLogger(__name__)
 
 
 def scrape_turfomania_quinte(
@@ -24,10 +29,8 @@ def scrape_turfomania_quinte(
     if meeting.get("source") != "turfomania":
         raise ValueError("Selected meeting is not a Turfomania meeting")
 
-    return _validate_quinte_frame(
-        meeting,
-        frame if frame is not None else scrape_turfomania_race(url, None),
-    )
+    source_frame = frame if frame is not None else _scrape_quinte_landing(url)
+    return _validate_quinte_frame(meeting, source_frame)
 
 
 def find_turfomania_quinte_meeting(
@@ -37,10 +40,9 @@ def find_turfomania_quinte_meeting(
     if not meetings:
         raise ValueError("No Turfomania meetings are available for today's Quinté")
 
-    frame = scrape_turfomania_race(QUINTE_URL, None)
+    frame = _scrape_quinte_landing(QUINTE_URL)
     if frame.empty:
         raise ValueError("Turfomania Quinté page returned no runners")
-
     race_date_text = str(frame["RACE_DATE"].iloc[0] or "")
     try:
         race_date = datetime.strptime(race_date_text, "%d/%m/%Y").date()
@@ -63,7 +65,71 @@ def find_turfomania_quinte_meeting(
             f"No Turfomania meeting found for the Quinté at {race_track or 'an unknown track'} "
             f"on {race_date.isoformat()}"
         )
-    return meeting, _validate_quinte_frame(meeting, frame)
+    frame = _validate_quinte_frame(meeting, frame)
+    return meeting, frame
+
+
+def _scrape_quinte_landing(url: str) -> pd.DataFrame:
+    html = fetch_race_html(url)
+    partants_url = _quinte_partants_url(html, landing_url=url)
+    frame = scrape_turfomania_race(partants_url, None)
+    if frame.empty:
+        return frame
+
+    expert_url = _quinte_expert_commentary_url(html, landing_url=url)
+    frame.attrs["turfomania_expert_commentary"] = (
+        _fetch_turfomania_expert_commentary(expert_url) if expert_url else None
+    )
+    return frame
+
+
+def _quinte_partants_url(html: str, *, landing_url: str = QUINTE_URL) -> str:
+    soup = BeautifulSoup(html, "html.parser")
+    links = soup.select(".onglets-bis-bloc.course-more-links .bis-cards a[href]")
+    return (
+        _validated_quinte_link_url(links[0] if links else None, "partants-", landing_url=landing_url)
+        or landing_url
+    )
+
+
+def _quinte_expert_commentary_url(html: str, *, landing_url: str = QUINTE_URL) -> str | None:
+    soup = BeautifulSoup(html, "html.parser")
+    links = soup.select(".onglets-bis-bloc.course-more-links .bis-cards a[href]")
+    return _validated_quinte_link_url(
+        links[1] if len(links) > 1 else None,
+        "pronostics-",
+        landing_url=landing_url,
+    )
+
+
+def _validated_quinte_link_url(link, filename_prefix: str, *, landing_url: str) -> str | None:
+    if link is None:
+        return None
+    url = urljoin(landing_url, str(link["href"]))
+    parsed_url = urlparse(url)
+    query = parse_qs(parsed_url.query)
+    if (
+        parsed_url.hostname not in {"turfomania.fr", "www.turfomania.fr"}
+        or not parsed_url.path.startswith(f"/pronostics/{filename_prefix}")
+        or not query.get("idcourse")
+    ):
+        return None
+    return url
+
+
+def _fetch_turfomania_expert_commentary(url: str) -> str | None:
+    try:
+        response = _session().get(url, headers=HEADERS, timeout=TIMEOUT_SECONDS)
+        response.raise_for_status()
+    except requests.RequestException:
+        logger.warning("Could not load Turfomania expert pronostic page: %s", url, exc_info=True)
+        return None
+
+    commentary = BeautifulSoup(response.text, "html.parser").select_one(".prono-commentaire")
+    if commentary is None:
+        return None
+    text = "\n".join(line.strip() for line in commentary.get_text("\n").splitlines() if line.strip())
+    return text or None
 
 
 def _validate_quinte_frame(meeting: dict[str, Any], source_frame: pd.DataFrame) -> pd.DataFrame:

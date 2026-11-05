@@ -52,7 +52,7 @@ router = APIRouter(prefix="/races", tags=["races"])
 logger = logging.getLogger(__name__)
 
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
-HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v7"
+HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v8"
 RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v3"
 BETTING_CACHE_VERSION = "betting-analysis-v1"
 
@@ -309,6 +309,7 @@ def _analysis_response(
     max_horses: int,
 ) -> AnalysisResponse:
     non_partant_numbers = _non_partant_numbers(frame)
+    expert_commentary = frame.attrs.get("turfomania_expert_commentary")
     if "NON_PARTANT" in frame.columns:
         starter_mask = ~frame["NON_PARTANT"].map(_is_non_partant_value)
         frame = frame.loc[starter_mask].drop(columns=["NON_PARTANT"]).copy()
@@ -340,6 +341,7 @@ def _analysis_response(
         columns=[str(column) for column in display_frame.columns],
         rows=dataframe_records(display_frame),
         non_partant_numbers=non_partant_numbers,
+        expert_commentary=expert_commentary,
         model_version="initial-migration",
         prognosis=prognosis_rows,
         model_check=model_check,
