@@ -615,14 +615,6 @@ function SubscriberDashboard() {
             )}
           </section>
 
-          {analysis.expert_commentary && (
-            <section className="subscriber-expert-pronostic public-widget" aria-labelledby="subscriber-expert-pronostic-title">
-              <p className="public-kicker">PRONOSTIC DES EXPERTS TURFOMANIA</p>
-              <h2 id="subscriber-expert-pronostic-title">Le commentaire des experts</h2>
-              <p>{analysis.expert_commentary}</p>
-            </section>
-          )}
-
           {leadingHorse && (
             <section className="subscriber-featured public-widget" aria-labelledby="subscriber-pick-title">
               <div className="subscriber-featured-copy">
@@ -657,6 +649,14 @@ function SubscriberDashboard() {
             <div className="subscriber-insights-grid subscriber-insights-grid-single">
               <ShodHorsesCard rows={analysis.rows} />
             </div>
+          )}
+
+          {analysis.expert_commentary && (
+            <section className="subscriber-expert-pronostic public-widget" aria-labelledby="subscriber-expert-pronostic-title">
+              <p className="public-kicker">PRONOSTIC DES EXPERTS TURFOMANIA</p>
+              <h2 id="subscriber-expert-pronostic-title">Le commentaire des experts</h2>
+              <p>{analysis.expert_commentary}</p>
+            </section>
           )}
 
           <section className="subscriber-composite-scores public-widget" aria-labelledby="subscriber-composite-scores-title">
