@@ -1,4 +1,4 @@
-const CACHE_VERSION = "racex-shell-v3";
+const CACHE_VERSION = "racex-shell-v4";
 const SHELL_CACHE = CACHE_VERSION;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
@@ -8,7 +8,7 @@ const PRECACHE_URLS = [
   "/",
   OFFLINE_URL,
   "/manifest.webmanifest",
-  "/icon.svg",
+  "/icons/icon-96.png",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
   "/icons/maskable-192.png",
