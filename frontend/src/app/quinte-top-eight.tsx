@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "./auth-context";
+import { offlineKeys, readOffline, saveOffline } from "./offline-data";
+import { interpolate } from "../i18n/format";
+import { useI18n } from "../i18n/provider";
 
 type Horse = Record<string, string | number | boolean | null>;
 
@@ -36,7 +39,7 @@ function requestTodayAnalysis() {
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) {
-          throw new Error(payload.detail ?? "Impossible de charger l'analyse du Quinté+.");
+          throw new Error(payload.detail ?? "");
         }
         return payload as QuinteAnalysis;
       })
@@ -69,22 +72,34 @@ function topEight(rows: Horse[]) {
 
 export default function QuinteTopEight() {
   const { loading: authLoading } = useAuth();
+  const { messages, intlLocale } = useI18n();
+  const t = messages.topEight;
   const [analysis, setAnalysis] = useState<QuinteAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [cachedAt, setCachedAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
 
+    const cacheKey = offlineKeys.topEight(localDate());
     let active = true;
     requestTodayAnalysis()
       .then((result) => {
-        if (active) setAnalysis(result);
+        if (!active) return;
+        setAnalysis(result);
+        setCachedAt(null);
+        void saveOffline(cacheKey, result);
       })
-      .catch((requestError: unknown) => {
-        if (active) {
-          setError(requestError instanceof Error ? requestError.message : "Impossible de charger l'analyse du Quinté+.");
+      .catch(async () => {
+        const cached = await readOffline<QuinteAnalysis>(cacheKey);
+        if (!active) return;
+        if (cached) {
+          setAnalysis(cached.payload);
+          setCachedAt(cached.savedAt);
+          return;
         }
+        setError(t.error);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -92,17 +107,28 @@ export default function QuinteTopEight() {
     return () => {
       active = false;
     };
-  }, [authLoading]);
+  }, [authLoading, t.error]);
 
-  function retry() {
+  async function retry() {
     setLoading(true);
     setError("");
-    requestTodayAnalysis()
-      .then(setAnalysis)
-      .catch((requestError: unknown) => {
-        setError(requestError instanceof Error ? requestError.message : "Impossible de charger l'analyse du Quinté+.");
-      })
-      .finally(() => setLoading(false));
+    const cacheKey = offlineKeys.topEight(localDate());
+    try {
+      const result = await requestTodayAnalysis();
+      setAnalysis(result);
+      setCachedAt(null);
+      void saveOffline(cacheKey, result);
+    } catch {
+      const cached = await readOffline<QuinteAnalysis>(cacheKey);
+      if (cached) {
+        setAnalysis(cached.payload);
+        setCachedAt(cached.savedAt);
+      } else {
+        setError(t.error);
+      }
+    } finally {
+      setLoading(false);
+    }
   }
 
   const rankedHorses = analysis ? topEight(analysis.rows) : [];
@@ -111,28 +137,38 @@ export default function QuinteTopEight() {
     <section className="public-widget free-analysis" aria-labelledby="free-analysis-title" aria-live="polite">
       <div className="free-analysis-heading">
         <div>
-          <p className="public-kicker">ANALYSE GRATUITE DU JOUR</p>
-          <h2 id="free-analysis-title">Top 8 par score composite</h2>
-          <p className="free-analysis-description">
-            Sans poids direct pour les cotes; l’IC reste inclus pour les courses de plat.
-          </p>
+          <p className="public-kicker">{t.kicker}</p>
+          <h2 id="free-analysis-title">{t.title}</h2>
+          <p className="free-analysis-description">{t.description}</p>
         </div>
-        {analysis && <span className="free-analysis-count">{analysis.row_count} partants</span>}
+        {analysis && <span className="free-analysis-count">{interpolate(t.count, { count: analysis.row_count })}</span>}
       </div>
+
+      {cachedAt !== null && (
+        <p className="free-analysis-status" role="status">
+          {interpolate(messages.cache.savedAt, {
+            time: new Intl.DateTimeFormat(intlLocale, {
+              timeZone: "Europe/Paris",
+              hour: "2-digit",
+              minute: "2-digit",
+            }).format(new Date(cachedAt)),
+          })}
+        </p>
+      )}
 
       {loading && (
         <p className="free-analysis-status" role="status">
-          {authLoading ? "Vérification des accès…" : "Chargement de l’analyse enregistrée…"}
+          {authLoading ? t.checking : t.loading}
         </p>
       )}
       {!loading && error && (
         <div className="free-analysis-error" role="alert">
           <p>{error}</p>
-          <button type="button" onClick={retry}>Réessayer</button>
+          <button type="button" onClick={retry}>{t.retry}</button>
         </div>
       )}
       {!loading && !error && analysis && rankedHorses.length > 0 && (
-        <ul className="free-analysis-list" aria-label="Numéros des huit chevaux les mieux classés">
+        <ul className="free-analysis-list" aria-label={t.listAria}>
           {rankedHorses.map(({ row }, index) => (
             <li key={`${value(row, numberFields)}-${index}`}>
               <strong>{value(row, numberFields)}</strong>
@@ -141,7 +177,7 @@ export default function QuinteTopEight() {
         </ul>
       )}
       {!loading && !error && analysis && rankedHorses.length === 0 && (
-        <p className="free-analysis-status">Le score composite n’est pas disponible pour cette course.</p>
+        <p className="free-analysis-status">{t.unavailable}</p>
       )}
     </section>
   );

@@ -1,6 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { interpolate } from "../i18n/format";
+import { useI18n } from "../i18n/provider";
+import { offlineKeys, readOffline, saveOffline } from "./offline-data";
+import { useOnlineStatus } from "./use-online-status";
 
 type OddsPoint = { captured_at: string; odds: number };
 type OddsSeries = { number: string; horse_name: string; points: OddsPoint[] };
@@ -32,39 +36,66 @@ function niceStep(max: number) {
   return niceFraction * power;
 }
 
-function timeLabel(timestamp: string) {
-  return new Intl.DateTimeFormat("fr-FR", {
+function timeLabel(timestamp: string, intlLocale: string) {
+  return new Intl.DateTimeFormat(intlLocale, {
     hour: "2-digit",
     minute: "2-digit",
     timeZone: "Europe/Paris",
   }).format(new Date(timestamp));
 }
 
-function formatOdds(odds: number) {
-  return odds.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatOdds(odds: number, intlLocale: string) {
+  return odds.toLocaleString(intlLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export default function QuinteOddsChart({ meetingDate }: { meetingDate?: string }) {
+  const { messages, intlLocale } = useI18n();
+  const t = messages.odds;
+  const online = useOnlineStatus();
   const [history, setHistory] = useState<OddsHistory | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [cachedAt, setCachedAt] = useState<number | null>(null);
 
   const loadHistory = useCallback(async () => {
+    const cacheKey = offlineKeys.odds(meetingDate ?? new Intl.DateTimeFormat("fr-CA", {
+      timeZone: "Europe/Paris",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date()));
+    const applyCached = async () => {
+      const cached = await readOffline<OddsHistory>(cacheKey);
+      if (!cached) return false;
+      setHistory(cached.payload);
+      setCachedAt(cached.savedAt);
+      setError("");
+      return true;
+    };
+    if (!online) {
+      if (!(await applyCached())) setError(t.error);
+      setLoading(false);
+      return;
+    }
     try {
       const dateQuery = meetingDate ? `?date=${encodeURIComponent(meetingDate)}` : "";
       const response = await fetch(`${apiUrl}/api/v1/races/turfomania/quinte/today/odds${dateQuery}`, {
         cache: "no-store",
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.detail ?? "Impossible de charger l’historique des cotes.");
+      if (!response.ok) throw new Error(payload.detail ?? "");
       setHistory(payload as OddsHistory);
+      setCachedAt(null);
       setError("");
+      void saveOffline(cacheKey, payload as OddsHistory);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Impossible de charger l’historique des cotes.");
+      if (!(await applyCached())) {
+        setError(loadError instanceof Error && loadError.message ? loadError.message : t.error);
+      }
     } finally {
       setLoading(false);
     }
-  }, [meetingDate]);
+  }, [meetingDate, online, t.error]);
 
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void loadHistory(), 0);
@@ -119,19 +150,28 @@ export default function QuinteOddsChart({ meetingDate }: { meetingDate?: string 
     <section className="public-widget odds-chart-panel" aria-labelledby="odds-chart-title" aria-live="polite">
       <div className="odds-chart-heading">
         <div>
-          <p className="public-kicker">SUIVI DU MARCHÉ</p>
-          <h2 id="odds-chart-title">Évolution des cotes</h2>
-          <p className="odds-chart-description">Un point toutes les 30 minutes · heures de Paris</p>
+          <p className="public-kicker">{t.kicker}</p>
+          <h2 id="odds-chart-title">{t.title}</h2>
+          <p className="odds-chart-description">{t.description}</p>
         </div>
         {history?.race && <span className="free-analysis-count">{history.race.race_key ?? "Quinté+"}</span>}
       </div>
 
-      {loading && <p className="free-analysis-status" role="status">Chargement de l’historique des cotes…</p>}
+      {cachedAt !== null && (
+        <p className="odds-chart-cache-note" role="status">
+          {interpolate(messages.cache.savedAt, {
+            time: new Intl.DateTimeFormat(intlLocale, {
+              timeZone: "Europe/Paris",
+              hour: "2-digit",
+              minute: "2-digit",
+            }).format(new Date(cachedAt)),
+          })}
+        </p>
+      )}
+      {loading && <p className="free-analysis-status" role="status">{t.loading}</p>}
       {!loading && error && <p className="odds-chart-error" role="alert">{error}</p>}
       {!loading && !error && (!history?.race || allPoints.length === 0) && (
-        <p className="free-analysis-status">
-          Les premières cotes seront affichées après le prochain relevé programmé.
-        </p>
+        <p className="free-analysis-status">{t.empty}</p>
       )}
       {!loading && !error && allPoints.length > 0 && (
         <>
@@ -140,7 +180,7 @@ export default function QuinteOddsChart({ meetingDate }: { meetingDate?: string 
               className="odds-chart"
               viewBox={`0 0 ${chart.width} ${chart.height}`}
               role="img"
-              aria-label="Graphique de l’évolution des cotes du Quinté+, une ligne colorée par cheval"
+              aria-label={t.chartAria}
             >
               {Array.from({ length: Math.floor(yMax / step) + 1 }, (_, index) => {
                 const odds = index * step;
@@ -160,11 +200,11 @@ export default function QuinteOddsChart({ meetingDate }: { meetingDate?: string 
                 className="odds-chart-axis-line"
               />
               <text x={chart.left} y={chart.height - 16} textAnchor="start" className="odds-chart-axis">
-                {timeLabel(new Date(firstTimestamp).toISOString())}
+                {timeLabel(new Date(firstTimestamp).toISOString(), intlLocale)}
               </text>
               {lastTimestamp !== firstTimestamp && (
                 <text x={chart.width - chart.right} y={chart.height - 16} textAnchor="end" className="odds-chart-axis">
-                  {timeLabel(new Date(lastTimestamp).toISOString())}
+                  {timeLabel(new Date(lastTimestamp).toISOString(), intlLocale)}
                 </text>
               )}
               {series.map((runner, index) => {
@@ -182,7 +222,14 @@ export default function QuinteOddsChart({ meetingDate }: { meetingDate?: string 
                     )}
                     {points.map((point) => (
                       <circle key={`${point.captured_at}-${runner.number}`} cx={x(point.timestamp)} cy={y(point.odds)} r="4" fill={color}>
-                        <title>{`N° ${runner.number} ${runner.horse_name}: ${point.odds.toFixed(2)} à ${timeLabel(point.captured_at)}`}</title>
+                        <title>
+                          {interpolate(t.tooltip, {
+                            number: runner.number,
+                            name: runner.horse_name,
+                            odds: point.odds.toFixed(2),
+                            time: timeLabel(point.captured_at, intlLocale),
+                          })}
+                        </title>
                       </circle>
                     ))}
                   </g>
@@ -191,20 +238,20 @@ export default function QuinteOddsChart({ meetingDate }: { meetingDate?: string 
             </svg>
           </div>
           <section className="odds-movers" aria-labelledby="odds-movers-title">
-            <h3 id="odds-movers-title">Chevaux avec les cotes en baisse</h3>
+            <h3 id="odds-movers-title">{t.moversTitle}</h3>
             {movements.length > 0 ? (
               <ol>
                 {movements.slice(0, 5).map(({ runner, openingOdds, latestOdds, dropPercent }) => (
                   <li key={runner.number}>
-                    <strong>N° {runner.number}{runner.horse_name ? ` · ${runner.horse_name}` : ""}</strong>
-                    <span>{formatOdds(openingOdds)} → {formatOdds(latestOdds)}</span>
-                    <b>−{dropPercent.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %</b>
+                    <strong>{interpolate(t.horse, { number: runner.number })}{runner.horse_name ? ` · ${runner.horse_name}` : ""}</strong>
+                    <span>{formatOdds(openingOdds, intlLocale)} → {formatOdds(latestOdds, intlLocale)}</span>
+                    <b>−{dropPercent.toLocaleString(intlLocale, { maximumFractionDigits: 1 })} %</b>
                   </li>
                 ))}
               </ol>
             ) : !hasComparableSamples ? (
               <>
-                <p>Un seul relevé est disponible pour le moment ; les variations apparaîtront au prochain relevé.</p>
+                <p>{t.singleSample}</p>
                 <ol>
                   {series.map((runner) => {
                     const latestPoint = runner.points
@@ -213,19 +260,19 @@ export default function QuinteOddsChart({ meetingDate }: { meetingDate?: string 
                       .at(-1);
                     return latestPoint ? (
                       <li key={runner.number}>
-                        <strong>N° {runner.number}{runner.horse_name ? ` · ${runner.horse_name}` : ""}</strong>
-                        <span>Cote actuelle</span>
-                        <b className="odds-current-value">{formatOdds(latestPoint.odds)}</b>
+                        <strong>{interpolate(t.horse, { number: runner.number })}{runner.horse_name ? ` · ${runner.horse_name}` : ""}</strong>
+                        <span>{t.currentOdds}</span>
+                        <b className="odds-current-value">{formatOdds(latestPoint.odds, intlLocale)}</b>
                       </li>
                     ) : null;
                   })}
                 </ol>
               </>
             ) : (
-              <p>Aucune cote en baisse depuis le premier relevé.</p>
+              <p>{t.noDrops}</p>
             )}
           </section>
-          <ul className="odds-chart-legend" aria-label="Chevaux représentés sur le graphique">
+          <ul className="odds-chart-legend" aria-label={t.legendAria}>
             {series.map((runner, index) => (
               <li key={runner.number}>
                 <span style={{ backgroundColor: colors[index % colors.length] }} />
@@ -236,7 +283,7 @@ export default function QuinteOddsChart({ meetingDate }: { meetingDate?: string 
           </ul>
         </>
       )}
-      <p className="odds-chart-footnote">Les cotes sont indicatives et peuvent évoluer entre deux relevés.</p>
+      <p className="odds-chart-footnote">{t.footnote}</p>
     </section>
   );
 }

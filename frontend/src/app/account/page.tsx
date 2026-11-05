@@ -6,6 +6,8 @@ import type { CountryCode } from "libphonenumber-js";
 import { useAuth } from "../auth-context";
 import SiteNavigation from "../site-navigation";
 import { parseValidPhoneNumber, PhoneField, usePhonePreferences } from "../phone-field";
+import { interpolate, priceLabel } from "../../i18n/format";
+import { useI18n } from "../../i18n/provider";
 
 const whatsappAccounts = [
   { label: "Moov Burkina", number: "22660354400" },
@@ -22,16 +24,10 @@ function isCheckoutResponse(value: unknown): value is { checkout_url: string } {
   );
 }
 
-function formatDate(value: string | null) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("fr-FR", {
-    dateStyle: "long",
-    timeZone: "Africa/Ouagadougou",
-  }).format(new Date(value));
-}
-
 function AccountPageContent() {
   const { apiFetch, configured, loading, profile, profileError, refreshProfile, session, signIn, signOut, signUp } = useAuth();
+  const { messages, intlLocale } = useI18n();
+  const t = messages.account;
   const phonePreferences = usePhonePreferences();
   const [mode, setMode] = useState<"login" | "signup">("signup");
   const [email, setEmail] = useState("");
@@ -49,17 +45,24 @@ function AccountPageContent() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneCountryOverride, setPhoneCountryOverride] = useState<CountryCode | null>(null);
   const phoneCountry = phoneCountryOverride ?? phonePreferences.country;
-  const phoneLocale = phonePreferences.locale;
+
+  const formatDate = (value: string | null) => {
+    if (!value) return "—";
+    return new Intl.DateTimeFormat(intlLocale, {
+      dateStyle: "long",
+      timeZone: "Africa/Ouagadougou",
+    }).format(new Date(value));
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       if (new URLSearchParams(window.location.search).get("payment") !== "complete") return;
       setPaymentReturn(true);
-      setMessage("Retour de Chariow détecté. RaceX vérifie la confirmation du paiement avant d’activer votre abonnement.");
+      setMessage(t.paymentReturn);
       void refreshProfile();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [refreshProfile]);
+  }, [refreshProfile, t.paymentReturn]);
 
   useEffect(() => {
     if (!paymentReturn || profile?.role === "subscriber") return;
@@ -86,7 +89,7 @@ function AccountPageContent() {
     event.preventDefault();
     const parsedPhone = parseValidPhoneNumber(phoneNumber, phoneCountry);
     if (!parsedPhone) {
-      setError("Saisissez un numéro de téléphone valide pour le pays sélectionné.");
+      setError(t.invalidPhone);
       return;
     }
     setCheckoutBusy(true);
@@ -109,15 +112,15 @@ function AccountPageContent() {
         const detail =
           typeof result === "object" && result !== null && "detail" in result && typeof result.detail === "string"
             ? result.detail
-            : "Impossible de démarrer le paiement Chariow.";
+            : t.checkoutError;
         throw new Error(detail);
       }
       if (!isCheckoutResponse(result) || !result.checkout_url.startsWith("https://")) {
-        throw new Error("Chariow n’a pas renvoyé de lien de paiement valide.");
+        throw new Error(t.checkoutLinkError);
       }
       window.location.assign(result.checkout_url);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Impossible de démarrer le paiement Chariow.");
+      setError(requestError instanceof Error ? requestError.message : t.checkoutError);
       setCheckoutBusy(false);
     }
   }
@@ -126,7 +129,7 @@ function AccountPageContent() {
     event.preventDefault();
     const parsedPhone = mode === "signup" ? parseValidPhoneNumber(phone, phoneCountry) : null;
     if (mode === "signup" && !parsedPhone) {
-      setError("Saisissez un numéro de téléphone valide pour le pays sélectionné.");
+      setError(t.invalidPhone);
       return;
     }
     setBusy(true);
@@ -137,54 +140,57 @@ function AccountPageContent() {
         const result = await signUp(email, password, parsedPhone?.internationalNumber ?? "");
         if (result.hasSession) {
           setSignupConfirmationEmail(null);
-          setMessage("Votre compte est créé. Votre accès démo de 7 jours est activé.");
+          setMessage(t.created);
         } else if (result.identityCreated) {
           setSignupConfirmationEmail(email.trim());
         } else {
           setSignupConfirmationEmail(null);
-          setMessage("Supabase n’a pas confirmé la création d’un nouveau compte. Si vous avez déjà un compte, essayez de vous connecter ou réinitialisez le mot de passe. Sinon, vérifiez que l’inscription par e-mail est activée dans Supabase.");
+          setMessage(t.signupUnconfirmed);
         }
       } else {
         await signIn(email, password);
-        setMessage("Connexion réussie. Chargement de votre niveau d’accès…");
+        setMessage(t.signedIn);
       }
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "L’opération a échoué.");
+      setError(requestError instanceof Error ? requestError.message : t.operationFailed);
     } finally {
       setBusy(false);
     }
   }
+
+  const roleLabel = profile
+    ? t.roles[profile.role]
+    : "";
 
   return (
     <main className="shell account-shell">
       <SiteNavigation currentPage="account" />
       <header className="subscriber-header">
         <div>
-          <p className="subscriber-eyebrow">RACEX · COMPTE</p>
-          <h1>Votre accès RaceX</h1>
-          <p className="subscriber-date">Démo gratuite de 7 jours · paiement à renouveler chaque mois</p>
+          <p className="subscriber-eyebrow">{t.eyebrow}</p>
+          <h1>{t.title}</h1>
+          <p className="subscriber-date">{t.subtitle}</p>
         </div>
       </header>
 
       {!configured && (
         <section className="subscriber-state subscriber-error" role="alert">
-          L’authentification n’est pas configurée. L’administrateur doit ajouter les identifiants publics Supabase à la configuration du frontend.
+          {t.notConfigured}
         </section>
       )}
 
-      {loading && <section className="subscriber-state" role="status">Chargement de votre compte…</section>}
+      {loading && <section className="subscriber-state" role="status">{t.loading}</section>}
 
       {!loading && !session && (
         <section className="public-widget account-card">
           {signupConfirmationEmail ? (
             <div className="account-confirmation" role="status" aria-labelledby="account-confirmation-title">
-              <p className="public-kicker">INSCRIPTION ENREGISTRÉE</p>
-              <h2 id="account-confirmation-title">Vérifiez votre boîte e-mail</h2>
+              <p className="public-kicker">{t.confirmationKicker}</p>
+              <h2 id="account-confirmation-title">{t.confirmationTitle}</h2>
               <p>
-                Un e-mail de confirmation a été envoyé à <strong>{signupConfirmationEmail}</strong>.
-                Ouvrez-le et cliquez sur le lien pour activer votre compte.
+                {t.confirmationBodyBefore} <strong>{signupConfirmationEmail}</strong>. {t.confirmationBodyAfter}
               </p>
-              <p className="account-help">Pensez aussi à vérifier vos courriers indésirables. Après confirmation, connectez-vous à RaceX.</p>
+              <p className="account-help">{t.confirmationHelp}</p>
               <button
                 type="button"
                 className="subscriber-refresh"
@@ -194,44 +200,42 @@ function AccountPageContent() {
                   setPassword("");
                 }}
               >
-                J’ai confirmé mon adresse, me connecter
+                {t.confirmationCta}
               </button>
             </div>
           ) : (
             <>
-              <div className="account-mode-switch" aria-label="Choisir une action">
+              <div className="account-mode-switch" aria-label={t.modeSwitchAria}>
                 <button type="button" className={mode === "signup" ? "selected" : ""} onClick={() => { setMode("signup"); setError(""); setMessage(""); }}>
-                  Créer un compte
+                  {t.signupTab}
                 </button>
                 <button type="button" className={mode === "login" ? "selected" : ""} onClick={() => { setMode("login"); setError(""); setMessage(""); }}>
-                  Se connecter
+                  {t.loginTab}
                 </button>
               </div>
-              <h2>{mode === "signup" ? "Commencez vos 7 jours de démo" : "Ravi de vous revoir"}</h2>
+              <h2>{mode === "signup" ? t.signupTitle : t.loginTitle}</h2>
               <p className="account-card-copy">
-                {mode === "signup"
-                  ? "La création du compte active automatiquement l’accès aux fonctions abonnés pour 7 jours."
-                  : "Connectez-vous pour retrouver les droits associés à votre compte."}
+                {mode === "signup" ? t.signupCopy : t.loginCopy}
               </p>
               <form className="account-form" onSubmit={submit}>
-                <label htmlFor="account-email">Adresse e-mail</label>
+                <label htmlFor="account-email">{t.email}</label>
                 <input id="account-email" type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
                 {mode === "signup" && (
                   <PhoneField
                     country={phoneCountry}
                     idPrefix="account-phone"
-                    label="Numéro de téléphone"
-                    locale={phoneLocale}
+                    label={t.phone}
+                    locale={intlLocale}
                     number={phone}
                     onCountryChange={setPhoneCountryOverride}
                     onNumberChange={setPhone}
                   />
                 )}
-                <label htmlFor="account-password">Mot de passe</label>
+                <label htmlFor="account-password">{t.password}</label>
                 <input id="account-password" type="password" minLength={8} autoComplete={mode === "signup" ? "new-password" : "current-password"} required value={password} onChange={(event) => setPassword(event.target.value)} />
-                <p className="account-help">8 caractères minimum.</p>
+                <p className="account-help">{t.passwordHelp}</p>
                 <button className="subscriber-refresh" type="submit" disabled={busy || !configured}>
-                  {busy ? "Veuillez patienter…" : mode === "signup" ? "Créer mon compte" : "Se connecter"}
+                  {busy ? t.busy : mode === "signup" ? t.createAccount : t.signIn}
                 </button>
               </form>
               {message && <p className="account-message" role="status">{message}</p>}
@@ -243,22 +247,20 @@ function AccountPageContent() {
 
       {!loading && session && profile && (
         <section className="public-widget account-card">
-          <p className="public-kicker">MON COMPTE</p>
+          <p className="public-kicker">{t.profileKicker}</p>
           <h2>{profile.email}</h2>
           <div className="account-status-grid">
-            <div><span>TÉLÉPHONE</span><strong>{profile.phone || "Non renseigné"}</strong></div>
-            <div><span>NIVEAU D’ACCÈS</span><strong>{profile.role === "admin" ? "Administrateur" : profile.role === "subscriber" ? "Abonné" : profile.role === "demo" ? "Démo" : "Accès simple"}</strong></div>
-            {profile.role === "demo" && <div><span>DÉMO VALABLE JUSQU’AU</span><strong>{formatDate(profile.demo_expires_at)}</strong></div>}
-            {profile.role === "subscriber" && <div><span>ABONNEMENT VALABLE JUSQU’AU</span><strong>{formatDate(profile.subscriber_expires_at)}</strong></div>}
+            <div><span>{t.phoneLabel}</span><strong>{profile.phone || t.notProvided}</strong></div>
+            <div><span>{t.accessLabel}</span><strong>{roleLabel}</strong></div>
+            {profile.role === "demo" && <div><span>{t.demoUntil}</span><strong>{formatDate(profile.demo_expires_at)}</strong></div>}
+            {profile.role === "subscriber" && <div><span>{t.subscriptionUntil}</span><strong>{formatDate(profile.subscriber_expires_at)}</strong></div>}
           </div>
           {profile.role !== "admin" && (
             <div className="account-renewal">
-              <h3>{profile.role === "subscriber" ? "Renouveler votre accès" : "Passer à l’abonnement"}</h3>
-              <p>
-                Choisissez une formule. Chaque paiement confirmé ajoute la durée correspondante à votre accès RaceX. Le paiement est traité de façon sécurisée par Chariow.
-              </p>
+              <h3>{profile.role === "subscriber" ? t.renewalSubscriber : t.renewalOther}</h3>
+              <p>{t.renewalBody}</p>
               <form className="account-form account-checkout-form" onSubmit={startCheckout}>
-                <label htmlFor="checkout-plan">Formule</label>
+                <label htmlFor="checkout-plan">{t.planLabel}</label>
                 <select
                   id="checkout-plan"
                   value={selectedPlan}
@@ -269,58 +271,58 @@ function AccountPageContent() {
                     }
                   }}
                 >
-                  <option value="weekly">Hebdomadaire · 2 500 FCFA · 7 jours</option>
-                  <option value="monthly">Mensuelle · 8 000 FCFA · 1 mois</option>
-                  <option value="annual">Annuelle · 80 000 FCFA · 1 an</option>
+                  <option value="weekly">{interpolate(t.planWeekly, { price: priceLabel(2500, intlLocale) })}</option>
+                  <option value="monthly">{interpolate(t.planMonthly, { price: priceLabel(8000, intlLocale) })}</option>
+                  <option value="annual">{interpolate(t.planAnnual, { price: priceLabel(80000, intlLocale) })}</option>
                 </select>
-                <label htmlFor="checkout-first-name">Prénom</label>
+                <label htmlFor="checkout-first-name">{t.firstName}</label>
                 <input id="checkout-first-name" autoComplete="given-name" maxLength={50} required value={firstName} onChange={(event) => setFirstName(event.target.value)} />
-                <label htmlFor="checkout-last-name">Nom</label>
+                <label htmlFor="checkout-last-name">{t.lastName}</label>
                 <input id="checkout-last-name" autoComplete="family-name" maxLength={50} required value={lastName} onChange={(event) => setLastName(event.target.value)} />
                 <PhoneField
                   country={phoneCountry}
                   idPrefix="checkout-phone"
-                  label="Numéro de téléphone"
-                  locale={phoneLocale}
+                  label={t.phone}
+                  locale={intlLocale}
                   number={phoneNumber}
                   onCountryChange={setPhoneCountryOverride}
                   onNumberChange={setPhoneNumber}
                 />
-                <p className="account-help">Vous pouvez saisir le numéro au format local ou international.</p>
+                <p className="account-help">{t.phoneHelp}</p>
                 <button className="subscriber-refresh account-chariow-button" type="submit" disabled={checkoutBusy}>
-                  {checkoutBusy ? "Redirection vers Chariow…" : profile.role === "subscriber" ? "Renouveler sur Chariow" : "Payer sur Chariow"}
+                  {checkoutBusy ? t.checkoutBusy : profile.role === "subscriber" ? t.renewOnChariow : t.payOnChariow}
                 </button>
               </form>
               {paymentReturn && profile.role !== "subscriber" && (
                 <p className="account-payment-pending" role="status">
-                  RaceX vérifie la confirmation du paiement et actualise automatiquement votre accès pendant une minute. Si votre abonnement n’apparaît pas ensuite, actualisez votre compte.
+                  {t.paymentPending}
                 </p>
               )}
               {paymentReturn && profile.role === "subscriber" && (
-                <p className="account-message" role="status">Votre accès abonné est actif jusqu’au {formatDate(profile.subscriber_expires_at)}.</p>
+                <p className="account-message" role="status">{interpolate(t.paymentActive, { date: formatDate(profile.subscriber_expires_at) })}</p>
               )}
               {error && <p className="account-error" role="alert">{error}</p>}
               <div className="account-whatsapp-links">
                 {whatsappAccounts.map((contact) => (
-                  <a key={contact.number} href={`https://wa.me/${contact.number}?text=${encodeURIComponent("Bonjour, j’ai une question concernant le paiement ou l’activation de mon abonnement RaceX.")}`} target="_blank" rel="noreferrer">
-                    Contacter sur WhatsApp · {contact.label}
+                  <a key={contact.number} href={`https://wa.me/${contact.number}?text=${encodeURIComponent(t.whatsappMessage)}`} target="_blank" rel="noreferrer">
+                    {interpolate(t.whatsappPrefix, { label: contact.label })}
                   </a>
                 ))}
               </div>
             </div>
           )}
-          <button type="button" className="account-signout" onClick={() => void signOut()}>Se déconnecter</button>
+          <button type="button" className="account-signout" onClick={() => void signOut()}>{t.signOut}</button>
         </section>
       )}
 
       {!loading && session && !profile && (
         <section className="subscriber-state subscriber-error" role="alert">
-          {profileError || "Votre profil n’a pas pu être chargé."}
+          {profileError || t.profileNotLoaded}
         </section>
       )}
 
-      <p className="account-basic-note">L’accueil public reste consultable sans compte. Les paiements sont traités sur Chariow.</p>
-      <p><Link href="/">Retour à l’accueil</Link></p>
+      <p className="account-basic-note">{t.basicNote}</p>
+      <p><Link href="/">{t.backHome}</Link></p>
     </main>
   );
 }

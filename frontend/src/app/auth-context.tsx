@@ -2,6 +2,8 @@
 
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useMessages } from "../i18n/provider";
+import { offlineKeys, readOffline, removeOfflineKeys, saveOffline } from "./offline-data";
 
 export type AccessRole = "simple" | "demo" | "subscriber" | "admin";
 export type AccountProfile = {
@@ -20,6 +22,7 @@ type AuthContextValue = {
   session: Session | null;
   profile: AccountProfile | null;
   profileError: string;
+  offlineAccess: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, phone: string) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
@@ -46,16 +49,29 @@ function getSupabaseClient() {
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export function AuthProvider({ children }: Readonly<{ children: React.ReactNode }>) {
+  const t = useMessages().auth;
   const client = getSupabaseClient();
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<AccountProfile | null>(null);
   const [profileError, setProfileError] = useState("");
+  const [offlineAccess, setOfflineAccess] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = useCallback(async (accessToken: string | null) => {
-    if (!accessToken) {
+  const loadProfile = useCallback(async (accessToken: string | null, userId: string | null) => {
+    if (!accessToken || !userId) {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        const cached = await readOffline<AccountProfile>(offlineKeys.lastProfile);
+        if (cached) {
+          setProfile(cached.payload);
+          setProfileError("");
+          setOfflineAccess(true);
+          setLoading(false);
+          return;
+        }
+      }
       setProfile(null);
       setProfileError("");
+      setOfflineAccess(false);
       setLoading(false);
       return;
     }
@@ -65,16 +81,29 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
         cache: "no-store",
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.detail ?? "Impossible de charger votre compte.");
-      setProfile(payload as AccountProfile);
+      if (!response.ok) throw new Error(payload.detail ?? t.profileError);
+      const nextProfile = payload as AccountProfile;
+      setProfile(nextProfile);
       setProfileError("");
+      setOfflineAccess(false);
+      void saveOffline(offlineKeys.profile(nextProfile.id), nextProfile);
+      void saveOffline(offlineKeys.lastProfile, nextProfile);
     } catch (error) {
-      setProfile(null);
-      setProfileError(error instanceof Error ? error.message : "Impossible de charger votre compte.");
+      const cached = await readOffline<AccountProfile>(offlineKeys.profile(userId))
+        ?? await readOffline<AccountProfile>(offlineKeys.lastProfile);
+      if (cached) {
+        setProfile(cached.payload);
+        setProfileError("");
+        setOfflineAccess(true);
+      } else {
+        setProfile(null);
+        setOfflineAccess(false);
+        setProfileError(error instanceof Error ? error.message : t.profileError);
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t.profileError]);
 
   useEffect(() => {
     if (!client) {
@@ -86,14 +115,16 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
       if (!active) return;
       setSession(nextSession);
       window.setTimeout(() => {
-        if (active) void loadProfile(nextSession?.access_token ?? null);
+        if (active) {
+          void loadProfile(nextSession?.access_token ?? null, nextSession?.user.id ?? null);
+        }
       }, 0);
     });
     void client.auth.getSession().then(({ data, error }) => {
       if (!active) return;
       if (error) setProfileError(error.message);
       setSession(data.session);
-      void loadProfile(data.session?.access_token ?? null);
+      void loadProfile(data.session?.access_token ?? null, data.session?.user.id ?? null);
     });
     return () => {
       active = false;
@@ -102,13 +133,13 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
   }, [client, loadProfile]);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    if (!client) throw new Error("L’authentification Supabase n’est pas configurée.");
+    if (!client) throw new Error(t.notConfigured);
     const { error } = await client.auth.signInWithPassword({ email, password });
     if (error) throw error;
-  }, [client]);
+  }, [client, t.notConfigured]);
 
   const signUp = useCallback(async (email: string, password: string, phone: string) => {
-    if (!client) throw new Error("L’authentification Supabase n’est pas configurée.");
+    if (!client) throw new Error(t.notConfigured);
     const { data, error } = await client.auth.signUp({
       email,
       password,
@@ -122,23 +153,31 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
       hasSession: Boolean(data.session),
       identityCreated: Boolean(data.user?.identities?.length),
     };
-  }, [client]);
+  }, [client, t.notConfigured]);
 
   const signOut = useCallback(async () => {
     if (!client) return;
+    const previousUserId = session?.user.id ?? profile?.id;
+    setProfile(null);
+    setOfflineAccess(false);
+    setProfileError("");
+    if (previousUserId) {
+      void removeOfflineKeys([offlineKeys.analysisPrefix(previousUserId), offlineKeys.profile(previousUserId)]);
+    }
+    void removeOfflineKeys([offlineKeys.lastProfile]);
     const { error } = await client.auth.signOut();
     if (error) throw error;
-  }, [client]);
+  }, [client, profile?.id, session?.user.id]);
 
   const apiFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
-    if (!session?.access_token) throw new Error("Connectez-vous pour continuer.");
+    if (!session?.access_token) throw new Error(t.signInRequired);
     const headers = new Headers(init?.headers);
     headers.set("Authorization", `Bearer ${session.access_token}`);
     return fetch(input, { ...init, headers });
-  }, [session]);
+  }, [session, t.signInRequired]);
 
   const refreshProfile = useCallback(async () => {
-    await loadProfile(session?.access_token ?? null);
+    await loadProfile(session?.access_token ?? null, session?.user.id ?? null);
   }, [loadProfile, session]);
 
   const value = useMemo<AuthContextValue>(() => ({
@@ -147,12 +186,13 @@ export function AuthProvider({ children }: Readonly<{ children: React.ReactNode 
     session,
     profile,
     profileError,
+    offlineAccess,
     signIn,
     signUp,
     signOut,
     apiFetch,
     refreshProfile,
-  }), [apiFetch, client, loading, profile, profileError, refreshProfile, session, signIn, signOut, signUp]);
+  }), [apiFetch, client, loading, offlineAccess, profile, profileError, refreshProfile, session, signIn, signOut, signUp]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

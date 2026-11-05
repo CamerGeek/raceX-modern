@@ -3,13 +3,16 @@ import Image from "next/image";
 import Link from "next/link";
 import QuinteTopEight from "./quinte-top-eight";
 import SiteNavigation from "./site-navigation";
+import { getRequestMessages } from "../i18n/server";
+import { localeMeta } from "../i18n/config";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
 
-const quinteWidgetDocument = `<!doctype html>
-<html lang="fr">
+function quinteWidgetDocument(lang: string, offlineNote: string) {
+  return `<!doctype html>
+<html lang="${lang}">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -19,6 +22,8 @@ const quinteWidgetDocument = `<!doctype html>
       html, body { margin: 0; background: #fbfaf5; color: #18221f; font-family: Arial, sans-serif; }
       body { overflow-x: auto; }
       .widget-content { width: 100%; }
+      .widget-fallback { margin: 0; padding: 1rem 1.25rem; border-left: 3px solid #c96f3b; background: #f3f0e8; color: #65736d; font: .85rem/1.5 Arial, sans-serif; }
+      .widget-fallback[hidden] { display: none; }
       table.tableaux3 {
         width: 100% !important;
         border: 0 !important;
@@ -85,14 +90,22 @@ const quinteWidgetDocument = `<!doctype html>
   </head>
   <body>
     <div class="widget-content">
+      <p class="widget-fallback" id="widget-fallback" hidden>${offlineNote}</p>
+      <script>
+        window.addEventListener("error", function () {
+          var note = document.getElementById("widget-fallback");
+          if (note) note.hidden = false;
+        }, true);
+      </script>
       <script src="/api/quinte-widget"></script>
     </div>
   </body>
 </html>`;
+}
 
-function resultsWidgetDocument(widgetType: "results" | "live-results") {
+function resultsWidgetDocument(widgetType: "results" | "live-results", lang: string, offlineNote: string) {
   return `<!doctype html>
-<html lang="fr">
+<html lang="${lang}">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -101,6 +114,8 @@ function resultsWidgetDocument(widgetType: "results" | "live-results") {
       * { box-sizing: border-box; }
       html, body { margin: 0; background: #fbfaf5; color: #18221f; font-family: Arial, sans-serif; }
       .widget-content { width: 100%; }
+      .widget-fallback { margin: 0; padding: 1rem 1.25rem; border-left: 3px solid #c96f3b; background: #f3f0e8; color: #65736d; font: .85rem/1.5 Arial, sans-serif; }
+      .widget-fallback[hidden] { display: none; }
       table.tableaux3 {
         width: 100% !important;
         border: 0 !important;
@@ -154,17 +169,28 @@ function resultsWidgetDocument(widgetType: "results" | "live-results") {
   </head>
   <body>
     <div class="widget-content">
+      <p class="widget-fallback" id="widget-fallback" hidden>${offlineNote}</p>
+      <script>
+        window.addEventListener("error", function () {
+          var note = document.getElementById("widget-fallback");
+          if (note) note.hidden = false;
+        }, true);
+      </script>
       <script src="/api/quinte-widget?type=${widgetType}"></script>
     </div>
   </body>
 </html>`;
 }
 
-export default function Home() {
+export default async function Home() {
+  const { locale, messages } = await getRequestMessages();
+  const t = messages.home;
+  const lang = localeMeta[locale].htmlLang;
+
   return (
-    <main className="public-home">
+    <main className="public-home" lang={lang}>
       <header className="public-header">
-        <Link className="public-brand" href="/" aria-label="RaceX, accueil">
+        <Link className="public-brand" href="/" aria-label={t.brandAria}>
           <Image
             src="/racex-logo.png"
             alt="RaceX"
@@ -175,46 +201,43 @@ export default function Home() {
           />
         </Link>
         <SiteNavigation currentPage="home" />
-        <span className="public-edition">COURSES DU JOUR</span>
+        <span className="public-edition">{t.edition}</span>
       </header>
 
       <section className="public-intro" aria-labelledby="quinte-title">
-        <p className="public-kicker">LE RENDEZ-VOUS DU JOUR</p>
-        <h1 id="quinte-title">Les partants du Quinté+</h1>
-        <p>
-          Retrouvez la course du jour et ses partants. Les informations ci-dessous
-          sont fournies par Zone-Turf.
-        </p>
+        <p className="public-kicker">{t.kicker}</p>
+        <h1 id="quinte-title">{t.title}</h1>
+        <p>{t.intro}</p>
       </section>
 
       <QuinteTopEight />
 
-      <section className="quinte-dashboard" aria-label="Informations du Quinté+">
-        <section className="public-widget starters-widget" aria-label="Partants du Quinté+ du jour">
+      <section className="quinte-dashboard" aria-label={t.dashboardAria}>
+        <section className="public-widget starters-widget" aria-label={t.startersAria}>
           <iframe
-            title="Partants du Quinté+ du jour, fournis par Zone-Turf"
-            srcDoc={quinteWidgetDocument}
+            title={t.startersFrameTitle}
+            srcDoc={quinteWidgetDocument(lang, t.widgetOffline)}
             sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
             className="quinte-widget-frame"
           />
         </section>
 
         <div className="quinte-sidebar">
-          <aside className="public-widget results-widget" aria-label="Résultats récents du Quinté+">
-            <h2 className="public-widget-heading">Résultats récents</h2>
+          <aside className="public-widget results-widget" aria-label={t.resultsAria}>
+            <h2 className="public-widget-heading">{t.resultsHeading}</h2>
             <iframe
-              title="Arrivées et rapports récents du Quinté+, fournis par Zone-Turf"
-              srcDoc={resultsWidgetDocument("results")}
+              title={t.resultsFrameTitle}
+              srcDoc={resultsWidgetDocument("results", lang, t.widgetOffline)}
               sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
               className="quinte-results-frame"
             />
           </aside>
 
-          <aside className="public-widget live-results-widget" aria-label="Résultats des courses en direct">
-            <h2 className="public-widget-heading">Résultats en direct</h2>
+          <aside className="public-widget live-results-widget" aria-label={t.liveResultsAria}>
+            <h2 className="public-widget-heading">{t.liveResultsHeading}</h2>
             <iframe
-              title="Arrivées et rapports des courses en direct, fournis par Zone-Turf"
-              srcDoc={resultsWidgetDocument("live-results")}
+              title={t.liveResultsFrameTitle}
+              srcDoc={resultsWidgetDocument("live-results", lang, t.widgetOffline)}
               sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
               className="quinte-live-results-frame"
             />
@@ -224,11 +247,11 @@ export default function Home() {
 
       <footer className="public-footer">
         <p>
-          Le widget est fourni par{" "}
+          {t.sourcePrefix}{" "}
           <a href="https://www.zone-turf.fr/quinte/" target="_blank" rel="noreferrer">
             Zone-Turf
           </a>
-          . Les partants et les cotes peuvent évoluer.
+          . {t.sourceSuffix}
         </p>
       </footer>
     </main>

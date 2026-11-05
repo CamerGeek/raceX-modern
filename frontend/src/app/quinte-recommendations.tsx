@@ -1,3 +1,8 @@
+"use client";
+
+import { interpolate } from "../i18n/format";
+import { useI18n } from "../i18n/provider";
+
 type Horse = Record<string, string | number | boolean | null>;
 
 export type QuinteModelPredictions = {
@@ -31,11 +36,11 @@ function horseNumber(row: Horse) {
   return String(row[key]).trim().replace(/\.0$/, "");
 }
 
-function horseName(row: Horse) {
+function horseName(row: Horse, fallback: string) {
   const key = ["CHEVAL", "Cheval", "NOM", "NAME"].find((field) =>
     row[field] !== null && row[field] !== undefined && row[field] !== "",
   );
-  return key ? String(row[key]) : "Cheval sans nom";
+  return key ? String(row[key]) : fallback;
 }
 
 export function getModelShortlistRows(predictions: QuinteModelPredictions | null) {
@@ -74,22 +79,21 @@ function shodHorseRows(rows: Horse[]) {
 }
 
 export function ShodHorsesCard({ rows }: { rows: Horse[] }) {
+  const t = useI18n().messages.shod;
   const shodHorses = shodHorseRows(rows);
   const allHorsesShod = rows.length > 0 && rows.every(hasShodDef);
 
   return (
-    <section className="public-widget quinte-pick-card" aria-label="Chevaux ferrés">
+    <section className="public-widget quinte-pick-card" aria-label={t.aria}>
       <div>
-        <p className="public-kicker">INDICATION FERRURE</p>
-        <h2>Chevaux ferrés</h2>
-        <p className="quinte-pick-description">
-          Partants ferrés selon DEF. (valeur vide, « - » ou nan).
-        </p>
+        <p className="public-kicker">{t.kicker}</p>
+        <h2>{t.title}</h2>
+        <p className="quinte-pick-description">{t.description}</p>
       </div>
       {allHorsesShod ? (
-        <p className="free-analysis-status">Tous les chevaux de cette course sont ferrés.</p>
+        <p className="free-analysis-status">{t.all}</p>
       ) : shodHorses.length > 0 ? (
-        <ol className="free-analysis-list" aria-label="Chevaux ferrés">
+        <ol className="free-analysis-list" aria-label={t.aria}>
           {shodHorses.map((horse, index) => (
             <li key={`${horseNumber(horse)}-${index}`}>
               <strong>{horseNumber(horse)}</strong>
@@ -97,40 +101,38 @@ export function ShodHorsesCard({ rows }: { rows: Horse[] }) {
           ))}
         </ol>
       ) : (
-        <p className="free-analysis-status">Aucun partant ferré identifié pour cette course.</p>
+        <p className="free-analysis-status">{t.none}</p>
       )}
     </section>
   );
 }
 
-function displayScore(score: number) {
-  return score.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
-}
-
 function PlotTwistCard({ rows }: { rows: PlotTwistItem[] }) {
+  const { messages, intlLocale } = useI18n();
+  const t = messages.recommendations;
+  const displayScore = (score: number) =>
+    score.toLocaleString(intlLocale, { maximumFractionDigits: 2 });
+
   return (
     <section className="subscriber-discipline-card subscriber-plot-twist" aria-labelledby="subscriber-plot-twist-title">
-      <h3 id="subscriber-plot-twist-title">Plot twist · chevaux à surveiller</h3>
-      <p>
-        Partants hors du top 8 composite dont le score se situe à ±0,05 de la moyenne ou de la médiane.
-        C’est un repère complémentaire, pas une garantie de performance.
-      </p>
+      <h3 id="subscriber-plot-twist-title">{t.plotTwistTitle}</h3>
+      <p>{t.plotTwistDescription}</p>
       {rows.length > 0 ? (
         <ol>
           {rows.map(({ horse, score, rank, nearMean, nearMedian }, index) => (
             <li key={`plot-twist-${horseNumber(horse)}-${index}`}>
               <strong>{horseNumber(horse)}</strong>
-              <span>{horseName(horse)} · rang {rank}</span>
+              <span>{horseName(horse, t.unknownHorse)} · {interpolate(t.plotTwistRank, { rank })}</span>
               <b>
                 {displayScore(score)}
                 {" · "}
-                {nearMean && nearMedian ? "moyenne · médiane" : nearMean ? "moyenne" : "médiane"}
+                {nearMean && nearMedian ? t.nearMeanMedian : nearMean ? t.nearMean : t.nearMedian}
               </b>
             </li>
           ))}
         </ol>
       ) : (
-        <p className="free-analysis-status">Aucun partant hors top 8 ne correspond à ce repère pour cette course.</p>
+        <p className="free-analysis-status">{t.plotTwistEmpty}</p>
       )}
     </section>
   );
@@ -168,15 +170,17 @@ function PickCard({
   numbers: string[];
   emptyMessage: string;
 }) {
+  const t = useI18n().messages.recommendations;
+
   return (
     <section className="public-widget quinte-pick-card" aria-label={title}>
       <div>
-        <p className="public-kicker">SÉLECTION DU JOUR</p>
+        <p className="public-kicker">{t.pickKicker}</p>
         <h2>{title}</h2>
         <p className="quinte-pick-description">{description}</p>
       </div>
       {numbers.length > 0 ? (
-        <ol className="free-analysis-list" aria-label={`Numéros sélectionnés : ${title}`}>
+        <ol className="free-analysis-list" aria-label={interpolate(t.numbersAria, { title })}>
           {numbers.map((number, index) => (
             <li key={`${number}-${index}`}><strong>{number}</strong></li>
           ))}
@@ -193,6 +197,7 @@ export function PriorityTierPickCard({
 }: {
   predictions: QuinteModelPredictions | null;
 }) {
+  const t = useI18n().messages.recommendations;
   const horses = priorityTierShortlist(predictions);
   const tiers = horses.reduce<{ tier: number; numbers: string[] }[]>((groups, horse) => {
     const group = groups.find((item) => item.tier === horse.tier);
@@ -204,21 +209,21 @@ export function PriorityTierPickCard({
     return groups;
   }, []);
   const message = predictions?.status === "ready"
-    ? "Aucun cheval n’a de niveau de priorité disponible."
-    : predictions?.message ?? "Les niveaux de priorité du modèle ne sont pas disponibles pour cette course.";
+    ? t.priorityNone
+    : predictions?.message ?? t.priorityUnavailable;
 
   return (
-    <section className="public-widget quinte-pick-card" aria-label="Priorité des chevaux selon le modèle">
+    <section className="public-widget quinte-pick-card" aria-label={t.priorityAria}>
       <div>
-        <p className="public-kicker">SÉLECTION DU JOUR</p>
-        <h2>Priorité du modèle</h2>
-        <p className="quinte-pick-description">Chevaux classés par niveau de priorité du modèle, Tier 1 en premier.</p>
+        <p className="public-kicker">{t.pickKicker}</p>
+        <h2>{t.priorityTitle}</h2>
+        <p className="quinte-pick-description">{t.priorityDescription}</p>
       </div>
       {tiers.length > 0 ? (
-        <ol className="priority-tier-list" aria-label="Chevaux classés par niveau de priorité">
+        <ol className="priority-tier-list" aria-label={t.priorityListAria}>
           {tiers.map(({ tier, numbers }) => (
             <li key={tier}>
-              <strong>Tier {tier}:</strong>
+              <strong>{interpolate(t.tier, { tier })}</strong>
               <span>{numbers.join(" ")}</span>
             </li>
           ))}
@@ -234,16 +239,17 @@ export default function QuinteRecommendations({
   modelPredictions,
   plotTwistRows,
 }: QuinteRecommendationsProps) {
+  const t = useI18n().messages.recommendations;
   const modelNumbers = modelShortlist(modelPredictions);
   const modelMessage = modelPredictions?.status === "ready"
-    ? "Le modèle n’a pas fourni de chevaux classables."
-    : modelPredictions?.message ?? "Le Model Shortlist n’est pas disponible pour cette course.";
+    ? t.modelEmptyReady
+    : modelPredictions?.message ?? t.modelUnavailable;
 
   return (
     <div className="quinte-picks-grid">
       <PickCard
-        title="Model Shortlist(Choix du modele d'IA)"
-        description="Jusqu’à 8 numéros classés par deep score décroissant."
+        title={t.modelTitle}
+        description={t.modelDescription}
         numbers={modelNumbers}
         emptyMessage={modelMessage}
       />

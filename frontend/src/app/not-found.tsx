@@ -1,19 +1,17 @@
-import type { Metadata } from "next";
-import Link from "next/link";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Page introuvable",
-  description: "La page demandée est introuvable. Retrouvez les courses du jour sur RaceX.",
-  robots: { index: false, follow: true },
-};
+import Link from "next/link";
+import { useMessages } from "../i18n/provider";
 
 export default function NotFound() {
+  const t = useMessages().notFound;
+
   return (
     <main className="not-found-page">
-      <p className="public-kicker">RACEX · ERREUR 404</p>
-      <h1>Cette page n’existe pas</h1>
-      <p>Le lien est peut-être incorrect ou la page a été déplacée.</p>
-      <Link href="/">Retour aux courses du jour</Link>
+      <p className="public-kicker">{t.kicker}</p>
+      <h1>{t.title}</h1>
+      <p>{t.body}</p>
+      <Link href="/">{t.backHome}</Link>
     </main>
   );
 }

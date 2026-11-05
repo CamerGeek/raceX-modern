@@ -11,6 +11,10 @@ import QuinteRecommendations, {
 import SiteNavigation from "../site-navigation";
 import AccessGate from "../access-gate";
 import { useAuth } from "../auth-context";
+import { offlineKeys, readOffline, saveOffline } from "../offline-data";
+import { useOnlineStatus } from "../use-online-status";
+import { interpolate } from "../../i18n/format";
+import { useI18n } from "../../i18n/provider";
 
 type Horse = Record<string, string | number | boolean | null>;
 type AnalysisSignal = { label: string; value: string; detail: string };
@@ -88,8 +92,8 @@ function plotTwistCandidates(rows: Horse[]): PlotTwistItem[] {
     .slice(0, 4);
 }
 
-function displayScore(score: number | null) {
-  return score === null ? "—" : score.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+function displayScore(score: number | null, intlLocale: string) {
+  return score === null ? "—" : score.toLocaleString(intlLocale, { maximumFractionDigits: 2 });
 }
 
 function todayInParis() {
@@ -101,8 +105,8 @@ function todayInParis() {
   }).format(new Date());
 }
 
-function raceDateLabel(value = todayInParis()) {
-  return new Intl.DateTimeFormat("fr-FR", {
+function raceDateLabel(value: string, intlLocale: string) {
+  return new Intl.DateTimeFormat(intlLocale, {
     timeZone: "Europe/Paris",
     dateStyle: "full",
   }).format(new Date(`${value}T12:00:00`));
@@ -122,12 +126,12 @@ function horseNumber(horse: Horse) {
   return firstValue(horse, numberFields) || "—";
 }
 
-function horseName(horse: Horse) {
-  return firstValue(horse, nameFields) || "Cheval sans nom";
+function horseName(horse: Horse, fallback: string) {
+  return firstValue(horse, nameFields) || fallback;
 }
 
-function horseNameWithoutParenthesizedContent(horse: Horse) {
-  return horseName(horse).replace(/\s*\([^)]*\)/g, "").trim() || "Cheval sans nom";
+function horseNameWithoutParenthesizedContent(horse: Horse, fallback: string) {
+  return horseName(horse, fallback).replace(/\s*\([^)]*\)/g, "").trim() || fallback;
 }
 
 function horseMetric(horse: Horse, keys: string[]) {
@@ -148,56 +152,66 @@ function lowestMetricFirst(rows: Horse[], keys: string[]) {
     .map(({ horse }) => horse);
 }
 
-function formatMetric(value: string) {
+function formatMetric(value: string, intlLocale: string) {
   const numeric = Number(value.replace(",", "."));
   return value && Number.isFinite(numeric)
-    ? numeric.toLocaleString("fr-FR", { maximumFractionDigits: 2 })
+    ? numeric.toLocaleString(intlLocale, { maximumFractionDigits: 2 })
     : value || "—";
 }
 
 function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
+  const { messages, intlLocale } = useI18n();
+  const t = messages.subscribers;
+  const d = t.discipline;
   const isFlat = analysis.race_type === "flat";
   const isTrot = analysis.race_type === "trot";
   const isObstacles = analysis.race_type === "obstacles";
+  const unknownHorse = messages.recommendations.unknownHorse;
+
   const disciplineCards = isFlat || isObstacles
     ? [
         {
-          title: "Régularité des signaux",
-          description: "Chevaux présents sur plusieurs critères favorables",
+          id: "consistency",
+          title: d.consistencyTitle,
+          description: d.consistencyDescription,
           rows: analysis.overview?.consistency_score ?? [],
           metricKeys: ["consistency_score", "Consistance"],
-          metricLabel: "Facteurs",
+          metricLabel: d.consistencyMetric,
         },
         {
-          title: "Outsiders à surveiller",
-          description: "Score composite mieux classé que la cote",
+          id: "upsets",
+          title: d.upsetsTitle,
+          description: d.upsetsDescription,
           rows: analysis.overview?.odds_divergence ?? analysis.overview?.upset_potential ?? [],
           metricKeys: ["Divergence", "divergence", "FinalUpset"],
-          metricLabel: "Écart",
+          metricLabel: d.upsetsMetric,
         },
       ]
     : isTrot
     ? [
         {
-          title: "Performance",
-          description: "Coefficient de réussite, ajusté si handicap",
+          id: "performance",
+          title: d.performanceTitle,
+          description: d.performanceDescription,
           rows: sectionRows(analysis, "Performance (S_COEFF)"),
           metricKeys: ["S_COEFF_Handicap_Adj", "S_COEFF_Handicap_Adjusted", "S_COEFF"],
           metricLabel: "S_COEFF",
         },
         {
-          title: "Forme récente",
-          description: "Tendance et moyenne des dernières performances",
+          id: "form",
+          title: d.formTitle,
+          description: d.formDescription,
           rows: sectionRows(analysis, "Form Trend"),
           metricKeys: ["Trend", "Recent_Avg"],
-          metricLabel: "Tendance",
+          metricLabel: d.formMetric,
         },
         {
-          title: "Chevaux sûrs",
-          description: "Classés du risque de disqualification le plus faible au plus élevé",
+          id: "safe",
+          title: d.safeTitle,
+          description: d.safeDescription,
           rows: sectionRows(analysis, "Disqualification Risk"),
           metricKeys: ["DQ_Risk_Amplified", "DQ_Risk"],
-          metricLabel: "Risque",
+          metricLabel: d.safeMetric,
         },
       ]
     : [];
@@ -235,10 +249,10 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
     : [];
   const obstacleDisciplineCode = firstValue(analysis.model_predictions?.rows[0] ?? {}, ["DISCIPLINE"]);
   const obstacleDisciplineLabel = ({
-    h: "haies",
-    s: "steeple",
-    c: "cross",
-  } as Record<string, string>)[obstacleDisciplineCode] ?? "obstacles";
+    h: d.disciplineHaies,
+    s: d.disciplineSteeple,
+    c: d.disciplineCross,
+  } as Record<string, string>)[obstacleDisciplineCode] ?? d.disciplineObstacles;
   const obstacleIncidentRows = isObstacles
     ? (analysis.model_predictions?.rows ?? [])
         .map((horse, index) => ({
@@ -267,28 +281,24 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
     <section className="subscriber-discipline" aria-labelledby="subscriber-discipline-title">
       <div className="subscriber-section-heading">
         <div>
-          <p className="public-kicker">FACTEURS PROPRES À LA DISCIPLINE</p>
+          <p className="public-kicker">{d.kicker}</p>
           <h2 id="subscriber-discipline-title">
-            {isFlat ? "Repères du plat" : isTrot ? "Repères du trot" : "Repères des obstacles"}
+            {isFlat ? d.titleFlat : isTrot ? d.titleTrot : d.titleObstacles}
           </h2>
           <p>
-            {isFlat
-              ? "Régularité, écart au marché et avantage des stalles lorsque ces données sont disponibles."
-              : isTrot
-              ? "Performance, forme et chevaux les moins exposés à la disqualification."
-              : "Régularité des signaux, outsiders à surveiller et classements du modèle obstacles."}
+            {isFlat ? d.introFlat : isTrot ? d.introTrot : d.introObstacles}
           </p>
         </div>
       </div>
       <div className="subscriber-discipline-grid">
         {disciplineCards.map((card) => {
-          const orderedRows = card.title === "Chevaux sûrs"
+          const orderedRows = card.id === "safe"
             ? lowestMetricFirst(card.rows, card.metricKeys)
             : card.rows;
           const rows = orderedRows.slice(0, 4);
           if (!rows.length) return null;
           return (
-            <article className="subscriber-discipline-card" key={card.title}>
+            <article className="subscriber-discipline-card" key={card.id}>
               <h3>{card.title}</h3>
               <p>{card.description}</p>
               <ol>
@@ -296,11 +306,11 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
                   <li key={`${horseNumber(horse)}-${index}`}>
                     <strong>{horseNumber(horse)}</strong>
                     <span>
-                      {card.title === "Forme récente"
-                        ? horseNameWithoutParenthesizedContent(horse)
-                        : horseName(horse)}
+                      {card.id === "form"
+                        ? horseNameWithoutParenthesizedContent(horse, unknownHorse)
+                        : horseName(horse, unknownHorse)}
                     </span>
-                    <b>{formatMetric(horseMetric(horse, card.metricKeys))}</b>
+                    <b>{formatMetric(horseMetric(horse, card.metricKeys), intlLocale)}</b>
                   </li>
                 ))}
               </ol>
@@ -309,14 +319,14 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
         })}
         {isObstacles && obstacleModelRows.length > 0 && (
           <article className="subscriber-discipline-card">
-            <h3>Classement du modèle obstacles</h3>
-            <p>Scores de classement du modèle dédié, et non probabilités calibrées.</p>
+            <h3>{d.obstacleModelTitle}</h3>
+            <p>{d.obstacleModelDescription}</p>
             <ol>
               {obstacleModelRows.map(({ horse, score }, index) => (
                 <li key={`${horseNumber(horse)}-${index}`}>
                   <strong>{horseNumber(horse)}</strong>
-                  <span>{horseName(horse)}</span>
-                  <b>{formatMetric(String(score))}</b>
+                  <span>{horseName(horse, unknownHorse)}</span>
+                  <b>{formatMetric(String(score), intlLocale)}</b>
                 </li>
               ))}
             </ol>
@@ -324,16 +334,18 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
         )}
         {isObstacles && obstacleFormRows.length > 0 && (
           <article className="subscriber-discipline-card">
-            <h3>Forme en {obstacleDisciplineLabel}</h3>
-            <p>Indice pondéré des performances dans cette spécialité : plus bas est favorable.</p>
+            <h3>{interpolate(d.obstacleFormTitle, { discipline: obstacleDisciplineLabel })}</h3>
+            <p>{d.obstacleFormDescription}</p>
             <ol>
               {obstacleFormRows.map(({ horse, score, success }, index) => (
                 <li key={`obstacle-form-${horseNumber(horse)}-${index}`}>
                   <strong>{horseNumber(horse)}</strong>
-                  <span>{horseName(horse)}</span>
+                  <span>{horseName(horse, unknownHorse)}</span>
                   <b>
-                    {formatMetric(String(score))}
-                    {success !== null && Number.isFinite(success) ? ` · réussite ${formatMetric(String(success))}` : ""}
+                    {formatMetric(String(score), intlLocale)}
+                    {success !== null && Number.isFinite(success)
+                      ? interpolate(d.obstacleSuccess, { value: formatMetric(String(success), intlLocale) })
+                      : ""}
                   </b>
                 </li>
               ))}
@@ -342,44 +354,44 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
         )}
         {isObstacles && obstacleMusicAvailable && (
           <article className="subscriber-discipline-card">
-            <h3>Historique des incidents</h3>
-            <p>Comptage sur la musique disponible : T = chute, A = arrêt. Des arrêts répétés sont un signal de prudence, pas une garantie de résultat.</p>
+            <h3>{d.incidentsTitle}</h3>
+            <p>{d.incidentsDescription}</p>
             {obstacleIncidentRows.length > 0 ? (
               <ol>
                 {obstacleIncidentRows.map(({ horse, falls, stops }, index) => {
                   return (
                     <li key={`obstacle-incident-${horseNumber(horse)}-${index}`}>
                       <strong>{horseNumber(horse)}</strong>
-                      <span>{horseName(horse)}</span>
-                      <b>{stops} arrêt(s) · {falls} chute(s)</b>
+                      <span>{horseName(horse, unknownHorse)}</span>
+                      <b>{interpolate(d.incidentsCount, { stops, falls })}</b>
                     </li>
                   );
                 })}
               </ol>
             ) : (
-              <p className="free-analysis-status">Aucune chute ni aucun arrêt détecté dans les musiques disponibles.</p>
+              <p className="free-analysis-status">{d.incidentsNone}</p>
             )}
           </article>
         )}
         {isFlat && bestPosts.length > 0 && (
           <article className="subscriber-discipline-card subscriber-posts-card">
-            <h3>Stalles favorables</h3>
-            <p>{track || "Hippodrome"}{distance ? ` · ${distance} m` : ""}</p>
-            <div className="subscriber-posts-list" aria-label="Numéros associés aux stalles favorables">
+            <h3>{d.postsTitle}</h3>
+            <p>{track || d.trackFallback}{distance ? ` · ${distance} m` : ""}</p>
+            <div className="subscriber-posts-list" aria-label={d.postsAria}>
               {bestPosts.map((number) => <span key={number}>{number}</span>)}
             </div>
           </article>
         )}
         {!isFlat && fitnessRows.length > 0 && (
           <article className="subscriber-discipline-card">
-            <h3>Condition physique</h3>
-            <p>Indice de forme : les valeurs les plus basses sont les meilleures.</p>
+            <h3>{d.fitnessTitle}</h3>
+            <p>{d.fitnessDescription}</p>
             <ol>
               {fitnessRows.map((horse, index) => (
                 <li key={`${horseNumber(horse)}-${index}`}>
                   <strong>{horseNumber(horse)}</strong>
-                  <span>{horseName(horse)}</span>
-                  <b>{formatMetric(horseMetric(horse, ["Fitness_Adjusted", "Fitness"]))}</b>
+                  <span>{horseName(horse, unknownHorse)}</span>
+                  <b>{formatMetric(horseMetric(horse, ["Fitness_Adjusted", "Fitness"]), intlLocale)}</b>
                 </li>
               ))}
             </ol>
@@ -388,8 +400,12 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
       </div>
       {!isFlat && analysis.handicap && (
         <p className="subscriber-discipline-note">
-          Handicap pris en compte : {analysis.handicap.penalized_count} partant(s) pénalisé(s)
-          {analysis.handicap.distance ? ` · recul de ${analysis.handicap.distance} m` : ""}.
+          {interpolate(d.handicapNote, {
+            count: analysis.handicap.penalized_count,
+            distance: analysis.handicap.distance
+              ? interpolate(d.handicapDistance, { distance: analysis.handicap.distance })
+              : "",
+          })}
         </p>
       )}
     </section>
@@ -397,25 +413,53 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
 }
 
 function SubscriberDashboard() {
-  const { apiFetch } = useAuth();
+  const { apiFetch, profile: accountProfile, session } = useAuth();
+  const { messages, intlLocale } = useI18n();
+  const t = messages.subscribers;
+  const online = useOnlineStatus();
+  const userId = session?.user.id ?? accountProfile?.id ?? null;
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [loadedAt, setLoadedAt] = useState("");
+  const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [parisToday, setParisToday] = useState(todayInParis);
   const [selectedDayOffset, setSelectedDayOffset] = useState(0);
   const requestSequence = useRef(0);
+  const wasOnline = useRef(online);
   const selectedRaceDate = addDays(parisToday, selectedDayOffset);
   const selectedDayLabel = selectedDayOffset === -1
-    ? "Quinté+ d'hier"
+    ? t.dayYesterday
     : selectedDayOffset === 1
-      ? "Quinté+ de demain"
-      : "Quinté+ du jour";
+      ? t.dayTomorrow
+      : t.dayToday;
 
   const loadAnalysis = useCallback(async () => {
     const sequence = ++requestSequence.current;
     setLoading(true);
     setError("");
+    const cacheKey = userId ? offlineKeys.analysis(userId, selectedRaceDate) : null;
+    const timeFormat = new Intl.DateTimeFormat(intlLocale, {
+      timeZone: "Europe/Paris",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const applyCached = async () => {
+      const cached = cacheKey ? await readOffline<Analysis>(cacheKey) : null;
+      if (sequence !== requestSequence.current) return false;
+      if (!cached) return false;
+      setAnalysis(cached.payload);
+      setCachedAt(cached.savedAt);
+      setLoadedAt(timeFormat.format(new Date(cached.savedAt)));
+      return true;
+    };
+    if (!online || !userId) {
+      if (!(await applyCached())) {
+        if (sequence === requestSequence.current) setError(t.loadError);
+      }
+      if (sequence === requestSequence.current) setLoading(false);
+      return;
+    }
     try {
       const response = await apiFetch(`${apiUrl}/api/v1/races/turfomania/quinte/today/analyze`, {
         method: "POST",
@@ -425,22 +469,27 @@ function SubscriberDashboard() {
       });
       const payload = await response.json();
       if (!response.ok) {
-        throw new Error(payload.detail ?? "Impossible de charger l’analyse de la course.");
+        throw new Error(payload.detail ?? "");
       }
       if (sequence !== requestSequence.current) return;
       setAnalysis(payload as Analysis);
-      setLoadedAt(new Intl.DateTimeFormat("fr-FR", {
-        timeZone: "Europe/Paris",
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(new Date()));
+      setCachedAt(null);
+      setLoadedAt(timeFormat.format(new Date()));
+      if (cacheKey) void saveOffline(cacheKey, payload as Analysis);
     } catch (loadError) {
       if (sequence !== requestSequence.current) return;
-      setError(loadError instanceof Error ? loadError.message : "Impossible de charger l’analyse de la course.");
+      if (!(await applyCached())) {
+        setError(loadError instanceof Error && loadError.message ? loadError.message : t.loadError);
+      }
     } finally {
       if (sequence === requestSequence.current) setLoading(false);
     }
-  }, [apiFetch, selectedRaceDate]);
+  }, [apiFetch, online, selectedRaceDate, intlLocale, t.loadError, userId]);
+
+  useEffect(() => {
+    if (online && !wasOnline.current) void loadAnalysis();
+    wasOnline.current = online;
+  }, [online, loadAnalysis]);
 
   useEffect(() => {
     const updateParisDate = () => {
@@ -496,41 +545,49 @@ function SubscriberDashboard() {
   const firstRunner = analysis?.rows[0];
   const venue = firstRunner ? firstValue(firstRunner, ["HIPPODROME", "HIPPO", "TRACK"]) : "";
   const distance = firstRunner ? firstValue(firstRunner, ["DIST.", "DISTANCE"]) : "";
+  const disciplineLabel = analysis
+    ? analysis.race_type === "flat"
+      ? t.disciplines.flat
+      : analysis.race_type === "obstacles"
+        ? t.disciplines.obstacles
+        : t.disciplines.trot
+    : "";
+  const unknownHorse = messages.recommendations.unknownHorse;
 
   return (
     <main className="shell subscriber-shell">
       <SiteNavigation currentPage="subscribers" />
       <header className="subscriber-header">
         <div>
-          <p className="subscriber-eyebrow">RACEX · ESPACE ABONNÉS</p>
-          <h1>Votre tableau de bord Quinté+</h1>
-          <p className="subscriber-date">{raceDateLabel(selectedRaceDate)}</p>
+          <p className="subscriber-eyebrow">{t.eyebrow}</p>
+          <h1>{t.title}</h1>
+          <p className="subscriber-date">{raceDateLabel(selectedRaceDate, intlLocale)}</p>
         </div>
         <div className="subscriber-header-actions">
-          {loadedAt && <span className="subscriber-updated">Données chargées à {loadedAt} · heure de Paris</span>}
+          {loadedAt && <span className="subscriber-updated">{interpolate(t.loadedAt, { time: loadedAt })}</span>}
           {analysis && !loading && !error && (
             <button
               type="button"
               className="subscriber-refresh subscriber-export"
               onClick={exportCurrentRacePdf}
-              title="Ouvre l’impression du navigateur pour enregistrer le document au format PDF."
+              title={t.printTooltip}
             >
-              Imprimer / enregistrer en PDF
+              {t.printCta}
             </button>
           )}
           <button type="button" className="subscriber-refresh" onClick={refreshAnalysis} disabled={loading}>
-            {loading ? "Actualisation…" : "Actualiser"}
+            {loading ? t.refreshing : t.refresh}
           </button>
         </div>
       </header>
-      <div className="subscriber-race-date-switch" role="group" aria-label="Choisir la course à analyser">
+      <div className="subscriber-race-date-switch" role="group" aria-label={t.dateSwitchAria}>
         <button
           type="button"
           className={selectedDayOffset === -1 ? "selected" : ""}
           aria-pressed={selectedDayOffset === -1}
           onClick={() => setSelectedDayOffset(-1)}
         >
-          Quinté+ d’hier
+          {t.dayYesterday}
         </button>
         <button
           type="button"
@@ -538,7 +595,7 @@ function SubscriberDashboard() {
           aria-pressed={selectedDayOffset === 0}
           onClick={() => setSelectedDayOffset(0)}
         >
-          Quinté+ du jour
+          {t.dayToday}
         </button>
         <button
           type="button"
@@ -546,23 +603,35 @@ function SubscriberDashboard() {
           aria-pressed={selectedDayOffset === 1}
           onClick={() => setSelectedDayOffset(1)}
         >
-          Quinté+ de demain
+          {t.dayTomorrow}
         </button>
       </div>
       {selectedDayOffset === 0 && (
-        <p className="subscriber-analysis-notice">
-          L’analyse du Quinté+ du jour, plus fiable que celle préparée la veille, est disponible à partir de 9 h (heure de Paris). Appuyez sur « Actualiser » après 9 h pour la consulter.
+        <p className="subscriber-analysis-notice">{t.notice}</p>
+      )}
+
+      {analysis && (cachedAt !== null || !online) && (
+        <p className="subscriber-offline-banner" role="status">
+          {cachedAt !== null
+            ? interpolate(t.offlineBanner, {
+                time: new Intl.DateTimeFormat(intlLocale, {
+                  timeZone: "Europe/Paris",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }).format(new Date(cachedAt)),
+              })
+            : messages.cache.fromDevice}
         </p>
       )}
 
-      {loading && <section className="subscriber-state" role="status">Chargement de l’analyse enregistrée…</section>}
+      {loading && <section className="subscriber-state" role="status">{t.loading}</section>}
       {!loading && error && (
         <section className="subscriber-state subscriber-error" role="alert">
           <p>{error}</p>
-          <button type="button" className="subscriber-refresh" onClick={refreshAnalysis}>Réessayer</button>
+          <button type="button" className="subscriber-refresh" onClick={refreshAnalysis}>{t.retry}</button>
         </section>
       )}
-      {!loading && !error && !analysis && <section className="subscriber-state">Aucune analyse n’est disponible pour le moment.</section>}
+      {!loading && !error && !analysis && <section className="subscriber-state">{t.empty}</section>}
 
       {analysis && !loading && !error && (
         <>
@@ -579,63 +648,65 @@ function SubscriberDashboard() {
                 <path d="M310 224 437 407h-75l-90-130-91 130h-72l127-181-112-161h75l75 108 76-108h72z" fill="#2ac7ff" />
               </svg>
               <div>
-                <p className="subscriber-eyebrow">RACEX · {selectedDayLabel.toLocaleUpperCase("fr-FR")}</p>
-                <h1>Le journal des courses</h1>
+                <p className="subscriber-eyebrow">{interpolate(t.printEyebrow, { day: selectedDayLabel.toLocaleUpperCase(intlLocale) })}</p>
+                <h1>{t.printTitle}</h1>
                 <p>
-                  {raceDateLabel(selectedRaceDate)}
+                  {raceDateLabel(selectedRaceDate, intlLocale)}
                   {venue && <> · {venue}</>}
                   {distance && <> · {distance}</>}
                   {" · "}
-                  {analysis.race_type === "flat" ? "Plat" : analysis.race_type === "obstacles" ? "Obstacles" : "Trot"}
+                  {disciplineLabel}
                 </p>
               </div>
             </div>
-            <span>Analyse chargée à {loadedAt} · heure de Paris · Modèle {analysis.model_version}</span>
+            <span>{interpolate(t.printLoadedAt, { time: loadedAt, model: analysis.model_version })}</span>
           </header>
 
-          <section className="subscriber-race-summary" aria-label="Résumé de la course">
-            <div><span>COURSE</span><strong>{selectedDayLabel}</strong></div>
-            {venue && <div><span>HIPPODROME</span><strong>{venue}</strong></div>}
-            {distance && <div><span>DISTANCE</span><strong>{distance}</strong></div>}
-            <div><span>PARTANTS ANALYSÉS</span><strong>{analysis.row_count}</strong></div>
-            <div><span>DISCIPLINE</span><strong>{analysis.race_type === "flat" ? "Plat" : analysis.race_type === "obstacles" ? "Obstacles" : "Trot"}</strong></div>
+          <section className="subscriber-race-summary" aria-label={t.summaryAria}>
+            <div><span>{t.summary.race}</span><strong>{selectedDayLabel}</strong></div>
+            {venue && <div><span>{t.summary.venue}</span><strong>{venue}</strong></div>}
+            {distance && <div><span>{t.summary.distance}</span><strong>{distance}</strong></div>}
+            <div><span>{t.summary.runners}</span><strong>{analysis.row_count}</strong></div>
+            <div><span>{t.summary.discipline}</span><strong>{disciplineLabel}</strong></div>
           </section>
 
           <section className="subscriber-non-partants public-widget" aria-labelledby="subscriber-non-partants-title">
             <div>
-              <p className="public-kicker">STATUT AU MOMENT DU RELEVÉ</p>
-              <h2 id="subscriber-non-partants-title">Non-partants</h2>
+              <p className="public-kicker">{t.nonPartants.kicker}</p>
+              <h2 id="subscriber-non-partants-title">{t.nonPartants.title}</h2>
             </div>
             {analysis.non_partant_numbers.length > 0 ? (
-              <ul aria-label="Numéros des chevaux non-partants">
+              <ul aria-label={t.nonPartants.listAria}>
                 {analysis.non_partant_numbers.map((number) => <li key={number}>{number}</li>)}
               </ul>
             ) : (
-              <p>Aucun non-partant détecté au moment du relevé.</p>
+              <p>{t.nonPartants.none}</p>
             )}
           </section>
 
           {leadingHorse && (
             <section className="subscriber-featured public-widget" aria-labelledby="subscriber-pick-title">
               <div className="subscriber-featured-copy">
-                <p className="public-kicker">POINT FORT DU MODÈLE</p>
-                <h2 id="subscriber-pick-title">Favori du moment selon le Modèle d’IA</h2>
+                <p className="public-kicker">{t.featured.kicker}</p>
+                <h2 id="subscriber-pick-title">{t.featured.title}</h2>
                 <p className="subscriber-featured-horse">
-                  N° {firstValue(leadingHorse, numberFields) || "—"}{" "}
-                  <strong>{firstValue(leadingHorse, nameFields) || "Cheval sans nom"}</strong>
+                  {interpolate(t.featured.horse, {
+                    number: firstValue(leadingHorse, numberFields) || "—",
+                    name: firstValue(leadingHorse, nameFields) || unknownHorse,
+                  })}
                 </p>
                 <p className="subscriber-rationale">
-                  Ce cheval est classé premier dans le Model Shortlist selon son deep score décroissant.
-                  {leaderScore !== null && <> Son deep score est de <strong>{displayScore(leaderScore)}</strong>.</>}
-                  {leaderOdds && <> Cote relevée : <strong>{leaderOdds}</strong>.</>}
-                  {leaderForm && <> Musique : <strong>{leaderForm}</strong>.</>}
+                  {t.featured.rationale}
+                  {leaderScore !== null && <> {interpolate(t.featured.rationaleScore, { score: displayScore(leaderScore, intlLocale) })}</>}
+                  {leaderOdds && <> {interpolate(t.featured.rationaleOdds, { odds: leaderOdds })}</>}
+                  {leaderForm && <> {interpolate(t.featured.rationaleForm, { form: leaderForm })}</>}
                 </p>
-                <p className="subscriber-caveat">Classement indicatif fondé sur les données disponibles, sans garantie de résultat.</p>
+                <p className="subscriber-caveat">{t.featured.caveat}</p>
               </div>
               <div className="subscriber-featured-stats">
-                <div><span>DEEP SCORE</span><strong>{displayScore(leaderScore)}</strong></div>
-                <div><span>FAVORI DU MARCHÉ</span><strong>{lowestOdds === undefined ? "—" : lowestOdds.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</strong></div>
-                <div><span>CHEVAUX SHORTLISTÉS</span><strong>{modelShortlistRows.length}</strong></div>
+                <div><span>{t.featured.deepScore}</span><strong>{displayScore(leaderScore, intlLocale)}</strong></div>
+                <div><span>{t.featured.marketFav}</span><strong>{lowestOdds === undefined ? "—" : lowestOdds.toLocaleString(intlLocale, { maximumFractionDigits: 2 })}</strong></div>
+                <div><span>{t.featured.shortlisted}</span><strong>{modelShortlistRows.length}</strong></div>
               </div>
             </section>
           )}
@@ -653,8 +724,8 @@ function SubscriberDashboard() {
 
           {analysis.expert_commentary && (
             <section className="subscriber-expert-pronostic public-widget" aria-labelledby="subscriber-expert-pronostic-title">
-              <p className="public-kicker">PRONOSTIC DES EXPERTS TURFOMANIA</p>
-              <h2 id="subscriber-expert-pronostic-title">Le commentaire des experts</h2>
+              <p className="public-kicker">{t.expert.kicker}</p>
+              <h2 id="subscriber-expert-pronostic-title">{t.expert.title}</h2>
               <p>{analysis.expert_commentary}</p>
             </section>
           )}
@@ -662,21 +733,21 @@ function SubscriberDashboard() {
           <section className="subscriber-composite-scores public-widget" aria-labelledby="subscriber-composite-scores-title">
             <div className="subscriber-section-heading">
               <div>
-                <p className="public-kicker">CLASSEMENT COMPLET</p>
-                <h2 id="subscriber-composite-scores-title">Scores composites de tous les partants</h2>
-                <p>Classés du score composite le plus élevé au plus faible.</p>
+                <p className="public-kicker">{t.composite.kicker}</p>
+                <h2 id="subscriber-composite-scores-title">{t.composite.title}</h2>
+                <p>{t.composite.description}</p>
               </div>
             </div>
             <div className="subscriber-composite-table-wrap">
               <table className="subscriber-composite-table">
                 <thead>
                   <tr>
-                    <th scope="col">Rang</th>
-                    <th scope="col">N°</th>
-                    <th scope="col">Cheval</th>
-                    <th scope="col">Cote</th>
-                    <th scope="col">Forme récente</th>
-                    <th scope="col">Score composite</th>
+                    <th scope="col">{t.composite.rank}</th>
+                    <th scope="col">{t.composite.number}</th>
+                    <th scope="col">{t.composite.horse}</th>
+                    <th scope="col">{t.composite.odds}</th>
+                    <th scope="col">{t.composite.form}</th>
+                    <th scope="col">{t.composite.score}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -684,10 +755,10 @@ function SubscriberDashboard() {
                     <tr key={`${horseNumber(horse)}-${index}`}>
                       <td>{score === null ? "—" : rank + 1}</td>
                       <td>{horseNumber(horse)}</td>
-                      <td>{horseName(horse)}</td>
+                      <td>{horseName(horse, unknownHorse)}</td>
                       <td>{firstValue(horse, oddsFields) || "—"}</td>
                       <td>{firstValue(horse, formFields) || "—"}</td>
-                      <td>{displayScore(score)}</td>
+                      <td>{displayScore(score, intlLocale)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -698,20 +769,16 @@ function SubscriberDashboard() {
           <DisciplineHighlights analysis={analysis} />
 
           <footer className="subscriber-print-footer">
-            <p>
-              Analyse indicative fondée sur les données disponibles au moment du chargement. Les scores,
-              pronostics et cotes peuvent évoluer et ne garantissent aucun résultat ; ce document ne
-              constitue pas un conseil de mise.
-            </p>
+            <p>{t.footer.disclaimer}</p>
             <span>
-              © {new Date().getFullYear()} RaceX · Développé par Georges BODIONG
+              {interpolate(t.footer.credit, { year: new Date().getFullYear() })}
               <br />
-              deebodiong@gmail.com · +22660354400 / +22674911538
+              {t.footer.contact}
             </span>
           </footer>
 
           <details className="subscriber-details public-widget">
-            <summary>Comprendre les signaux et les limites de l’analyse</summary>
+            <summary>{t.methodology.summary}</summary>
             {analysis.race_details && <p className="subscriber-race-details">{analysis.race_details}</p>}
             {analysis.signals.length > 0 && (
               <div className="subscriber-signals">
@@ -723,15 +790,15 @@ function SubscriberDashboard() {
               </div>
             )}
             <ul className="subscriber-methodology">
-              <li>Le classement ci-dessus reflète le score composite disponible pour chaque partant.</li>
-              <li><strong>Pronostic (Prono Flash) :</strong> en plat et en obstacles, il croise les classements de forme (IF), de classe (IC) et de coefficient de réussite (S_COEFF). Les chevaux présents dans la moitié supérieure des trois classements sont prioritaires, puis ceux présents dans deux ; ceux repérés dans un seul peuvent compléter la sélection jusqu’à huit. Au trot, il combine sept indicateurs pondérés : coefficient de réussite (20 %), forme/fitness (15 %), tendance (15 %), risque de disqualification (20 %), cote (15 %), courses récentes (10 %) et ferrure (5 %). Chaque indicateur disponible contribue pour les chevaux figurant dans sa moitié supérieure.</li>
-              <li><strong>Model Shortlist :</strong> classement distinct du Pronostic, établi en triant les chevaux par score Deep décroissant, jusqu’à huit partants. Les scores servent à classer ; ils ne sont pas des probabilités de victoire ou de placé calibrées.</li>
-              <li><strong>Priorité du modèle :</strong> les niveaux Tier indiquent l’ordre dans lequel les règles de sélection du modèle retiennent les chevaux ; Tier 1 est prioritaire. Au trot et en obstacles, Tier 1 correspond à au moins trois votes de sources de modèles, Tier 2 à deux votes, puis les places restantes sont complétées par le score moyen de placé. En plat, Tier 1 regroupe les chevaux ayant au moins trois votes, Tier 2 les deux meilleurs par S_COEFF (ou par score moyen de placé si S_COEFF manque), Tier 3 le meilleur score « dark horse », Tier 4 les autres chevaux ayant deux votes, et Tier 5 complète selon le score moyen de placé. La sélection est plafonnée à six chevaux. Les niveaux ne sont ni des probabilités ni une prédiction garantie de l’ordre d’arrivée ; les chevaux sans tier n’ont pas été retenus dans cette sélection.</li>
-              <li>Les cotes sont des relevés périodiques, pas des données en temps réel.</li>
-              <li>Les signaux peuvent être incomplets ou évoluer avant le départ.</li>
-              {analysis.handicap && <li>Analyse handicap : {analysis.handicap.penalized_count} partant(s) pénalisé(s).</li>}
+              <li>{t.methodology.ranking}</li>
+              <li>{t.methodology.prognosis}</li>
+              <li>{t.methodology.modelShortlist}</li>
+              <li>{t.methodology.priorityTier}</li>
+              <li>{t.methodology.odds}</li>
+              <li>{t.methodology.signals}</li>
+              {analysis.handicap && <li>{interpolate(t.methodology.handicap, { count: analysis.handicap.penalized_count })}</li>}
               {analysis.model_predictions?.message && <li>{analysis.model_predictions.message}</li>}
-              <li>Version du modèle : {analysis.model_version}.</li>
+              <li>{interpolate(t.methodology.modelVersion, { version: analysis.model_version })}</li>
             </ul>
           </details>
         </>

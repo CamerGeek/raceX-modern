@@ -7,6 +7,7 @@ import {
   parsePhoneNumberFromString,
   type CountryCode,
 } from "libphonenumber-js";
+import { useMessages } from "../i18n/provider";
 
 const DEFAULT_COUNTRY: CountryCode = "BF";
 const DEFAULT_PREFERENCES = { country: DEFAULT_COUNTRY, locale: "fr" };
@@ -99,6 +100,7 @@ export function PhoneField({
   onCountryChange,
   onNumberChange,
 }: PhoneFieldProps) {
+  const t = useMessages().phone;
   const countries = useMemo(() => {
     const names = new Intl.DisplayNames([locale], { type: "region" });
     return getCountries()
@@ -118,7 +120,7 @@ export function PhoneField({
   return (
     <div className="account-phone-fields">
       <div>
-        <label htmlFor={`${idPrefix}-country`}>Pays et indicatif</label>
+        <label htmlFor={`${idPrefix}-country`}>{t.countryLabel}</label>
         <select
           id={`${idPrefix}-country`}
           autoComplete="country"

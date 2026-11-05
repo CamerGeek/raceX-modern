@@ -1,22 +1,40 @@
 import type { MetadataRoute } from "next";
+import { localeMeta } from "../i18n/config";
+import { getRequestMessages } from "../i18n/server";
 
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const { locale, messages } = await getRequestMessages();
+  const t = messages.pwa;
+
+  const shortcutIcon = [{ src: "/icons/icon-96.png", sizes: "96x96", type: "image/png" }];
+
   return {
     id: "/",
-    name: "RaceX Analysis Desk",
-    short_name: "RaceX",
-    description: "Horse racing analysis and handicap intelligence.",
+    name: t.name,
+    short_name: t.shortName,
+    description: t.description,
+    lang: localeMeta[locale].htmlLang,
+    dir: "ltr",
     start_url: "/",
     scope: "/",
     display: "standalone",
+    display_override: ["window-controls-overlay", "standalone", "minimal-ui"],
     orientation: "any",
     background_color: "#f3f0e8",
     theme_color: "#103b32",
-    categories: ["sports", "productivity"],
+    categories: ["sports", "news"],
     icons: [
-      { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-      { src: "/icon-maskable.svg", sizes: "any", type: "image/svg+xml", purpose: "maskable" },
+      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      { src: "/icons/maskable-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+      { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icons/monochrome-512.png", sizes: "512x512", type: "image/png", purpose: "monochrome" },
+      { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+    ],
+    shortcuts: [
+      { name: t.shortcutToday, url: "/", icons: shortcutIcon },
+      { name: t.shortcutAccount, url: "/account", icons: shortcutIcon },
+      { name: t.shortcutSubscribers, url: "/subscribers", icons: shortcutIcon },
     ],
   };
 }
