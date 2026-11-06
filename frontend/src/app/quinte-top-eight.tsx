@@ -13,9 +13,11 @@ let todayAnalysisRequest: Promise<QuinteAnalysis> | null = null;
 
 function requestTodayAnalysis() {
   if (!todayAnalysisRequest) {
-    todayAnalysisRequest = fetch(
-      `${apiUrl}/api/v1/races/turfomania/quinte/today/public?date=${parisDate()}`,
-    )
+    todayAnalysisRequest = fetch(`${apiUrl}/api/v1/races/turfomania/quinte/today/public`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: parisDate() }),
+    })
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) {
