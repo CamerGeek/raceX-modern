@@ -333,7 +333,7 @@ const fr = {
       title: "Combinaisons Quinté+",
       description: "Générez le plan des tickets de 5 chevaux à partir de l’analyse enregistrée, ou composez vos propres combinaisons avec le système réducteur intégré.",
       autoTitle: "Plan automatique",
-      autoDescription: "Base issue du Model Shortlist, complétée par le système réducteur intégré. Jusqu’à 50 tickets de 5 chevaux.",
+      autoDescription: "Toutes les combinaisons de 5 chevaux du Model Shortlist, jusqu’à 56 tickets.",
       autoCta: "Générer les combinaisons",
       autoRefresh: "Recalculer",
       generating: "Génération des combinaisons…",

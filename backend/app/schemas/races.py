@@ -35,7 +35,7 @@ class BettingRequest(BaseModel):
     force_refresh: bool = False
     simulations: int = Field(default=5000, ge=100, le=50000)
     combination_size: int = Field(default=5, ge=1, le=20)
-    max_combinations: int = Field(default=50, ge=1, le=500)
+    max_combinations: int = Field(default=56, ge=1, le=500)
     mandatory: list[str] = []
     excluded: list[str] = []
 

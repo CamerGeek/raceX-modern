@@ -335,7 +335,7 @@ const en = {
       title: "Quinté+ combinations",
       description: "Generate the 5-horse ticket plan from the saved analysis, or build your own combinations with the built-in reducing system.",
       autoTitle: "Automatic plan",
-      autoDescription: "Base taken from the Model Shortlist and completed by the built-in reducing system. Up to 50 tickets of 5 horses.",
+      autoDescription: "Every 5-horse combination from the Model Shortlist, up to 56 tickets.",
       autoCta: "Generate combinations",
       autoRefresh: "Recalculate",
       generating: "Generating combinations…",

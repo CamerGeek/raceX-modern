@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
 HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v8"
 RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v3"
-BETTING_CACHE_VERSION = "betting-analysis-v3"
+BETTING_CACHE_VERSION = "betting-analysis-v4"
 PUBLIC_QUINTE_TTL_SECONDS = 300
 
 _public_quinte_cache: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -982,7 +982,7 @@ def combinations(request: BettingRequest, _: dict[str, Any] = Depends(require_ad
 
 
 SUBSCRIBER_COMBINATION_SIZE = 5
-SUBSCRIBER_MAX_COMBINATIONS = 50
+SUBSCRIBER_MAX_COMBINATIONS = 56
 
 
 def _subscriber_quinte_frame(client: SupabaseClientWrapper, race_id: str) -> tuple[pd.DataFrame, dict]:

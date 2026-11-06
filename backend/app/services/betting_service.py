@@ -192,25 +192,23 @@ def _derived_base(
     return base[:target]
 
 
-def _associates_from_shortlist(
+def _shortlist_pool(
     shortlist: list[str],
-    base: list[str],
     substitutes: list[str],
     all_horses: list[str],
-    required: int,
+    combination_size: int,
 ) -> list[str]:
-    """Associates keep every shortlist horse in play, topped up only when the shortlist cannot fill the ticket."""
+    """Play the whole model shortlist, topping up from Plot Twist and starters only when it is too small."""
     eligible = set(all_horses)
-    base_set = set(base)
-    associates = [number for number in dict.fromkeys(shortlist) if number in eligible and number not in base_set]
-    if not associates:
-        return [number for number in all_horses if number not in base_set]
+    pool = [number for number in dict.fromkeys(shortlist) if number in eligible]
+    if not pool:
+        return list(all_horses)
     for number in [*substitutes, *all_horses]:
-        if len(associates) >= required:
+        if len(pool) >= combination_size:
             break
-        if number in eligible and number not in base_set and number not in associates:
-            associates.append(number)
-    return associates
+        if number in eligible and number not in pool:
+            pool.append(number)
+    return pool
 
 
 def _unique_combinations(
@@ -234,7 +232,7 @@ def generate_combination_plan(
     frame: pd.DataFrame,
     race_type: str,
     combination_size: int = 5,
-    max_combinations: int = 50,
+    max_combinations: int = 56,
     mandatory: list[str] | None = None,
     excluded: list[str] | None = None,
     source: str = "turfomania",
@@ -267,11 +265,10 @@ def generate_combination_plan(
 
     if mandatory:
         associates = [horse for horse in all_horses if horse not in base]
+        combinations_result = reducing_system(base, associates, combination_size)
     else:
-        associates = _associates_from_shortlist(
-            shortlist, base, substitutes, all_horses, max(0, combination_size - len(base))
-        )
-    combinations_result = reducing_system(base, associates, combination_size)
+        pool = _shortlist_pool(shortlist, substitutes, all_horses, combination_size)
+        combinations_result = reducing_system([], pool, combination_size)
     return {
         "combinations": _unique_combinations(combinations_result, combination_size, max_combinations),
         "base": base,

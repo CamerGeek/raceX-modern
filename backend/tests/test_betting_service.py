@@ -1,3 +1,5 @@
+import itertools
+
 import pandas as pd
 import pytest
 from fastapi import HTTPException
@@ -57,7 +59,7 @@ def test_plot_twist_requires_more_than_eight_scored_horses() -> None:
     assert betting_service.plot_twist_numbers(descending_field(8)) == []
 
 
-def test_plan_uses_model_shortlist_as_mandatory_base(monkeypatch) -> None:
+def test_plan_reports_the_shortlist_top_three_as_the_base(monkeypatch) -> None:
     monkeypatch.setattr(
         betting_service,
         "analyze_race",
@@ -74,11 +76,10 @@ def test_plan_uses_model_shortlist_as_mandatory_base(monkeypatch) -> None:
     assert plan["base"] == ["6", "3", "14"]
     assert plan["substitutes"] == ["9", "10"]
     assert plan["combinations"]
-    assert all(set(plan["base"]) <= set(combination) for combination in plan["combinations"])
 
 
 @pytest.mark.parametrize("race_type", ["flat", "trot"])
-def test_plan_keeps_every_shortlist_horse_in_the_combinations(monkeypatch, race_type: str) -> None:
+def test_plan_generates_all_combinations_of_the_eight_horse_shortlist(monkeypatch, race_type: str) -> None:
     monkeypatch.setattr(
         betting_service,
         "analyze_race",
@@ -93,14 +94,12 @@ def test_plan_keeps_every_shortlist_horse_in_the_combinations(monkeypatch, race_
 
     plan = betting_service.generate_combination_plan(pd.DataFrame(), race_type)
 
-    assert plan["base"] == ["6", "3", "14"]
-    assert plan["substitutes"] == ["9", "10"]
-    assert len(plan["combinations"]) == 10
+    expected = [str(number) for number in shortlist]
+    assert len(plan["combinations"]) == 56
     assert all(len(combination) == 5 for combination in plan["combinations"])
-    assert all(set(plan["base"]) <= set(combination) for combination in plan["combinations"])
-    assert all(set(combination) <= {str(number) for number in shortlist} for combination in plan["combinations"])
-    covered = {number for combination in plan["combinations"] for number in combination}
-    assert covered == {str(number) for number in shortlist}
+    assert {frozenset(combination) for combination in plan["combinations"]} == {
+        frozenset(combination) for combination in itertools.combinations(expected, 5)
+    }
 
 
 def test_plan_tops_up_associates_when_the_shortlist_cannot_fill_the_ticket(monkeypatch) -> None:
@@ -340,6 +339,6 @@ def test_subscriber_custom_combinations_use_the_reducing_system(monkeypatch) -> 
     )
 
     assert captured["combination_size"] == 5
-    assert captured["max_combinations"] == 50
+    assert captured["max_combinations"] == 56
     assert response["combinations"] == [["2", "5", "1", "3", "4"]]
     assert response["base"] == ["2", "5"]

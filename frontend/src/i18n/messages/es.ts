@@ -335,7 +335,7 @@ const es = {
       title: "Combinaciones Quinté+",
       description: "Genera el plan de boletos de 5 caballos a partir del análisis guardado o crea tus propias combinaciones con el sistema reductor integrado.",
       autoTitle: "Plan automático",
-      autoDescription: "Base tomada del Model Shortlist y completada por el sistema reductor integrado. Hasta 50 boletos de 5 caballos.",
+      autoDescription: "Todas las combinaciones de 5 caballos del Model Shortlist, hasta 56 boletos.",
       autoCta: "Generar combinaciones",
       autoRefresh: "Recalcular",
       generating: "Generando combinaciones…",

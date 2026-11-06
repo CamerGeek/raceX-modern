@@ -239,7 +239,7 @@ def test_betting_analyses_use_cache_unless_admin_forces_refresh(
         else {
             "race_type": "flat",
             "combination_size": 5,
-            "max_combinations": 50,
+            "max_combinations": 56,
             "mandatory": [],
             "excluded": [],
         }
