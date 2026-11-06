@@ -27,6 +27,9 @@ button, input, select { font: inherit; }
 .subscriber-race-summary div { display: grid; align-content: center; gap: .45rem; min-height: 5.1rem; padding: .85rem 1rem; border: 1px solid var(--line); border-radius: .6rem; background: rgba(251, 250, 245, .8); }
 .subscriber-race-summary span, .subscriber-featured-stats span { color: var(--muted); font: 700 .61rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .09em; }
 .subscriber-race-summary strong { color: var(--deep); font: 700 .9rem ui-sans-serif, system-ui, sans-serif; }
+.subscriber-status-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; margin-bottom: 1rem; }
+.subscriber-status-grid > :only-child { grid-column: 1 / -1; }
+.subscriber-status-grid .subscriber-non-partants { margin-bottom: 0; }
 .subscriber-non-partants { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; padding: .8rem 1rem; border-color: rgba(164, 60, 44, .25); background: #fff8f4; }
 .subscriber-non-partants .public-kicker { margin: 0 0 .2rem; color: #a43c2c; }
 .subscriber-non-partants h2 { margin: 0; color: #7d2c20; font: 700 .9rem ui-sans-serif, system-ui, sans-serif; }
@@ -559,6 +562,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 @media (max-width: 900px) { .quinte-picks-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) {
   .quinte-picks-grid { grid-template-columns: 1fr; }
+  .subscriber-status-grid { grid-template-columns: 1fr; }
   .subscriber-insights-grid { grid-template-columns: 1fr; }
   .subscriber-non-partants { align-items: flex-start; flex-direction: column; }
 }

@@ -670,19 +670,22 @@ function SubscriberDashboard() {
             <div><span>{t.summary.discipline}</span><strong>{disciplineLabel}</strong></div>
           </section>
 
-          <section className="subscriber-non-partants public-widget" aria-labelledby="subscriber-non-partants-title">
-            <div>
-              <p className="public-kicker">{t.nonPartants.kicker}</p>
-              <h2 id="subscriber-non-partants-title">{t.nonPartants.title}</h2>
-            </div>
-            {analysis.non_partant_numbers.length > 0 ? (
-              <ul aria-label={t.nonPartants.listAria}>
-                {analysis.non_partant_numbers.map((number) => <li key={number}>{number}</li>)}
-              </ul>
-            ) : (
-              <p>{t.nonPartants.none}</p>
-            )}
-          </section>
+          <div className="subscriber-status-grid">
+            <section className="subscriber-non-partants public-widget" aria-labelledby="subscriber-non-partants-title">
+              <div>
+                <p className="public-kicker">{t.nonPartants.kicker}</p>
+                <h2 id="subscriber-non-partants-title">{t.nonPartants.title}</h2>
+              </div>
+              {analysis.non_partant_numbers.length > 0 ? (
+                <ul aria-label={t.nonPartants.listAria}>
+                  {analysis.non_partant_numbers.map((number) => <li key={number}>{number}</li>)}
+                </ul>
+              ) : (
+                <p>{t.nonPartants.none}</p>
+              )}
+            </section>
+            {analysis.race_type === "trot" && <ShodHorsesCard rows={analysis.rows} />}
+          </div>
 
           {leadingHorse && (
             <section className="subscriber-featured public-widget" aria-labelledby="subscriber-pick-title">
@@ -715,12 +718,6 @@ function SubscriberDashboard() {
             modelPredictions={analysis.model_predictions}
             plotTwistRows={plotTwistRows}
           />
-
-          {analysis.race_type === "trot" && (
-            <div className="subscriber-insights-grid subscriber-insights-grid-single">
-              <ShodHorsesCard rows={analysis.rows} />
-            </div>
-          )}
 
           {analysis.expert_commentary && (
             <section className="subscriber-expert-pronostic public-widget" aria-labelledby="subscriber-expert-pronostic-title">
