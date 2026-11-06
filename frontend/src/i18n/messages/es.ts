@@ -8,7 +8,7 @@ const es = {
     aboutTitle: "Acerca de RaceX",
     aboutDescription: "Descubre RaceX, un espacio dedicado al Quinté+ y al análisis de carreras de caballos.",
     faqTitle: "Preguntas frecuentes",
-    faqDescription: "Respuestas sobre las cuentas, los pagos y la forma en que RaceX elabora sus pronósticos, selecciones de modelos y votos.",
+    faqDescription: "Respuestas sobre cuentas, pagos, RaceX AI y la forma en que RaceX elabora sus pronósticos y combinaciones del Quinté+.",
     privacyTitle: "Privacidad y datos personales",
     privacyDescription: "Cómo RaceX utiliza, protege y conserva los datos vinculados a tu cuenta.",
     notFoundTitle: "Página no encontrada",
@@ -68,7 +68,7 @@ const es = {
   recommendations: {
     pickKicker: "SELECCIÓN DEL DÍA",
     numbersAria: "Números seleccionados: {title}",
-    modelTitle: "Model Shortlist (elección del modelo de IA)",
+    modelTitle: "Model Shortlist (elección de RaceX AI)",
     modelDescription: "Hasta 8 números clasificados por puntuación deep descendente.",
     modelEmptyReady: "El modelo no proporcionó caballos clasificables.",
     modelUnavailable: "El Model Shortlist no está disponible para esta carrera.",
@@ -314,7 +314,7 @@ const es = {
       summary: "Entender las señales y los límites del análisis",
       ranking: "La clasificación anterior refleja la puntuación compuesta disponible para cada participante.",
       prognosis: "Pronóstico (Prono Flash): en liso y obstáculos, cruza las clasificaciones de forma (IF), clase (IC) y coeficiente de éxito (S_COEFF). Tienen prioridad los caballos presentes en la mitad superior de las tres clasificaciones y después los presentes en dos; los detectados en una sola pueden completar la selección hasta ocho. En trote, combina siete indicadores ponderados: coeficiente de éxito (20 %), forma/fitness (15 %), tendencia (15 %), riesgo de descalificación (20 %), cuota (15 %), carreras recientes (10 %) y herrado (5 %). Cada indicador disponible contribuye para los caballos situados en su mitad superior.",
-      modelShortlist: "Model Shortlist: clasificación distinta del Pronóstico, establecida ordenando los caballos por puntuación Deep descendente, hasta ocho participantes. Las puntuaciones sirven para clasificar; no son probabilidades calibradas de victoria ni de puesto.",
+      modelShortlist: "Model Shortlist: clasificación distinta del Pronóstico, establecida por RaceX AI ordenando los caballos por puntuación Deep descendente, hasta ocho participantes. Las puntuaciones sirven para clasificar; no son probabilidades calibradas de victoria ni de puesto.",
       priorityTier: "Prioridad del modelo: los niveles Tier indican el orden en que las reglas de selección del modelo retienen a los caballos; Tier 1 tiene prioridad. En trote y obstáculos, Tier 1 corresponde a al menos tres votos de fuentes del modelo, Tier 2 a dos votos, y las plazas restantes se completan con la puntuación media de puesto. En liso, Tier 1 agrupa a los caballos con al menos tres votos, Tier 2 a los dos mejores por S_COEFF (o por puntuación media de puesto si falta S_COEFF), Tier 3 a la mejor puntuación «dark horse», Tier 4 a los demás caballos con dos votos y Tier 5 completa según la puntuación media de puesto. La selección se limita a seis caballos. Los niveles no son probabilidades ni una predicción garantizada del orden de llegada; los caballos sin tier no fueron retenidos en esta selección.",
       odds: "Las cuotas son registros periódicos, no datos en tiempo real.",
       signals: "Las señales pueden estar incompletas o cambiar antes de la salida.",
@@ -388,7 +388,7 @@ const es = {
   faq: {
     kicker: "RACEX · AYUDA",
     title: "Preguntas frecuentes",
-    intro: "Respuestas a las preguntas más frecuentes sobre RaceX, las cuentas y los análisis.",
+    intro: "Respuestas a las preguntas más frecuentes sobre RaceX, las cuentas, los análisis y las combinaciones.",
     questions: [
       {
         question: "¿Qué puedo consultar sin cuenta?",
@@ -415,12 +415,28 @@ const es = {
         answer: "Para las carreras de liso y obstáculos, RaceX compara las clasificaciones de forma (IF), clase (IC) y coeficiente de éxito (S_COEFF). Tienen prioridad los caballos presentes en la mitad superior de las tres clasificaciones y después los presentes en dos; los detectados en una sola clasificación pueden completar la selección hasta ocho. En trote, el pronóstico se basa en siete indicadores ponderados: coeficiente de éxito (20 %), forma/fitness (15 %), tendencia de forma (15 %), riesgo de descalificación (20 %), cuota (15 %), carreras recientes (10 %) y herrado (5 %). Los indicadores disponibles contribuyen a la puntuación de los caballos que figuran en su primera mitad de clasificación.",
       },
       {
-        question: "¿Cómo se elige el Model Shortlist?",
-        answer: "Es una clasificación distinta del Pronóstico: el modelo de aprendizaje automático clasifica los caballos por puntuación Deep descendente y muestra hasta ocho caballos. Estas puntuaciones sirven para clasificar a los participantes; no son probabilidades calibradas de victoria ni de puesto.",
+        question: "¿Qué es RaceX AI?",
+        answer: "RaceX AI es el nombre que agrupa todos los modelos y algoritmos de selección que utiliza RaceX: el Pronóstico, el Model Shortlist, la detección de caballos Plot Twist y el generador de combinaciones. Estos modelos se presentan ahora bajo este nombre único en la aplicación y su documentación; su detalle técnico interno no se publica.",
       },
       {
-        question: "¿Qué significa el Priority Tier del modelo?",
-        answer: "El Priority Tier indica el orden en que las reglas de selección del modelo retienen a los caballos; Tier 1 tiene prioridad. En trote y obstáculos, Tier 1 corresponde a al menos tres votos de fuentes del modelo, Tier 2 a dos votos, y las plazas restantes se completan con la puntuación media de puesto. En liso, Tier 1 agrupa a los caballos con al menos tres votos, Tier 2 a los dos mejores por S_COEFF (o por puntuación media de puesto si falta S_COEFF), Tier 3 a la mejor puntuación «dark horse», Tier 4 a los demás caballos con dos votos y Tier 5 completa según la puntuación media de puesto. La selección se limita a seis caballos. Los tiers son una regla de preselección, no probabilidades ni una predicción garantizada del orden de llegada. Un caballo sin tier no fue retenido en esta selección.",
+        question: "¿Cómo se elige el Model Shortlist?",
+        answer: "Esta clasificación, distinta del Pronóstico, la elabora RaceX AI: los caballos se ordenan por puntuación Deep descendente y se retienen los ocho primeros. Las puntuaciones sirven únicamente para clasificar a los participantes; no son probabilidades calibradas de victoria ni de puesto.",
+      },
+      {
+        question: "¿Qué significa el Priority Tier de RaceX AI?",
+        answer: "El Priority Tier indica el orden en que las reglas de selección de RaceX AI retienen a los caballos; Tier 1 tiene prioridad. En trote y obstáculos, Tier 1 corresponde a al menos tres votos de fuentes de RaceX AI, Tier 2 a dos votos, y las plazas restantes se completan con la puntuación media de puesto. En liso, Tier 1 agrupa a los caballos con al menos tres votos, Tier 2 a los dos mejores por S_COEFF (o por puntuación media de puesto si falta S_COEFF), Tier 3 a la mejor puntuación «dark horse», Tier 4 a los demás caballos con dos votos y Tier 5 completa según la puntuación media de puesto. La selección se limita a seis caballos. Los tiers son una regla de preselección, no probabilidades ni una predicción garantizada del orden de llegada. Un caballo sin tier no fue retenido en esta selección.",
+      },
+      {
+        question: "¿Qué son los caballos Plot Twist?",
+        answer: "Son participantes clasificados fuera de los ocho primeros del score compuesto cuyo score se mantiene cerca de la media o la mediana (±0,05). RaceX AI los señala como caballos a seguir. También actúan como sustitutos cuando un caballo del Model Shortlist no es participante, y completan la selección si esta tiene menos de cinco caballos disponibles.",
+      },
+      {
+        question: "¿Cómo se generan las combinaciones automáticas?",
+        answer: "RaceX AI toma el Model Shortlist y juega todas las combinaciones de 5 caballos: un shortlist de 8 caballos produce 56 boletos, con un límite de 56. Los tres primeros caballos del shortlist se muestran como base indicativa, pero no se imponen en cada boleto: cada caballo del shortlist aparece en varias combinaciones. El plan se calcula una vez y se sirve desde la caché de la carrera; se recalcula cuando cambian los datos o la versión del plan.",
+      },
+      {
+        question: "¿Puedo componer mis propias combinaciones?",
+        answer: "Sí, desde la pestaña Combinaciones del área de suscriptor. La tarjeta «Mis propias combinaciones» permite elegir una base (hasta 4 caballos presentes en cada boleto) y asociados; el sistema reductor de RaceX AI construye los boletos de 5 caballos, hasta 56. Solo se aceptan participantes: se rechaza un número no participante. Estas combinaciones personalizadas no se guardan en caché y no modifican el plan automático.",
       },
       {
         question: "¿Los análisis de RaceX garantizan una ganancia?",

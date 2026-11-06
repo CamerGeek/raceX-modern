@@ -8,7 +8,7 @@ const en = {
     aboutTitle: "About RaceX",
     aboutDescription: "Discover RaceX, a dedicated space for the Quinté+ and horse racing analysis.",
     faqTitle: "Frequently asked questions",
-    faqDescription: "Answers about accounts, payments and how RaceX builds its predictions, model shortlists and votes.",
+    faqDescription: "Answers about accounts, payments, RaceX AI and how RaceX builds its forecasts and Quinté+ combinations.",
     privacyTitle: "Privacy and personal data",
     privacyDescription: "How RaceX uses, protects and retains the data linked to your account.",
     notFoundTitle: "Page not found",
@@ -68,7 +68,7 @@ const en = {
   recommendations: {
     pickKicker: "TODAY’S SELECTION",
     numbersAria: "Selected numbers: {title}",
-    modelTitle: "Model Shortlist (AI model picks)",
+    modelTitle: "Model Shortlist (RaceX AI picks)",
     modelDescription: "Up to 8 numbers ranked by descending deep score.",
     modelEmptyReady: "The model did not provide any rankable horses.",
     modelUnavailable: "The Model Shortlist is not available for this race.",
@@ -314,7 +314,7 @@ const en = {
       summary: "Understanding the signals and the limits of the analysis",
       ranking: "The ranking above reflects the composite score available for each runner.",
       prognosis: "Forecast (Prono Flash): in flat and jump racing, it cross-references the form (IF), class (IC) and success coefficient (S_COEFF) rankings. Horses in the upper half of all three rankings come first, then those in two; horses flagged by only one ranking can complete the selection, up to eight. In trot racing, it combines seven weighted indicators: success coefficient (20%), form/fitness (15%), trend (15%), disqualification risk (20%), odds (15%), recent races (10%) and shoeing (5%). Each available indicator contributes for the horses in its upper half.",
-      modelShortlist: "Model Shortlist: a ranking distinct from the Forecast, built by sorting horses by descending Deep score, up to eight runners. The scores are used for ranking; they are not calibrated win or place probabilities.",
+      modelShortlist: "Model Shortlist: a ranking distinct from the Forecast, built by RaceX AI sorting horses by descending Deep score, up to eight runners. The scores are used for ranking; they are not calibrated win or place probabilities.",
       priorityTier: "Model priority: Tier levels show the order in which the model’s selection rules retain horses; Tier 1 comes first. In trot and jump racing, Tier 1 corresponds to at least three votes from model sources, Tier 2 to two votes, then the remaining places are filled by the average place score. In flat racing, Tier 1 groups horses with at least three votes, Tier 2 the two best by S_COEFF (or by average place score when S_COEFF is missing), Tier 3 the best dark-horse score, Tier 4 the other horses with two votes, and Tier 5 completes by average place score. The selection is capped at six horses. Tiers are a shortlist rule, not probabilities or a guaranteed prediction of the finishing order; horses without a tier were not retained in this selection.",
       odds: "Odds are periodic captures, not real-time data.",
       signals: "Signals may be incomplete or change before the start.",
@@ -388,7 +388,7 @@ const en = {
   faq: {
     kicker: "RACEX · HELP",
     title: "Frequently asked questions",
-    intro: "Answers to the most common questions about RaceX, accounts and analysis.",
+    intro: "Answers to the most common questions about RaceX, accounts, analysis and combinations.",
     questions: [
       {
         question: "What can I view without an account?",
@@ -415,12 +415,28 @@ const en = {
         answer: "For flat and jump races, RaceX compares the form (IF), class (IC) and success coefficient (S_COEFF) rankings. Horses in the upper half of all three rankings come first, then those in two; horses flagged by only one ranking can complete the selection, up to eight. In trot racing, the forecast relies on seven weighted indicators: success coefficient (20%), form/fitness (15%), form trend (15%), disqualification risk (20%), odds (15%), recent races (10%) and shoeing (5%). Available indicators contribute to the score of horses in their first half of the ranking.",
       },
       {
-        question: "How is the Model Shortlist chosen?",
-        answer: "It is a ranking distinct from the Forecast: the machine-learning model ranks horses by descending Deep score and shows up to eight horses. These scores are used to rank runners; they are not calibrated win or place probabilities.",
+        question: "What is RaceX AI?",
+        answer: "RaceX AI is the umbrella name for all the selection models and algorithms used by RaceX: the Forecast, the Model Shortlist, Plot Twist detection and the combination generator. These models are now presented under this single name in the app and its documentation; their internal technical details are not published.",
       },
       {
-        question: "What does the model’s Priority Tier mean?",
-        answer: "The Priority Tier shows the order in which the model’s selection rules retain horses; Tier 1 comes first. In trot and jump racing, Tier 1 corresponds to at least three votes from model sources, Tier 2 to two votes, then the remaining places are filled by the average place score. In flat racing, Tier 1 groups horses with at least three votes, Tier 2 the two best by S_COEFF (or by average place score when S_COEFF is missing), Tier 3 the best dark-horse score, Tier 4 the other horses with two votes, and Tier 5 completes by average place score. The selection is capped at six horses. Tiers are a shortlist rule, not probabilities or a guaranteed prediction of the finishing order. A horse without a tier was not retained in this selection.",
+        question: "How is the Model Shortlist chosen?",
+        answer: "This ranking, distinct from the Forecast, is produced by RaceX AI: horses are sorted by descending Deep score and the first eight are kept. The scores are used only to rank runners; they are not calibrated win or place probabilities.",
+      },
+      {
+        question: "What does the RaceX AI Priority Tier mean?",
+        answer: "The Priority Tier shows the order in which RaceX AI’s selection rules retain horses; Tier 1 comes first. In trot and jump racing, Tier 1 corresponds to at least three votes from RaceX AI sources, Tier 2 to two votes, then the remaining places are filled by the average place score. In flat racing, Tier 1 groups horses with at least three votes, Tier 2 the two best by S_COEFF (or by average place score when S_COEFF is missing), Tier 3 the best dark-horse score, Tier 4 the other horses with two votes, and Tier 5 completes by average place score. The selection is capped at six horses. Tiers are a shortlist rule, not probabilities or a guaranteed prediction of the finishing order. A horse without a tier was not retained in this selection.",
+      },
+      {
+        question: "What are Plot Twist horses?",
+        answer: "They are runners ranked outside the composite top eight whose score remains close to the mean or median (±0.05). RaceX AI flags them as horses to watch. They also act as substitutes when a Model Shortlist horse is not a starter, and complete the selection when it has fewer than five available horses.",
+      },
+      {
+        question: "How are the automatic combinations generated?",
+        answer: "RaceX AI takes the Model Shortlist and plays every 5-horse combination: an eight-horse shortlist produces 56 tickets, capped at 56. The top three shortlist horses are shown as an indicative base, but they are not forced into every ticket: each shortlist horse appears in several combinations. The plan is generated once and served from the race cache; it is regenerated when the data or the plan version changes.",
+      },
+      {
+        question: "Can I build my own combinations?",
+        answer: "Yes, from the Combinations tab in the subscriber area. The “My own combinations” card lets you choose a base (up to 4 horses present on every ticket) and associates; the RaceX AI reducing system builds the 5-horse tickets, up to 56. Only starters are accepted: a non-starter number is rejected. These custom combinations are not cached and do not change the automatic plan.",
       },
       {
         question: "Does RaceX analysis guarantee a win?",
