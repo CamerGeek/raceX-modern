@@ -5,7 +5,13 @@ import pytest
 
 from app.api import races
 from app.schemas.races import ModelPredictionResponse, TurfomaniaQuinteAnalysisResponse
-from app.schemas.races import TodayQuinteAnalysisRequest
+
+
+@pytest.fixture(autouse=True)
+def clear_public_quinte_cache():
+    races._public_quinte_cache.clear()
+    yield
+    races._public_quinte_cache.clear()
 
 
 def test_public_quinte_response_only_returns_number_selections(monkeypatch) -> None:
@@ -34,9 +40,7 @@ def test_public_quinte_response_only_returns_number_selections(monkeypatch) -> N
     )
     monkeypatch.setattr(races, "_analyze_today_turfomania_quinte", lambda _: analysis)
 
-    response = races.public_today_turfomania_quinte(
-        TodayQuinteAnalysisRequest(date=date(2026, 10, 8))
-    )
+    response = races._public_today_quinte_payload(date(2026, 10, 8))
 
     assert response["rows"] == [{"N°": "7", "Composite": 0.9}, {"N°": "4", "Composite": 0.8}, {"N°": "2", "Composite": 0.5}]
     assert "prognosis" not in response
@@ -44,6 +48,34 @@ def test_public_quinte_response_only_returns_number_selections(monkeypatch) -> N
     assert "race_id" not in response
     assert "race_details" not in response
     assert all("CHEVAL" not in row for row in response["rows"])
+
+
+def test_public_quinte_payload_is_served_from_ttl_cache(monkeypatch) -> None:
+    analysis = TurfomaniaQuinteAnalysisResponse(
+        race_id="race-id",
+        race_type="flat",
+        source="turfomania",
+        row_count=1,
+        columns=["N°", "Composite"],
+        rows=[{"N°": "4", "Composite": 0.8}],
+        model_version="test",
+        prognosis=[],
+    )
+    calls: list[date] = []
+
+    def fake_analyze(request):
+        calls.append(request.meeting_date)
+        return analysis
+
+    monkeypatch.setattr(races, "_analyze_today_turfomania_quinte", fake_analyze)
+
+    first = races._public_today_quinte_payload(date(2026, 10, 8))
+    second = races._public_today_quinte_payload(date(2026, 10, 8))
+    other_day = races._public_today_quinte_payload(date(2026, 10, 9))
+
+    assert first == second
+    assert other_day["rows"] == first["rows"]
+    assert calls == [date(2026, 10, 8), date(2026, 10, 9)]
 
 
 def test_homepage_analysis_cache_is_rejected_when_runner_data_is_newer() -> None:
@@ -156,14 +188,19 @@ def test_date_cache_returns_newest_analysis_across_duplicate_meetings() -> None:
     class Client:
         def list(self, table, *, filters, **kwargs):
             if table == "races":
-                meeting_id = filters[0][2]
-                race_id = "race-old" if meeting_id == "meeting-old" else "race-new"
-                return [{
-                    "id": race_id,
-                    "source": "turfomania",
-                    "race_type": "flat",
-                    "summary": {"q_plus": True},
-                }]
+                meeting_ids = filters[0][2]
+                if not isinstance(meeting_ids, list):
+                    meeting_ids = [meeting_ids]
+                return [
+                    {
+                        "id": "race-old" if meeting_id == "meeting-old" else "race-new",
+                        "meeting_id": meeting_id,
+                        "source": "turfomania",
+                        "race_type": "flat",
+                        "summary": {"q_plus": True},
+                    }
+                    for meeting_id in meeting_ids
+                ]
             if table == "analysis_runs":
                 race_id = filters[0][2]
                 created_at = "2026-10-09T09:00:00+00:00" if race_id == "race-old" else "2026-10-09T10:00:00+00:00"

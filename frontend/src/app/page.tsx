@@ -1,14 +1,21 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import { Suspense } from "react";
 import QuinteTopEight from "./quinte-top-eight";
 import SiteNavigation from "./site-navigation";
+import { fetchPublicTopEight } from "./race-data";
 import { getRequestMessages } from "../i18n/server";
 import { localeMeta } from "../i18n/config";
 
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
 };
+
+async function TopEightSection() {
+  const initialAnalysis = await fetchPublicTopEight();
+  return <QuinteTopEight initialAnalysis={initialAnalysis} />;
+}
 
 function quinteWidgetDocument(lang: string, offlineNote: string) {
   return `<!doctype html>
@@ -210,7 +217,22 @@ export default async function Home() {
         <p>{t.intro}</p>
       </section>
 
-      <QuinteTopEight />
+      <Suspense
+        fallback={
+          <section className="public-widget free-analysis" aria-labelledby="free-analysis-title" aria-live="polite">
+            <div className="free-analysis-heading">
+              <div>
+                <p className="public-kicker">{messages.topEight.kicker}</p>
+                <h2 id="free-analysis-title">{messages.topEight.title}</h2>
+                <p className="free-analysis-description">{messages.topEight.description}</p>
+              </div>
+            </div>
+            <p className="free-analysis-status" role="status">{messages.topEight.loading}</p>
+          </section>
+        }
+      >
+        <TopEightSection />
+      </Suspense>
 
       <section className="quinte-dashboard" aria-label={t.dashboardAria}>
         <section className="public-widget starters-widget" aria-label={t.startersAria}>

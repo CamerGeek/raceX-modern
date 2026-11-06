@@ -1,6 +1,8 @@
 from datetime import date, datetime, timedelta
 import logging
 import re
+import threading
+import time
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
@@ -27,6 +29,7 @@ from app.services.scraping_service import detect_race_type, detect_turfomania_ra
 from app.services.serialization import dataframe_records
 from app.services.supabase_client import SupabaseClientWrapper
 from app.services.auth_service import require_admin, require_subscriber_features
+from app.services.translation_service import translate_text
 from app.services.turfomania_download import _infer_race_type, parse_turfomania_meeting_url
 from app.services.turfomania_quinte import (
     QUINTE_TOMORROW_URL,
@@ -56,6 +59,10 @@ TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
 HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v8"
 RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v3"
 BETTING_CACHE_VERSION = "betting-analysis-v1"
+PUBLIC_QUINTE_TTL_SECONDS = 60
+
+_public_quinte_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+_public_quinte_lock = threading.Lock()
 
 
 def _saved_frame(client: SupabaseClientWrapper, race_id: str) -> tuple[pd.DataFrame, dict]:
@@ -453,6 +460,18 @@ def analyze_turfomania_quinte(
         raise HTTPException(status_code=502, detail=f"Turfomania Quinté analysis failed: {exc}") from exc
 
 
+def _localize_commentary(
+    response: TurfomaniaQuinteAnalysisResponse,
+    locale: str,
+) -> TurfomaniaQuinteAnalysisResponse:
+    if locale == "fr" or not response.expert_commentary:
+        return response
+    translated = translate_text(response.expert_commentary, locale)
+    if translated == response.expert_commentary:
+        return response
+    return response.model_copy(update={"expert_commentary": translated})
+
+
 @router.post(
     "/turfomania/quinte/today/analyze",
     response_model=TurfomaniaQuinteAnalysisResponse,
@@ -461,7 +480,7 @@ def analyze_today_turfomania_quinte(
     request: TodayQuinteAnalysisRequest,
     _: dict[str, Any] = Depends(require_subscriber_features),
 ) -> TurfomaniaQuinteAnalysisResponse:
-    return _analyze_today_turfomania_quinte(request)
+    return _localize_commentary(_analyze_today_turfomania_quinte(request), request.locale)
 
 
 @router.post(
@@ -477,9 +496,32 @@ def analyze_tomorrow_turfomania_quinte(
     )
 
 
+@router.get("/turfomania/quinte/today/public")
+def public_today_turfomania_quinte(
+    meeting_date: date | None = Query(default=None, alias="date"),
+) -> dict[str, Any]:
+    return _public_today_quinte_payload(meeting_date)
+
+
 @router.post("/turfomania/quinte/today/public")
-def public_today_turfomania_quinte(request: TodayQuinteAnalysisRequest) -> dict[str, Any]:
-    analysis = _analyze_today_turfomania_quinte(request)
+def public_today_turfomania_quinte_post(
+    request: TodayQuinteAnalysisRequest,
+) -> dict[str, Any]:
+    return _public_today_quinte_payload(request.meeting_date)
+
+
+def _public_today_quinte_payload(meeting_date: date | None) -> dict[str, Any]:
+    target_date = meeting_date or _paris_today()
+    cache_key = target_date.isoformat()
+    started_at = time.monotonic()
+    with _public_quinte_lock:
+        entry = _public_quinte_cache.get(cache_key)
+        if entry and started_at - entry[0] < PUBLIC_QUINTE_TTL_SECONDS:
+            return entry[1]
+
+    analysis = _analyze_today_turfomania_quinte(
+        TodayQuinteAnalysisRequest(date=target_date)
+    )
 
     def numeric_score(value: Any, fallback: float = -1.0) -> float:
         try:
@@ -507,15 +549,31 @@ def public_today_turfomania_quinte(request: TodayQuinteAnalysisRequest) -> dict[
         if number:
             public_rows.append({"N°": number, "Composite": horse.get("Composite")})
 
-    return {
+    payload = {
         "race_type": analysis.race_type,
         "row_count": analysis.row_count,
         "rows": public_rows,
     }
+    with _public_quinte_lock:
+        _public_quinte_cache.clear()
+        _public_quinte_cache[cache_key] = (started_at, payload)
+    return payload
 
 
 def _paris_today() -> date:
     return datetime.now(ZoneInfo("Europe/Paris")).date()
+
+
+def _races_for_meetings(
+    client: SupabaseClientWrapper,
+    meetings: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    meeting_ids = [meeting["id"] for meeting in meetings]
+    if not meeting_ids:
+        return []
+    if len(meeting_ids) == 1:
+        return client.list("races", filters=[("meeting_id", "eq", meeting_ids[0])], limit=500)
+    return client.list("races", filters=[("meeting_id", "in", meeting_ids)], limit=1000)
 
 
 def _analyze_today_turfomania_quinte(
@@ -645,34 +703,28 @@ def _reanalyze_saved_homepage_quinte(
     client: SupabaseClientWrapper,
     meetings: list[dict[str, Any]],
 ) -> TurfomaniaQuinteAnalysisResponse | None:
-    for meeting in meetings:
-        races = client.list(
-            "races",
-            filters=[("meeting_id", "eq", meeting["id"])],
-            limit=500,
-        )
-        for race in races:
-            summary = race.get("summary") or {}
-            if race.get("source") != "turfomania" or not summary.get("q_plus"):
-                continue
-            race_type = race.get("race_type")
-            if not _runner_table_for_race(race_type):
-                continue
+    for race in _races_for_meetings(client, meetings):
+        summary = race.get("summary") or {}
+        if race.get("source") != "turfomania" or not summary.get("q_plus"):
+            continue
+        race_type = race.get("race_type")
+        if not _runner_table_for_race(race_type):
+            continue
 
-            frame, saved_race = _saved_frame(client, race["id"])
-            response = _analysis_response(
-                frame,
-                race_type=saved_race["race_type"],
-                source="turfomania",
-                include_handicap=True,
-                max_horses=8,
-            )
-            result = TurfomaniaQuinteAnalysisResponse(
-                **response.model_dump(),
-                race_id=race["id"],
-            )
-            _store_homepage_quinte_analysis(client, result)
-            return result
+        frame, saved_race = _saved_frame(client, race["id"])
+        response = _analysis_response(
+            frame,
+            race_type=saved_race["race_type"],
+            source="turfomania",
+            include_handicap=True,
+            max_horses=8,
+        )
+        result = TurfomaniaQuinteAnalysisResponse(
+            **response.model_dump(),
+            race_id=race["id"],
+        )
+        _store_homepage_quinte_analysis(client, result)
+        return result
     return None
 
 
@@ -693,22 +745,17 @@ def _cached_homepage_quinte_for_date(
     cached_candidates: list[
         tuple[datetime, TurfomaniaQuinteAnalysisResponse]
     ] = []
-    for meeting in meeting_rows:
-        for race in client.list(
-            "races",
-            filters=[("meeting_id", "eq", meeting["id"])],
-            limit=500,
-        ):
-            summary = race.get("summary") or {}
-            if race.get("source") == "turfomania" and summary.get("q_plus"):
-                cached = _homepage_quinte_cache_entry(
-                    client,
-                    race["id"],
-                    race.get("race_type"),
-                    require_fresh=True,
-                )
-                if cached:
-                    cached_candidates.append(cached)
+    for race in _races_for_meetings(client, meeting_rows):
+        summary = race.get("summary") or {}
+        if race.get("source") == "turfomania" and summary.get("q_plus"):
+            cached = _homepage_quinte_cache_entry(
+                client,
+                race["id"],
+                race.get("race_type"),
+                require_fresh=True,
+            )
+            if cached:
+                cached_candidates.append(cached)
     if not cached_candidates:
         return None
     return max(cached_candidates, key=lambda candidate: candidate[0])[1]

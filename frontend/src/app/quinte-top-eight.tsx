@@ -1,41 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "./auth-context";
 import { offlineKeys, readOffline, saveOffline } from "./offline-data";
+import { apiUrl, parisDate, type Horse, type QuinteAnalysis } from "./race-data";
 import { interpolate } from "../i18n/format";
 import { useI18n } from "../i18n/provider";
 
-type Horse = Record<string, string | number | boolean | null>;
-
-type QuinteAnalysis = {
-  race_type: "flat" | "trot";
-  row_count: number;
-  rows: Horse[];
-};
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const scoreFields = ["Composite", "COMPOSITE_SCORE", "SCORE", "CS_norm", "Score"];
 const numberFields = ["N°", "N", "Numero", "NUMERO", "NUM"];
 
 let todayAnalysisRequest: Promise<QuinteAnalysis> | null = null;
 
-function localDate() {
-  return new Intl.DateTimeFormat("fr-CA", {
-    timeZone: "Europe/Paris",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
-
 function requestTodayAnalysis() {
   if (!todayAnalysisRequest) {
-    todayAnalysisRequest = fetch(`${apiUrl}/api/v1/races/turfomania/quinte/today/public`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: localDate() }),
-    })
+    todayAnalysisRequest = fetch(
+      `${apiUrl}/api/v1/races/turfomania/quinte/today/public?date=${parisDate()}`,
+    )
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) {
@@ -70,19 +50,23 @@ function topEight(rows: Horse[]) {
     .slice(0, 8);
 }
 
-export default function QuinteTopEight() {
-  const { loading: authLoading } = useAuth();
+export default function QuinteTopEight({ initialAnalysis = null }: { initialAnalysis?: QuinteAnalysis | null }) {
   const { messages, intlLocale } = useI18n();
   const t = messages.topEight;
-  const [analysis, setAnalysis] = useState<QuinteAnalysis | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [analysis, setAnalysis] = useState<QuinteAnalysis | null>(initialAnalysis);
+  const [loading, setLoading] = useState(initialAnalysis === null);
   const [error, setError] = useState("");
   const [cachedAt, setCachedAt] = useState<number | null>(null);
 
   useEffect(() => {
-    if (authLoading) return;
+    if (!initialAnalysis) return;
+    void saveOffline(offlineKeys.topEight(parisDate()), initialAnalysis);
+  }, [initialAnalysis]);
 
-    const cacheKey = offlineKeys.topEight(localDate());
+  useEffect(() => {
+    if (initialAnalysis) return;
+
+    const cacheKey = offlineKeys.topEight(parisDate());
     let active = true;
     requestTodayAnalysis()
       .then((result) => {
@@ -107,12 +91,12 @@ export default function QuinteTopEight() {
     return () => {
       active = false;
     };
-  }, [authLoading, t.error]);
+  }, [initialAnalysis, t.error]);
 
   async function retry() {
     setLoading(true);
     setError("");
-    const cacheKey = offlineKeys.topEight(localDate());
+    const cacheKey = offlineKeys.topEight(parisDate());
     try {
       const result = await requestTodayAnalysis();
       setAnalysis(result);
@@ -158,7 +142,7 @@ export default function QuinteTopEight() {
 
       {loading && (
         <p className="free-analysis-status" role="status">
-          {authLoading ? t.checking : t.loading}
+          {t.loading}
         </p>
       )}
       {!loading && error && (

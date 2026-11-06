@@ -414,7 +414,7 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
 
 function SubscriberDashboard() {
   const { apiFetch, profile: accountProfile, session } = useAuth();
-  const { messages, intlLocale } = useI18n();
+  const { messages, intlLocale, locale } = useI18n();
   const t = messages.subscribers;
   const online = useOnlineStatus();
   const userId = session?.user.id ?? accountProfile?.id ?? null;
@@ -464,7 +464,7 @@ function SubscriberDashboard() {
       const response = await apiFetch(`${apiUrl}/api/v1/races/turfomania/quinte/today/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: selectedRaceDate }),
+        body: JSON.stringify({ date: selectedRaceDate, locale }),
         cache: "no-store",
       });
       const payload = await response.json();
@@ -484,7 +484,7 @@ function SubscriberDashboard() {
     } finally {
       if (sequence === requestSequence.current) setLoading(false);
     }
-  }, [apiFetch, online, selectedRaceDate, intlLocale, t.loadError, userId]);
+  }, [apiFetch, online, selectedRaceDate, intlLocale, locale, t.loadError, userId]);
 
   useEffect(() => {
     if (online && !wasOnline.current) void loadAnalysis();

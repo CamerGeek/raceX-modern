@@ -39,6 +39,8 @@ class SupabaseClientWrapper:
         for column, operator, value in filters or []:
             if operator == "eq":
                 query = query.eq(column, value)
+            elif operator == "in":
+                query = query.in_(column, value)
             else:
                 raise ValueError(f"Unsupported filter operator: {operator}")
         if order_by:

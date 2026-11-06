@@ -26,6 +26,7 @@ class TurfomaniaQuinteAnalysisRequest(BaseModel):
 
 class TodayQuinteAnalysisRequest(BaseModel):
     meeting_date: date | None = Field(default=None, alias="date")
+    locale: Literal["fr", "en", "es"] = "fr"
 
 
 class BettingRequest(BaseModel):

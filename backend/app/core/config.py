@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     chariow_weekly_product_id: str = "prd_czkpuc2g"
     chariow_annual_product_id: str = "prd_4f2ld5qj"
     chariow_return_url: str = "http://localhost:3000/account?payment=complete"
+    deepl_api_key: str = ""
+    deepl_api_url: str = ""
+    google_translate_url: str = "https://clients5.google.com/translate_a/t"
+    translation_timeout_seconds: int = 10
 
     model_config = SettingsConfigDict(
         env_file=".env",
