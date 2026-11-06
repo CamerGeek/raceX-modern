@@ -211,6 +211,8 @@ function AdminPageContent() {
   const [reportTab, setReportTab] = useState("overview");
   const [simulationRows, setSimulationRows] = useState<SimulationRow[]>([]);
   const [combinations, setCombinations] = useState<string[][]>([]);
+  const [combinationBase, setCombinationBase] = useState<string[]>([]);
+  const [combinationSubstitutes, setCombinationSubstitutes] = useState<string[]>([]);
   const [bettingLoading, setBettingLoading] = useState(false);
   const [bettingError, setBettingError] = useState("");
 
@@ -550,7 +552,11 @@ function AdminPageContent() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail ?? `${tab} failed`);
       if (tab === "simulation") setSimulationRows(payload.rows ?? []);
-      else setCombinations(payload.combinations ?? []);
+      else {
+        setCombinations(payload.combinations ?? []);
+        setCombinationBase(payload.base ?? []);
+        setCombinationSubstitutes(payload.substitutes ?? []);
+      }
     } catch (requestError) {
       setBettingError(requestError instanceof Error ? requestError.message : `${tab} failed`);
     } finally {
@@ -720,7 +726,7 @@ function AdminPageContent() {
             }); })()}</div></div>
             </>}
             {reportTab === "simulation" && <div className="report-section"><div className="section-title"><span>MC</span><h3>Monte Carlo simulation</h3><p>5,000 simulated race orders</p><button type="button" className="cache-refresh-button" onClick={() => void loadBettingTab("simulation", true)} disabled={bettingLoading}>Recalculate</button></div>{bettingLoading && <p className="muted-result">Running simulation...</p>}{bettingError && <p className="error">{bettingError}</p>}{!bettingLoading && !bettingError && <><div className="table-scroll-hint" aria-hidden="true">Swipe to see all columns <span>→</span></div><div className="table-wrap"><table><thead><tr><th>Horse</th><th>Win probability</th><th>Top-3 probability</th><th>Average rank</th></tr></thead><tbody>{simulationRows.slice(0, 16).map((horse, index) => <tr key={`sim-${index}`}><td>{field(horse, ["N°", "N"], "-")} / {field(horse, ["Cheval", "CHEVAL"], "Unknown")}</td><td>{(horse.win_probability * 100).toFixed(1)}%</td><td>{(horse.podium_probability * 100).toFixed(1)}%</td><td>{horse.average_simulated_rank.toFixed(2)}</td></tr>)}</tbody></table></div></>}</div>}
-            {reportTab === "combinations" && <div className="report-section"><div className="section-title"><span>COMB</span><h3>Generated combinations</h3><p>{combinations.length} tickets / 5 horses</p><button type="button" className="cache-refresh-button" onClick={() => void loadBettingTab("combinations", true)} disabled={bettingLoading}>Recalculate</button></div>{bettingLoading && <p className="muted-result">Generating combinations...</p>}{bettingError && <p className="error">{bettingError}</p>}{!bettingLoading && !bettingError && <div className="combination-grid">{combinations.map((combination, index) => <div className="combination-row" key={`combo-${index}`}><strong>{String(index + 1).padStart(2, "0")}</strong>{combination.map((horse) => <span key={horse}>{horse}</span>)}</div>)}</div>}</div>}
+            {reportTab === "combinations" && <div className="report-section"><div className="section-title"><span>COMB</span><h3>Generated combinations</h3><p>{combinations.length} tickets / 5 horses</p><button type="button" className="cache-refresh-button" onClick={() => void loadBettingTab("combinations", true)} disabled={bettingLoading}>Recalculate</button></div>{bettingLoading && <p className="muted-result">Generating combinations...</p>}{bettingError && <p className="error">{bettingError}</p>}{!bettingLoading && !bettingError && <><p className="muted-result">Base (Model Shortlist): {combinationBase.length > 0 ? combinationBase.join(" · ") : "—"}{combinationSubstitutes.length > 0 && <> — Substitutes (Plot Twist): {combinationSubstitutes.join(" · ")}</>}</p><div className="combination-grid">{combinations.map((combination, index) => <div className="combination-row" key={`combo-${index}`}><strong>{String(index + 1).padStart(2, "0")}</strong>{combination.map((horse) => <span key={horse}>{horse}</span>)}</div>)}</div></>}</div>}
             {reportTab === "overview" && <>
             <div className="report-section"><div className="section-title"><span>02</span><h3>Handicap mechanics</h3><p>Distance and penalty signals</p></div><div className="handicap-panel"><strong>{analysis.handicap?.distance ? `${analysis.handicap.distance}m handicap` : "No distance handicap detected"}</strong><span>{analysis.handicap ? `${analysis.handicap.penalized_count} runners carry a penalty` : "The field is compared without a distance adjustment."}</span></div></div>
             </>}

@@ -40,6 +40,11 @@ class BettingRequest(BaseModel):
     excluded: list[str] = []
 
 
+class CustomCombinationRequest(BaseModel):
+    base: list[str] = Field(min_length=1, max_length=8)
+    associates: list[str] = Field(default_factory=list, max_length=30)
+
+
 class RaceResponse(BaseModel):
     race_type: str
     source: str

@@ -10,6 +10,7 @@ import QuinteRecommendations, {
 } from "../quinte-recommendations";
 import SiteNavigation from "../site-navigation";
 import AccessGate from "../access-gate";
+import CombinationsPanel from "./combinations-panel";
 import { useAuth } from "../auth-context";
 import { offlineKeys, readOffline, saveOffline } from "../offline-data";
 import { useOnlineStatus } from "../use-online-status";
@@ -425,6 +426,7 @@ function SubscriberDashboard() {
   const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [parisToday, setParisToday] = useState(todayInParis);
   const [selectedDayOffset, setSelectedDayOffset] = useState(0);
+  const [dashboardTab, setDashboardTab] = useState<"analysis" | "combinations">("analysis");
   const requestSequence = useRef(0);
   const wasOnline = useRef(online);
   const selectedRaceDate = addDays(parisToday, selectedDayOffset);
@@ -565,7 +567,7 @@ function SubscriberDashboard() {
         </div>
         <div className="subscriber-header-actions">
           {loadedAt && <span className="subscriber-updated">{interpolate(t.loadedAt, { time: loadedAt })}</span>}
-          {analysis && !loading && !error && (
+          {analysis && !loading && !error && dashboardTab === "analysis" && (
             <button
               type="button"
               className="subscriber-refresh subscriber-export"
@@ -610,6 +612,29 @@ function SubscriberDashboard() {
         <p className="subscriber-analysis-notice">{t.notice}</p>
       )}
 
+      {analysis && !error && (
+        <div className="report-tabs subscriber-report-tabs" role="tablist" aria-label={t.combinations.tabsAria}>
+          <button
+            type="button"
+            role="tab"
+            className={dashboardTab === "analysis" ? "active" : ""}
+            aria-selected={dashboardTab === "analysis"}
+            onClick={() => setDashboardTab("analysis")}
+          >
+            {t.combinations.tabAnalysis}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            className={dashboardTab === "combinations" ? "active" : ""}
+            aria-selected={dashboardTab === "combinations"}
+            onClick={() => setDashboardTab("combinations")}
+          >
+            {t.combinations.tabCombinations}
+          </button>
+        </div>
+      )}
+
       {analysis && (cachedAt !== null || !online) && (
         <p className="subscriber-offline-banner" role="status">
           {cachedAt !== null
@@ -633,7 +658,7 @@ function SubscriberDashboard() {
       )}
       {!loading && !error && !analysis && <section className="subscriber-state">{t.empty}</section>}
 
-      {analysis && !loading && !error && (
+      {analysis && !loading && !error && dashboardTab === "analysis" && (
         <>
           <header className="subscriber-print-masthead">
             <div className="subscriber-print-brand">
@@ -799,6 +824,15 @@ function SubscriberDashboard() {
             </ul>
           </details>
         </>
+      )}
+      {analysis && !loading && !error && dashboardTab === "combinations" && (
+        <CombinationsPanel
+          key={selectedRaceDate}
+          analysis={analysis}
+          plotTwistRows={plotTwistRows}
+          apiFetch={apiFetch}
+          online={online}
+        />
       )}
       <QuinteOddsChart meetingDate={selectedRaceDate} />
     </main>

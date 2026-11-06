@@ -290,22 +290,26 @@ def test_betting_analyses_use_cache_unless_admin_forces_refresh(
     def compute(*_args, **_kwargs):
         nonlocal compute_calls
         compute_calls += 1
-        return [{"fresh": True}]
+        if analysis_kind == "simulation":
+            return [{"fresh": True}]
+        return {"combinations": [{"fresh": True}], "base": ["4"], "substitutes": []}
 
     monkeypatch.setattr(races, "simulate_race", compute)
-    monkeypatch.setattr(races, "generate_combinations", compute)
+    monkeypatch.setattr(races, "generate_combination_plan", compute)
     request = BettingRequest(race_id="race-id", race_type="flat", force_refresh=force_refresh)
     if analysis_kind == "simulation":
         response = races.simulate(request)
     else:
         response = races.combinations(request)
 
+    refreshed_result = (
+        {**cached_result, "rows": [{"fresh": True}]}
+        if analysis_kind == "simulation"
+        else {**cached_result, "combinations": [{"fresh": True}], "base": ["4"], "substitutes": []}
+    )
     assert compute_calls == int(force_refresh)
     assert len(client.inserted) == int(force_refresh)
-    assert response == (cached_result if not force_refresh else {
-        **cached_result,
-        "rows" if analysis_kind == "simulation" else "combinations": [{"fresh": True}],
-    })
+    assert response == (cached_result if not force_refresh else refreshed_result)
 
 
 def test_detect_type_rejects_meeting_level_turfomania_url() -> None:

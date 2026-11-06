@@ -14,13 +14,18 @@ from app.schemas.races import (
     AnalysisRequest,
     AnalysisResponse,
     BettingRequest,
+    CustomCombinationRequest,
     RaceResponse,
     ScrapeRequest,
     TodayQuinteAnalysisRequest,
     TurfomaniaQuinteAnalysisRequest,
     TurfomaniaQuinteAnalysisResponse,
 )
-from app.services.betting_service import generate_combinations, simulate_race
+from app.services.betting_service import (
+    generate_combination_plan,
+    generate_custom_combinations,
+    simulate_race,
+)
 from app.services.analysis_service import analyze_race
 from app.services.model_prediction_service import predict_race as predict_model_race
 from app.services.meeting_persistence import FLAT_TABLE, TROT_TABLE, persist_scraped_meeting
@@ -58,7 +63,7 @@ logger = logging.getLogger(__name__)
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
 HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v8"
 RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v3"
-BETTING_CACHE_VERSION = "betting-analysis-v1"
+BETTING_CACHE_VERSION = "betting-analysis-v2"
 PUBLIC_QUINTE_TTL_SECONDS = 300
 
 _public_quinte_cache: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -941,8 +946,23 @@ def combinations(request: BettingRequest, _: dict[str, Any] = Depends(require_ad
         )
         if cached is not None:
             return cached
-        combos = generate_combinations(frame, race["race_type"], request.combination_size, request.max_combinations, request.mandatory, request.excluded)
-        result = {"race_id": request.race_id, "race_type": race["race_type"], "combination_size": request.combination_size, "combinations": combos}
+        plan = generate_combination_plan(
+            frame,
+            race["race_type"],
+            request.combination_size,
+            request.max_combinations,
+            request.mandatory,
+            request.excluded,
+            source=str(race.get("source") or "turfomania"),
+        )
+        result = {
+            "race_id": request.race_id,
+            "race_type": race["race_type"],
+            "combination_size": request.combination_size,
+            "base": plan["base"],
+            "substitutes": plan["substitutes"],
+            "combinations": plan["combinations"],
+        }
         if runner_table:
             _store_cached_result(
                 client,
@@ -959,6 +979,116 @@ def combinations(request: BettingRequest, _: dict[str, Any] = Depends(require_ad
         raise
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Combination generation failed: {exc}") from exc
+
+
+SUBSCRIBER_COMBINATION_SIZE = 5
+SUBSCRIBER_MAX_COMBINATIONS = 50
+
+
+def _subscriber_quinte_frame(client: SupabaseClientWrapper, race_id: str) -> tuple[pd.DataFrame, dict]:
+    frame, race = _saved_frame(client, race_id)
+    summary = race.get("summary") or {}
+    if race.get("source") != "turfomania" or not summary.get("q_plus"):
+        raise HTTPException(status_code=404, detail="Combinations are only available for a Turfomania Quinté+ race")
+    return frame, race
+
+
+@router.post("/{race_id}/combinations")
+def subscriber_combinations(
+    race_id: str,
+    _: dict[str, Any] = Depends(require_subscriber_features),
+) -> dict[str, Any]:
+    """Serve the cached Quinté+ combination plan, generating it once when needed."""
+    try:
+        client = SupabaseClientWrapper()
+        frame, race = _subscriber_quinte_frame(client, race_id)
+        options = {
+            "race_type": race["race_type"],
+            "combination_size": SUBSCRIBER_COMBINATION_SIZE,
+            "max_combinations": SUBSCRIBER_MAX_COMBINATIONS,
+            "mandatory": [],
+            "excluded": [],
+        }
+        runner_table = _runner_table_for_race(race["race_type"])
+        cached = (
+            _cached_result(
+                client,
+                race_id=race_id,
+                runner_table=runner_table,
+                cache_version=BETTING_CACHE_VERSION,
+                cache_kind="combinations",
+                options=options,
+            )
+            if runner_table
+            else None
+        )
+        if cached is not None:
+            return cached
+        plan = generate_combination_plan(
+            frame,
+            race["race_type"],
+            SUBSCRIBER_COMBINATION_SIZE,
+            SUBSCRIBER_MAX_COMBINATIONS,
+            source=str(race.get("source") or "turfomania"),
+        )
+        result = {
+            "race_id": race_id,
+            "race_type": race["race_type"],
+            "combination_size": SUBSCRIBER_COMBINATION_SIZE,
+            "base": plan["base"],
+            "substitutes": plan["substitutes"],
+            "combinations": plan["combinations"],
+        }
+        if runner_table:
+            _store_cached_result(
+                client,
+                race_id=race_id,
+                runner_table=runner_table,
+                model_version=BETTING_CACHE_VERSION,
+                cache_version=BETTING_CACHE_VERSION,
+                cache_kind="combinations",
+                options=options,
+                result=result,
+            )
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Combination generation failed: {exc}") from exc
+
+
+@router.post("/{race_id}/combinations/custom")
+def subscriber_custom_combinations(
+    race_id: str,
+    request: CustomCombinationRequest,
+    _: dict[str, Any] = Depends(require_subscriber_features),
+) -> dict[str, Any]:
+    """Generate subscriber-chosen tickets with the built-in reducing system."""
+    try:
+        client = SupabaseClientWrapper()
+        frame, race = _subscriber_quinte_frame(client, race_id)
+        plan = generate_custom_combinations(
+            frame,
+            race["race_type"],
+            request.base,
+            request.associates,
+            SUBSCRIBER_COMBINATION_SIZE,
+            SUBSCRIBER_MAX_COMBINATIONS,
+        )
+        return {
+            "race_id": race_id,
+            "race_type": race["race_type"],
+            "combination_size": SUBSCRIBER_COMBINATION_SIZE,
+            **plan,
+        }
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Combination generation failed: {exc}") from exc
+
+
 def _prognosis_rows(prognosis: pd.DataFrame, analyzed: pd.DataFrame, race_type: str = "flat") -> list[dict]:
     """Keep legacy prognosis order while returning the full horse records."""
     if prognosis is None or prognosis.empty or analyzed.empty:
