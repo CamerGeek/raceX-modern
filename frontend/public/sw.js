@@ -1,4 +1,4 @@
-const CACHE_VERSION = "racex-shell-v4";
+const CACHE_VERSION = "racex-shell-v5";
 const SHELL_CACHE = CACHE_VERSION;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
@@ -8,12 +8,12 @@ const PRECACHE_URLS = [
   "/",
   OFFLINE_URL,
   "/manifest.webmanifest",
-  "/icons/icon-96.png",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/icons/maskable-192.png",
-  "/icons/maskable-512.png",
-  "/apple-touch-icon.png",
+  "/icons/icon-96.bc021766.png",
+  "/icons/icon-192.5744981e.png",
+  "/icons/icon-512.ea14e0ae.png",
+  "/icons/maskable-192.d40add57.png",
+  "/icons/maskable-512.4367dffc.png",
+  "/apple-touch-icon.9768d4b5.png",
   "/favicon.ico",
 ];
 
@@ -118,7 +118,7 @@ async function cacheFirstStatic(request) {
   const cache = await caches.open(STATIC_CACHE);
   const cached = await cache.match(request);
   if (cached) return cached;
-  const response = await fetch(request);
+  const response = await fetch(new Request(request, { cache: "reload" }));
   if (response.ok) await cache.put(request, response.clone());
   return response;
 }

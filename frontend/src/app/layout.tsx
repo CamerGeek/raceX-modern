@@ -38,11 +38,11 @@ export async function generateMetadata(): Promise<Metadata> {
     manifest: "/manifest.webmanifest",
     icons: {
       icon: [
-        { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-        { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+        { url: "/icons/icon-192.5744981e.png", sizes: "192x192", type: "image/png" },
+        { url: "/icons/icon-512.ea14e0ae.png", sizes: "512x512", type: "image/png" },
       ],
-      shortcut: "/icons/icon-96.png",
-      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+      shortcut: "/icons/icon-96.bc021766.png",
+      apple: [{ url: "/apple-touch-icon.9768d4b5.png", sizes: "180x180", type: "image/png" }],
     },
     appleWebApp: {
       capable: true,
