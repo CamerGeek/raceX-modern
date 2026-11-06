@@ -233,7 +233,11 @@ class TrotPredictor:
         df["DEF"] = (df["DEF"].map(_clean_def) if "DEF" in df.columns
                      else pd.Series("0", index=df.index))
 
-        df = df.replace({True: 1, False: 0})
+        df = df.apply(
+            lambda column: column.map(
+                lambda value: int(value) if isinstance(value, bool) else value
+            ).infer_objects(copy=False)
+        )
 
         # keep raw display values before z-scoring
         for col in ("COTE", "REC", "GAIN", "FORME"):

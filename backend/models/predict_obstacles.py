@@ -238,7 +238,11 @@ class ObstaclesPredictor:
         if "N_WEIGHT" not in df.columns and "INDICS" in df.columns:
             df["N_WEIGHT"] = df["INDICS"].map(_extract_weight_evolution)
 
-        df = df.replace({True: 1, False: 0})
+        df = df.apply(
+            lambda column: column.map(
+                lambda value: int(value) if isinstance(value, bool) else value
+            ).infer_objects(copy=False)
+        )
 
         prepared = prepare_frame(df)
 

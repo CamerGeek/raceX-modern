@@ -1,5 +1,6 @@
 from functools import lru_cache
 import logging
+import os
 from pathlib import Path
 import sys
 from typing import Any
@@ -8,6 +9,9 @@ import pandas as pd
 
 from app.services.serialization import dataframe_records
 
+
+# CPU-only hosting: keep TensorFlow from probing CUDA when the deep models load.
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
 
 logger = logging.getLogger(__name__)
 MODELS_DIR = Path(__file__).resolve().parents[2] / "models"

@@ -18,7 +18,7 @@ type CombinationPlan = {
   race_type: string;
   combination_size: number;
   base: string[];
-  substitutes: string[];
+  substitutes?: string[];
   combinations: string[][];
 };
 
@@ -83,6 +83,7 @@ function CombinationResults({ plan }: { plan: CombinationPlan }) {
   const { messages } = useI18n();
   const t = messages.subscribers.combinations;
   const base = new Set(plan.base);
+  const substitutes = plan.substitutes ?? [];
   return (
     <div className="combination-results">
       <p className="muted-result">
@@ -92,8 +93,8 @@ function CombinationResults({ plan }: { plan: CombinationPlan }) {
         {plan.base.length
           ? interpolate(t.baseSummary, { numbers: plan.base.join(" · ") })
           : t.baseEmpty}
-        {plan.substitutes.length > 0 && (
-          <> — {interpolate(t.substitutesSummary, { numbers: plan.substitutes.join(" · ") })}</>
+        {substitutes.length > 0 && (
+          <> — {interpolate(t.substitutesSummary, { numbers: substitutes.join(" · ") })}</>
         )}
       </p>
       <div className="combination-grid">

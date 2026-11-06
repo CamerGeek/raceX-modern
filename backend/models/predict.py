@@ -231,7 +231,11 @@ class RacePredictor:
             df = df.drop(columns=["FORME", "IF"], errors="ignore")
             df = df.rename(columns={"MUSIQUE": "HORSE_MUSIC"})
         df = canonicalize_columns(df)
-        df = df.replace({True: 1, False: 0})
+        df = df.apply(
+            lambda column: column.map(
+                lambda value: int(value) if isinstance(value, bool) else value
+            ).infer_objects(copy=False)
+        )
 
         race_info = {}
         for key, col in (("track", "TRACK"), ("date", "DATE"),
