@@ -9,7 +9,7 @@ import pandas as pd
 
 from app.services.analysis_service import analyze_race
 from app.services.model_prediction_service import predict_race as predict_model_race
-from race_scraper_app import generate_trotting_bets, reducing_system
+from race_scraper_app import reducing_system
 
 NUMBER_COLUMNS = ("N°", "N", "Numero", "NUMERO", "N?", "NUM")
 DEEP_SCORE_COLUMNS = ("place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score")
@@ -192,6 +192,27 @@ def _derived_base(
     return base[:target]
 
 
+def _associates_from_shortlist(
+    shortlist: list[str],
+    base: list[str],
+    substitutes: list[str],
+    all_horses: list[str],
+    required: int,
+) -> list[str]:
+    """Associates keep every shortlist horse in play, topped up only when the shortlist cannot fill the ticket."""
+    eligible = set(all_horses)
+    base_set = set(base)
+    associates = [number for number in dict.fromkeys(shortlist) if number in eligible and number not in base_set]
+    if not associates:
+        return [number for number in all_horses if number not in base_set]
+    for number in [*substitutes, *all_horses]:
+        if len(associates) >= required:
+            break
+        if number in eligible and number not in base_set and number not in associates:
+            associates.append(number)
+    return associates
+
+
 def _unique_combinations(
     combinations_result: list[tuple] | list[list],
     combination_size: int,
@@ -234,6 +255,8 @@ def generate_combination_plan(
         return {"combinations": [], "base": [], "substitutes": []}
 
     twists = [number for number in plot_twist_numbers(analyzed) if number in all_horses]
+    combination_size = max(1, min(combination_size, len(all_horses)))
+    shortlist: list[str] = []
     if mandatory:
         base = [number for number in dict.fromkeys(_number(value) for value in mandatory) if number in all_horses]
     else:
@@ -242,12 +265,13 @@ def generate_combination_plan(
         base = _derived_base(shortlist, twists, all_horses, combination_size)
     substitutes = [number for number in twists if number not in base]
 
-    associates = [horse for horse in all_horses if horse not in base]
-    combination_size = max(1, min(combination_size, len(all_horses)))
-    if race_type == "trot":
-        combinations_result = generate_trotting_bets(analyzed, analyzed, base_horses=base, desired_size=combination_size, max_combos=max_combinations)
+    if mandatory:
+        associates = [horse for horse in all_horses if horse not in base]
     else:
-        combinations_result = reducing_system(base, associates, combination_size)
+        associates = _associates_from_shortlist(
+            shortlist, base, substitutes, all_horses, max(0, combination_size - len(base))
+        )
+    combinations_result = reducing_system(base, associates, combination_size)
     return {
         "combinations": _unique_combinations(combinations_result, combination_size, max_combinations),
         "base": base,

@@ -77,6 +77,57 @@ def test_plan_uses_model_shortlist_as_mandatory_base(monkeypatch) -> None:
     assert all(set(plan["base"]) <= set(combination) for combination in plan["combinations"])
 
 
+@pytest.mark.parametrize("race_type", ["flat", "trot"])
+def test_plan_keeps_every_shortlist_horse_in_the_combinations(monkeypatch, race_type: str) -> None:
+    monkeypatch.setattr(
+        betting_service,
+        "analyze_race",
+        lambda *_args, **_kwargs: (descending_field(), pd.DataFrame(), None),
+    )
+    shortlist = [6, 3, 14, 4, 8, 5, 12, 1]
+    monkeypatch.setattr(
+        betting_service,
+        "predict_model_race",
+        lambda *_args, **_kwargs: predictions_with_top(*shortlist),
+    )
+
+    plan = betting_service.generate_combination_plan(pd.DataFrame(), race_type)
+
+    assert plan["base"] == ["6", "3", "14"]
+    assert plan["substitutes"] == ["9", "10"]
+    assert len(plan["combinations"]) == 10
+    assert all(len(combination) == 5 for combination in plan["combinations"])
+    assert all(set(plan["base"]) <= set(combination) for combination in plan["combinations"])
+    assert all(set(combination) <= {str(number) for number in shortlist} for combination in plan["combinations"])
+    covered = {number for combination in plan["combinations"] for number in combination}
+    assert covered == {str(number) for number in shortlist}
+
+
+def test_plan_tops_up_associates_when_the_shortlist_cannot_fill_the_ticket(monkeypatch) -> None:
+    monkeypatch.setattr(
+        betting_service,
+        "analyze_race",
+        lambda *_args, **_kwargs: (descending_field(), pd.DataFrame(), None),
+    )
+    monkeypatch.setattr(
+        betting_service,
+        "predict_model_race",
+        lambda *_args, **_kwargs: {
+            "status": "ready",
+            "rows": [
+                {"NUMERO": number, "place_prob_deep": score}
+                for number, score in [(6, 0.99), (3, 0.96), (14, 0.93), (4, 0.90)]
+            ],
+        },
+    )
+
+    plan = betting_service.generate_combination_plan(pd.DataFrame(), "flat", combination_size=6)
+
+    assert plan["base"] == ["6", "3", "14"]
+    assert len(plan["combinations"]) == 1
+    assert set(plan["combinations"][0]) == {"6", "3", "14", "4", "9", "10"}
+
+
 def test_plot_twist_horses_substitute_for_unavailable_shortlist_horses(monkeypatch) -> None:
     frame = pd.DataFrame({
         "N°": list(range(1, 17)),

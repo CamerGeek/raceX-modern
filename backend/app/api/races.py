@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
 HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v8"
 RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v3"
-BETTING_CACHE_VERSION = "betting-analysis-v2"
+BETTING_CACHE_VERSION = "betting-analysis-v3"
 PUBLIC_QUINTE_TTL_SECONDS = 300
 
 _public_quinte_cache: dict[str, tuple[float, dict[str, Any]]] = {}
