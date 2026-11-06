@@ -17,7 +17,7 @@ export function parisDate() {
   }).format(new Date());
 }
 
-export const TOP_EIGHT_REVALIDATE_SECONDS = 60;
+export const TOP_EIGHT_REVALIDATE_SECONDS = 300;
 const TOP_EIGHT_TIMEOUT_MS = 8000;
 
 export async function fetchPublicTopEight(): Promise<QuinteAnalysis | null> {
