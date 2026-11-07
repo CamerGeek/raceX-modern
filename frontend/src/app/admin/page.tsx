@@ -7,8 +7,10 @@ import AccessGate from "../access-gate";
 import { useAuth } from "../auth-context";
 import QuinteRecommendations, {
   getModelShortlistRows,
+  getModelWinRows,
   PriorityTierPickCard,
   ShodHorsesCard,
+  winScoreOf,
   type PlotTwistItem,
 } from "../quinte-recommendations";
 
@@ -221,6 +223,7 @@ function AdminPageContent() {
   const [reportTab, setReportTab] = useState("overview");
   const [simulationRows, setSimulationRows] = useState<SimulationRow[]>([]);
   const [combinations, setCombinations] = useState<string[][]>([]);
+  const [combinationReadyTickets, setCombinationReadyTickets] = useState<{ type: string; numbers: string[] }[]>([]);
   const [combinationBase, setCombinationBase] = useState<string[]>([]);
   const [combinationSubstitutes, setCombinationSubstitutes] = useState<string[]>([]);
   const [combinationSize, setCombinationSize] = useState(5);
@@ -246,8 +249,8 @@ function AdminPageContent() {
     : [];
   const printVenue = analysis ? field(analysis.rows[0] ?? {}, ["HIPPODROME", "HIPPO", "TRACK"], "") : "";
   const printModelRows = getModelShortlistRows(analysis?.model_predictions ?? null);
-  const printLeadingHorse = printModelRows[0];
-  const printLeaderScore = printLeadingHorse ? field(printLeadingHorse, ["place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score"], "") : "";
+  const printLeadingHorse = getModelWinRows(analysis?.model_predictions ?? null)[0];
+  const printLeaderScore = printLeadingHorse ? winScoreOf(printLeadingHorse) : "";
   const printOdds = (analysis?.rows ?? [])
     .map((horse) => Number(field(horse, ["COTE", "Cote", "ODDS"], "").trim().replace(",", ".")))
     .filter((odds) => Number.isFinite(odds) && odds > 0);
@@ -420,6 +423,7 @@ function AdminPageContent() {
       setReportTab("overview");
       setSimulationRows([]);
       setCombinations([]);
+      setCombinationReadyTickets([]);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Race analysis failed");
     } finally {
@@ -504,6 +508,7 @@ function AdminPageContent() {
       setReportTab("overview");
       setSimulationRows([]);
       setCombinations([]);
+      setCombinationReadyTickets([]);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Quinté+ analysis failed");
     } finally {
@@ -541,6 +546,7 @@ function AdminPageContent() {
       setReportTab("overview");
       setSimulationRows([]);
       setCombinations([]);
+      setCombinationReadyTickets([]);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Tomorrow's Quinté+ analysis failed");
     } finally {
@@ -565,6 +571,7 @@ function AdminPageContent() {
       if (tab === "simulation") setSimulationRows(payload.rows ?? []);
       else {
         setCombinations(payload.combinations ?? []);
+        setCombinationReadyTickets(payload.ready_tickets ?? []);
         setCombinationBase(payload.base ?? []);
         setCombinationSubstitutes(payload.substitutes ?? []);
       }
@@ -578,6 +585,7 @@ function AdminPageContent() {
   function changeCombinationSize(size: number) {
     setCombinationSize(size);
     setCombinations([]);
+    setCombinationReadyTickets([]);
     setCombinationBase([]);
     setCombinationSubstitutes([]);
     void loadBettingTab("combinations", true, size);
@@ -745,7 +753,7 @@ function AdminPageContent() {
             }); })()}</div></div>
             </>}
             {reportTab === "simulation" && <div className="report-section"><div className="section-title"><span>MC</span><h3>Monte Carlo simulation</h3><p>5,000 simulated race orders</p><button type="button" className="cache-refresh-button" onClick={() => void loadBettingTab("simulation", true)} disabled={bettingLoading}>Recalculate</button></div>{bettingLoading && <p className="muted-result">Running simulation...</p>}{bettingError && <p className="error">{bettingError}</p>}{!bettingLoading && !bettingError && <><div className="table-scroll-hint" aria-hidden="true">Swipe to see all columns <span>→</span></div><div className="table-wrap"><table><thead><tr><th>Horse</th><th>Win probability</th><th>Top-3 probability</th><th>Average rank</th></tr></thead><tbody>{simulationRows.slice(0, 16).map((horse, index) => <tr key={`sim-${index}`}><td>{field(horse, ["N°", "N"], "-")} / {field(horse, ["Cheval", "CHEVAL"], "Unknown")}</td><td>{(horse.win_probability * 100).toFixed(1)}%</td><td>{(horse.podium_probability * 100).toFixed(1)}%</td><td>{horse.average_simulated_rank.toFixed(2)}</td></tr>)}</tbody></table></div></>}</div>}
-            {reportTab === "combinations" && <div className="report-section"><div className="section-title"><span>COMB</span><h3>Generated combinations</h3><p>{combinations.length} tickets / {combinationSize} horses</p><div className="combination-game-switch" role="group" aria-label="Combination game">{ADMIN_GAME_OPTIONS.map((option) => <button key={option.size} type="button" aria-pressed={combinationSize === option.size} onClick={() => changeCombinationSize(option.size)} disabled={bettingLoading}>{option.label}</button>)}</div><button type="button" className="cache-refresh-button" onClick={() => void loadBettingTab("combinations", true)} disabled={bettingLoading}>Recalculate</button></div>{bettingLoading && <p className="muted-result">Generating combinations...</p>}{bettingError && <p className="error">{bettingError}</p>}{!bettingLoading && !bettingError && <><p className="muted-result">Top {Math.min(3, combinationSize - 1)} (Model Shortlist): {combinationBase.length > 0 ? combinationBase.join(" · ") : "—"}{combinationSubstitutes.length > 0 && <> — Substitutes (Plot Twist): {combinationSubstitutes.join(" · ")}</>}</p><div className="combination-grid">{combinations.map((combination, index) => <div className="combination-row" key={`combo-${index}`}><strong>{String(index + 1).padStart(2, "0")}</strong>{combination.map((horse) => <span key={horse}>{horse}</span>)}</div>)}</div></>}</div>}
+            {reportTab === "combinations" && <div className="report-section"><div className="section-title"><span>COMB</span><h3>Generated combinations</h3><p>{combinations.length} tickets / {combinationSize} horses</p><div className="combination-game-switch" role="group" aria-label="Combination game">{ADMIN_GAME_OPTIONS.map((option) => <button key={option.size} type="button" aria-pressed={combinationSize === option.size} onClick={() => changeCombinationSize(option.size)} disabled={bettingLoading}>{option.label}</button>)}</div><button type="button" className="cache-refresh-button" onClick={() => void loadBettingTab("combinations", true)} disabled={bettingLoading}>Recalculate</button></div>{bettingLoading && <p className="muted-result">Generating combinations...</p>}{bettingError && <p className="error">{bettingError}</p>}{!bettingLoading && !bettingError && <>{combinationReadyTickets.length > 0 && <div className="ready-tickets"><h4>Tickets prêts à jouer</h4><div className="ready-ticket-grid">{combinationReadyTickets.map((ticket) => <div className={`ready-ticket ready-${ticket.type}`} key={ticket.type}><span>{ticket.type === "winner" ? "Gagnant" : ticket.type === "quinella" ? "Couplé gagnant" : "Trio"}</span><strong>{ticket.numbers.join(" · ")}</strong></div>)}</div></div>}<p className="muted-result">Top {Math.min(3, combinationSize - 1)} (Model Shortlist): {combinationBase.length > 0 ? combinationBase.join(" · ") : "—"}{combinationSubstitutes.length > 0 && <> — Substitutes (Plot Twist): {combinationSubstitutes.join(" · ")}</>}</p><div className="combination-grid">{combinations.map((combination, index) => <div className="combination-row" key={`combo-${index}`}><strong>{String(index + 1).padStart(2, "0")}</strong>{combination.map((horse) => <span key={horse}>{horse}</span>)}</div>)}</div></>}</div>}
             {reportTab === "overview" && <>
             <div className="report-section"><div className="section-title"><span>02</span><h3>Handicap mechanics</h3><p>Distance and penalty signals</p></div><div className="handicap-panel"><strong>{analysis.handicap?.distance ? `${analysis.handicap.distance}m handicap` : "No distance handicap detected"}</strong><span>{analysis.handicap ? `${analysis.handicap.penalized_count} runners carry a penalty` : "The field is compared without a distance adjustment."}</span></div></div>
             </>}
@@ -793,15 +801,15 @@ function AdminPageContent() {
                   <strong>{field(printLeadingHorse, ["CHEVAL", "Cheval", "NOM", "NAME"], "Cheval sans nom")}</strong>
                 </p>
                 <p className="subscriber-rationale">
-                  Ce cheval est classé premier dans le Model Shortlist selon son deep score décroissant.
-                  {printLeaderScore && <> Son deep score est de <strong>{formatValue(Number(printLeaderScore.replace(",", ".")))}</strong>.</>}
+                  Ce cheval a le score gagnant le plus élevé selon RaceX AI.
+                  {printLeaderScore && <> Son score gagnant est de <strong>{formatValue(Number(printLeaderScore.replace(",", ".")))}</strong>.</>}
                   {field(printLeadingHorse, ["COTE", "Cote", "ODDS"], "") && <> Cote relevée : <strong>{field(printLeadingHorse, ["COTE", "Cote", "ODDS"])}</strong>.</>}
                   {field(printLeadingHorse, ["MUSIQUE", "DERNIÈRES PERF.", "FORME", "FORM"], "") && <> Musique : <strong>{field(printLeadingHorse, ["MUSIQUE", "DERNIÈRES PERF.", "FORME", "FORM"])}</strong>.</>}
                 </p>
                 <p className="subscriber-caveat">Classement indicatif fondé sur les données disponibles, sans garantie de résultat.</p>
               </div>
               <div className="subscriber-featured-stats">
-                <div><span>DEEP SCORE</span><strong>{printLeaderScore ? formatValue(Number(printLeaderScore.replace(",", "."))) : "—"}</strong></div>
+                <div><span>SCORE GAGNANT</span><strong>{printLeaderScore ? formatValue(Number(printLeaderScore.replace(",", "."))) : "—"}</strong></div>
                 <div><span>FAVORI DU MARCHÉ</span><strong>{printFavoriteOdds === null ? "—" : printFavoriteOdds.toLocaleString("fr-FR", { maximumFractionDigits: 2 })}</strong></div>
                 <div><span>CHEVAUX SHORTLISTÉS</span><strong>{printModelRows.length}</strong></div>
               </div>

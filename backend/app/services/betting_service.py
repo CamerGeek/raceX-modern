@@ -13,11 +13,13 @@ from race_scraper_app import reducing_system
 
 NUMBER_COLUMNS = ("N°", "N", "Numero", "NUMERO", "N?", "NUM")
 DEEP_SCORE_COLUMNS = ("place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score")
+WIN_SCORE_COLUMNS = ("p_win", "P_WIN")
 COMPOSITE_COLUMNS = ("Composite", "COMPOSITE_SCORE", "SCORE", "CS_norm", "Score")
 SHORTLIST_SIZE = 8
 BASE_SIZE = 3
 PLOT_TWIST_LIMIT = 4
 PLOT_TWIST_SCORE_WINDOW = 0.05
+READY_TICKET_SIZES = (("winner", 1), ("quinella", 2), ("trio", 3))
 
 
 def simulate_race(frame: pd.DataFrame, race_type: str, simulations: int = 5000, seed: int | None = 42) -> list[dict[str, Any]]:
@@ -119,6 +121,39 @@ def model_shortlist_numbers(model_predictions: dict[str, Any] | None) -> list[st
         if len(numbers) >= SHORTLIST_SIZE:
             break
     return numbers
+
+
+def model_win_ranked_numbers(model_predictions: dict[str, Any] | None, limit: int | None = None) -> list[str]:
+    """Horses ordered by model win score, falling back to the deep score when it is missing."""
+    if not model_predictions or model_predictions.get("status") != "ready":
+        return []
+    ranked: list[tuple[str, float, int]] = []
+    for index, row in enumerate(model_predictions.get("rows") or []):
+        number = _row_number(row)
+        score = _row_score(row, WIN_SCORE_COLUMNS)
+        if score is None:
+            score = _row_score(row, DEEP_SCORE_COLUMNS)
+        if number and score is not None:
+            ranked.append((number, score, index))
+    ranked.sort(key=lambda item: (-item[1], item[2]))
+    numbers: list[str] = []
+    for number, _, _ in ranked:
+        if number not in numbers:
+            numbers.append(number)
+        if limit is not None and len(numbers) >= limit:
+            break
+    return numbers
+
+
+def _ready_tickets(model_predictions: dict[str, Any] | None, all_horses: list[str]) -> list[dict[str, Any]]:
+    """Model straight picks shown before the generated combinations."""
+    eligible = set(all_horses)
+    ranked = [number for number in model_win_ranked_numbers(model_predictions) if number in eligible]
+    return [
+        {"type": kind, "numbers": ranked[:size]}
+        for kind, size in READY_TICKET_SIZES
+        if len(ranked) >= size
+    ]
 
 
 def plot_twist_numbers(analyzed: pd.DataFrame) -> list[str]:
@@ -239,10 +274,10 @@ def generate_combination_plan(
 ) -> dict[str, Any]:
     analyzed, _, _ = analyze_race(frame, race_type, include_handicap=True, max_horses=8)
     if analyzed.empty:
-        return {"combinations": [], "base": [], "substitutes": []}
+        return {"ready_tickets": [], "combinations": [], "base": [], "substitutes": []}
     number_column = next((column for column in ("N°", "N", "Numero") if column in analyzed.columns), None)
     if not number_column:
-        return {"combinations": [], "base": [], "substitutes": []}
+        return {"ready_tickets": [], "combinations": [], "base": [], "substitutes": []}
     blocked = {_number(value) for value in (excluded or [])} | _non_partant_numbers(frame)
     all_horses = list(dict.fromkeys(
         number
@@ -250,16 +285,18 @@ def generate_combination_plan(
         if number and number not in blocked
     ))
     if not all_horses:
-        return {"combinations": [], "base": [], "substitutes": []}
+        return {"ready_tickets": [], "combinations": [], "base": [], "substitutes": []}
 
     twists = [number for number in plot_twist_numbers(analyzed) if number in all_horses]
     combination_size = max(1, min(combination_size, len(all_horses)))
     shortlist: list[str] = []
+    ready_tickets: list[dict[str, Any]] = []
     if mandatory:
         base = [number for number in dict.fromkeys(_number(value) for value in mandatory) if number in all_horses]
     else:
         prediction = predict_model_race(frame, race_type, source)
         shortlist = model_shortlist_numbers(prediction)
+        ready_tickets = _ready_tickets(prediction, all_horses)
         base = _derived_base(shortlist, twists, all_horses, combination_size)
     substitutes = [number for number in twists if number not in base]
 
@@ -270,6 +307,7 @@ def generate_combination_plan(
         pool = _shortlist_pool(shortlist, substitutes, all_horses, combination_size)
         combinations_result = reducing_system([], pool, combination_size)
     return {
+        "ready_tickets": ready_tickets,
         "combinations": _unique_combinations(combinations_result, combination_size, max_combinations),
         "base": base,
         "substitutes": substitutes,

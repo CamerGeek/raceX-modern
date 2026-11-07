@@ -4,7 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import QuinteOddsChart from "../quinte-odds-chart";
 import QuinteRecommendations, {
   getModelShortlistRows,
+  getModelWinRows,
   ShodHorsesCard,
+  winScoreOf,
   type PlotTwistItem,
   type QuinteModelPredictions,
 } from "../quinte-recommendations";
@@ -532,10 +534,8 @@ function SubscriberDashboard() {
     });
   const plotTwistRows = analysis ? plotTwistCandidates(analysis.rows) : [];
   const modelShortlistRows = getModelShortlistRows(analysis?.model_predictions ?? null);
-  const leadingHorse = modelShortlistRows[0];
-  const leaderScoreText = leadingHorse
-    ? firstValue(leadingHorse, ["place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score"])
-    : "";
+  const leadingHorse = getModelWinRows(analysis?.model_predictions ?? null)[0];
+  const leaderScoreText = leadingHorse ? winScoreOf(leadingHorse) : "";
   const leaderScoreValue = Number(leaderScoreText.trim().replace(",", "."));
   const leaderScore = leaderScoreText && Number.isFinite(leaderScoreValue) ? leaderScoreValue : null;
   const leaderOdds = leadingHorse ? firstValue(leadingHorse, oddsFields) : "";
@@ -732,7 +732,7 @@ function SubscriberDashboard() {
                 <p className="subscriber-caveat">{t.featured.caveat}</p>
               </div>
               <div className="subscriber-featured-stats">
-                <div><span>{t.featured.deepScore}</span><strong>{displayScore(leaderScore, intlLocale)}</strong></div>
+                <div><span>{t.featured.winScore}</span><strong>{displayScore(leaderScore, intlLocale)}</strong></div>
                 <div><span>{t.featured.marketFav}</span><strong>{lowestOdds === undefined ? "—" : lowestOdds.toLocaleString(intlLocale, { maximumFractionDigits: 2 })}</strong></div>
                 <div><span>{t.featured.shortlisted}</span><strong>{modelShortlistRows.length}</strong></div>
               </div>

@@ -292,7 +292,12 @@ def test_betting_analyses_use_cache_unless_admin_forces_refresh(
         compute_calls += 1
         if analysis_kind == "simulation":
             return [{"fresh": True}]
-        return {"combinations": [{"fresh": True}], "base": ["4"], "substitutes": []}
+        return {
+            "ready_tickets": [{"type": "winner", "numbers": ["4"]}],
+            "combinations": [{"fresh": True}],
+            "base": ["4"],
+            "substitutes": [],
+        }
 
     monkeypatch.setattr(races, "simulate_race", compute)
     monkeypatch.setattr(races, "generate_combination_plan", compute)
@@ -305,7 +310,13 @@ def test_betting_analyses_use_cache_unless_admin_forces_refresh(
     refreshed_result = (
         {**cached_result, "rows": [{"fresh": True}]}
         if analysis_kind == "simulation"
-        else {**cached_result, "combinations": [{"fresh": True}], "base": ["4"], "substitutes": []}
+        else {
+            **cached_result,
+            "ready_tickets": [{"type": "winner", "numbers": ["4"]}],
+            "combinations": [{"fresh": True}],
+            "base": ["4"],
+            "substitutes": [],
+        }
     )
     assert compute_calls == int(force_refresh)
     assert len(client.inserted) == int(force_refresh)

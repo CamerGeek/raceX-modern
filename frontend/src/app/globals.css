@@ -392,6 +392,13 @@ h2 { font-size: 2.4rem; font-weight: 500; margin: .4rem 0 0; }
 .post-list span { padding: .55rem .7rem; color: white; background: var(--green); font: 700 .75rem ui-sans-serif, system-ui, sans-serif; }
 .muted-result { color: var(--muted); font: .78rem ui-sans-serif, system-ui, sans-serif; }
 .combination-grid { display: grid; gap: .45rem; }
+.ready-tickets { display: grid; gap: .45rem; padding: .8rem; border: 1px solid var(--line); border-radius: .55rem; background: var(--card-wash); }
+.ready-tickets h4 { margin: 0; color: var(--green); font: 700 .68rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.ready-ticket-grid { display: flex; flex-wrap: wrap; gap: .45rem; }
+.ready-ticket { display: flex; align-items: baseline; gap: .55rem; padding: .45rem .7rem; border: 1px solid var(--card-line); border-radius: .45rem; background: #fff; font: .78rem ui-sans-serif, system-ui, sans-serif; }
+.ready-ticket span { color: var(--muted); font-size: .66rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.ready-ticket strong { color: var(--green); font-weight: 700; }
+.ready-ticket.ready-winner strong { color: var(--orange); }
 .combination-row { display: flex; align-items: center; gap: .55rem; padding: .65rem; border: 1px solid var(--card-line); border-radius: .55rem; background: var(--card-wash); font: .78rem ui-sans-serif, system-ui, sans-serif; }
 .combination-row strong { width: 2rem; color: var(--muted); }
 .combination-row span { min-width: 2rem; padding: .3rem .45rem; color: white; background: var(--green); text-align: center; font-weight: 700; }

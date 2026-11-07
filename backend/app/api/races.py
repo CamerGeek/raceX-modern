@@ -64,7 +64,7 @@ logger = logging.getLogger(__name__)
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
 HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v8"
 RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v3"
-BETTING_CACHE_VERSION = "betting-analysis-v5"
+BETTING_CACHE_VERSION = "betting-analysis-v6"
 PUBLIC_QUINTE_TTL_SECONDS = 300
 
 _public_quinte_cache: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -960,6 +960,7 @@ def combinations(request: BettingRequest, _: dict[str, Any] = Depends(require_ad
             "race_id": request.race_id,
             "race_type": race["race_type"],
             "combination_size": request.combination_size,
+            "ready_tickets": plan["ready_tickets"],
             "base": plan["base"],
             "substitutes": plan["substitutes"],
             "combinations": plan["combinations"],
@@ -1047,6 +1048,7 @@ def subscriber_combinations(
             "race_id": race_id,
             "race_type": race["race_type"],
             "combination_size": combination_size,
+            "ready_tickets": plan["ready_tickets"],
             "base": plan["base"],
             "substitutes": plan["substitutes"],
             "combinations": plan["combinations"],

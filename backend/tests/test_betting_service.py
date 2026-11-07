@@ -75,7 +75,68 @@ def test_plan_reports_the_shortlist_top_three_as_the_base(monkeypatch) -> None:
 
     assert plan["base"] == ["6", "3", "14"]
     assert plan["substitutes"] == ["9", "10"]
+    assert plan["ready_tickets"] == [
+        {"type": "winner", "numbers": ["6"]},
+        {"type": "quinella", "numbers": ["6", "3"]},
+        {"type": "trio", "numbers": ["6", "3", "14"]},
+    ]
     assert plan["combinations"]
+
+
+def test_ready_tickets_follow_the_highest_win_score(monkeypatch) -> None:
+    monkeypatch.setattr(
+        betting_service,
+        "analyze_race",
+        lambda *_args, **_kwargs: (descending_field(), pd.DataFrame(), None),
+    )
+    monkeypatch.setattr(
+        betting_service,
+        "predict_model_race",
+        lambda *_args, **_kwargs: {
+            "status": "ready",
+            "rows": [
+                {"NUMERO": 1, "place_prob_deep": 0.90, "p_win": 0.10},
+                {"NUMERO": 2, "place_prob_deep": 0.70, "p_win": 0.55},
+                {"NUMERO": 3, "place_prob_deep": 0.60, "p_win": 0.20},
+                {"NUMERO": 4, "place_prob_deep": 0.50, "p_win": 0.15},
+            ],
+        },
+    )
+
+    plan = betting_service.generate_combination_plan(pd.DataFrame(), "flat")
+
+    assert plan["ready_tickets"] == [
+        {"type": "winner", "numbers": ["2"]},
+        {"type": "quinella", "numbers": ["2", "3"]},
+        {"type": "trio", "numbers": ["2", "3", "4"]},
+    ]
+
+
+def test_ready_tickets_skip_non_starters(monkeypatch) -> None:
+    frame = pd.DataFrame([
+        {"N°": 1, "Composite": 0.7, "NON_PARTANT": "Non partant"},
+        {"N°": 2, "Composite": 0.6, "NON_PARTANT": ""},
+        {"N°": 3, "Composite": 0.5, "NON_PARTANT": ""},
+        {"N°": 4, "Composite": 0.4, "NON_PARTANT": ""},
+    ])
+    monkeypatch.setattr(
+        betting_service,
+        "analyze_race",
+        lambda *_args, **_kwargs: (frame, pd.DataFrame(), None),
+    )
+    monkeypatch.setattr(
+        betting_service,
+        "predict_model_race",
+        lambda *_args, **_kwargs: predictions_with_top(1, 2, 3, 4),
+    )
+
+    plan = betting_service.generate_combination_plan(frame, "flat")
+
+    assert plan["ready_tickets"] == [
+        {"type": "winner", "numbers": ["2"]},
+        {"type": "quinella", "numbers": ["2", "3"]},
+        {"type": "trio", "numbers": ["2", "3", "4"]},
+    ]
 
 
 @pytest.mark.parametrize(
@@ -369,6 +430,36 @@ def test_subscriber_combinations_reject_non_quinte_races(monkeypatch) -> None:
         races.subscriber_combinations("race-id", {})
 
     assert error.value.status_code == 404
+
+
+def test_subscriber_combinations_include_ready_tickets(monkeypatch) -> None:
+    monkeypatch.setattr(races, "SupabaseClientWrapper", lambda: object())
+    monkeypatch.setattr(
+        races,
+        "_saved_frame",
+        lambda *_args: (
+            pd.DataFrame(),
+            {"race_type": "flat", "source": "turfomania", "summary": {"q_plus": True}},
+        ),
+    )
+    monkeypatch.setattr(races, "_cached_result", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(races, "_store_cached_result", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(races, "_runner_table_for_race", lambda *_args: None)
+    monkeypatch.setattr(
+        races,
+        "generate_combination_plan",
+        lambda *_args, **_kwargs: {
+            "ready_tickets": [{"type": "winner", "numbers": ["2"]}],
+            "combinations": [["2", "3", "4"]],
+            "base": ["2"],
+            "substitutes": [],
+        },
+    )
+
+    response = races.subscriber_combinations("race-id", {})
+
+    assert response["ready_tickets"] == [{"type": "winner", "numbers": ["2"]}]
+    assert response["combinations"] == [["2", "3", "4"]]
 
 
 def test_subscriber_custom_combinations_use_the_reducing_system(monkeypatch) -> None:

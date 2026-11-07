@@ -26,6 +26,7 @@ export type PlotTwistItem = {
 
 const horseNumberFields = ["NUMERO", "N°", "N", "Numero", "N?", "NUM"];
 const deepScoreFields = ["place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score"];
+const winScoreFields = ["p_win", "P_WIN", ...deepScoreFields];
 const priorityTierFields = ["bet_tier", "priority_tier", "Priority tier", "Priority Tier"];
 
 function horseNumber(row: Horse) {
@@ -60,6 +61,33 @@ export function getModelShortlistRows(predictions: QuinteModelPredictions | null
     .map(({ row }) => row)
     .filter((row) => Boolean(horseNumber(row)))
     .slice(0, 8);
+}
+
+export function getModelWinRows(predictions: QuinteModelPredictions | null) {
+  if (predictions?.status !== "ready") return [];
+
+  return predictions.rows
+    .map((row, index) => {
+      const scoreKey = winScoreFields.find((field) =>
+        row[field] !== null && row[field] !== undefined && row[field] !== "",
+      );
+      const rawScore = scoreKey ? String(row[scoreKey]).trim().replace(",", ".") : "";
+      const score = Number(rawScore);
+      return { row, index, score: rawScore && Number.isFinite(score) ? score : null };
+    })
+    .filter((item): item is { row: Horse; index: number; score: number } => item.score !== null)
+    .sort((first, second) => second.score - first.score || first.index - second.index)
+    .map(({ row }) => row)
+    .filter((row) => Boolean(horseNumber(row)));
+}
+
+export function winScoreOf(row: Horse) {
+  const key = winScoreFields.find((field) =>
+    row[field] !== null && row[field] !== undefined && row[field] !== "",
+  );
+  const raw = key ? String(row[key]).trim().replace(",", ".") : "";
+  const score = Number(raw);
+  return raw && Number.isFinite(score) ? raw : "";
 }
 
 function hasShodDef(row: Horse) {
