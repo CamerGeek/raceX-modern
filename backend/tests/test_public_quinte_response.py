@@ -2,6 +2,7 @@ from datetime import date
 
 import pandas as pd
 import pytest
+from fastapi import HTTPException
 
 from app.api import races
 from app.schemas.races import ModelPredictionResponse, TurfomaniaQuinteAnalysisResponse
@@ -38,7 +39,7 @@ def test_public_quinte_response_only_returns_number_selections(monkeypatch) -> N
             ],
         ),
     )
-    monkeypatch.setattr(races, "_analyze_today_turfomania_quinte", lambda _: analysis)
+    monkeypatch.setattr(races, "_analyze_today_turfomania_quinte", lambda *_args, **_kwargs: analysis)
 
     response = races._public_today_quinte_payload(date(2026, 10, 8))
 
@@ -63,7 +64,7 @@ def test_public_quinte_payload_is_served_from_ttl_cache(monkeypatch) -> None:
     )
     calls: list[date] = []
 
-    def fake_analyze(request):
+    def fake_analyze(request, **_kwargs):
         calls.append(request.meeting_date)
         return analysis
 
@@ -251,3 +252,38 @@ def test_today_quinte_cache_miss_returns_no_cached_analysis() -> None:
         date(2026, 10, 9),
         meetings=[{"id": "meeting-id"}],
     ) is None
+
+
+def test_public_quinte_does_not_trigger_an_analysis_on_cache_miss(monkeypatch) -> None:
+    class Client:
+        def list(self, table, *, filters, **kwargs):
+            if table == "meetings":
+                return [{"id": "meeting-id"}]
+            if table == "races":
+                return [{
+                    "id": "race-id",
+                    "source": "turfomania",
+                    "race_type": "flat",
+                    "summary": {"q_plus": True},
+                }]
+            if table == "analysis_runs":
+                return []
+            raise AssertionError(f"unexpected list table: {table}")
+
+        def select_one(self, *_args, **_kwargs):
+            return {"updated_at": "2026-10-09T07:55:10+00:00"}
+
+    monkeypatch.setattr(races, "SupabaseClientWrapper", Client)
+    monkeypatch.setattr(
+        races,
+        "scrape_turfomania_quinte",
+        lambda *_args, **_kwargs: pytest.fail("public reads must not scrape"),
+    )
+    monkeypatch.setattr(
+        races,
+        "_analysis_response",
+        lambda *_args, **_kwargs: pytest.fail("public reads must not analyze"),
+    )
+
+    with pytest.raises(HTTPException, match="ask an admin"):
+        races._public_today_quinte_payload(date(2026, 10, 9))

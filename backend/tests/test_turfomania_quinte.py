@@ -282,10 +282,9 @@ def test_subscriber_tomorrow_quinte_analysis_reuses_shared_cache(
     assert second.model_dump() == first.model_dump()
 
 
-def test_race_day_quinte_refreshes_yesterdays_cached_analysis(
+def test_subscriber_analysis_does_not_regenerate_a_stale_cache(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    music = "(22j) 1s 4s Ah Ah (25) 6h Ts 4s 2s 6s 1h 2s (24) 5h"
     meeting = {**MEETING, "meeting_date": "2026-10-03"}
     race = {
         "id": "race-obstacles",
@@ -311,13 +310,9 @@ def test_race_day_quinte_refreshes_yesterdays_cached_analysis(
                         "homepage_analysis": {"model_predictions": {"rows": []}},
                     },
                 }]
-            if table == "flat_race_runners":
-                return [{"raw_data": {"N°": "4", "CHEVAL": "Runner", "MUSIQUE": music}}]
             raise AssertionError(f"unexpected list table: {table}")
 
         def select_one(self, table: str, **_: object) -> dict | None:
-            if table == "races":
-                return race
             if table == "flat_race_runners":
                 return {"updated_at": "2026-10-03T10:00:00+00:00"}
             raise AssertionError(f"unexpected select table: {table}")
@@ -329,53 +324,28 @@ def test_race_day_quinte_refreshes_yesterdays_cached_analysis(
     client = Client()
     monkeypatch.setattr(races_api, "_paris_today", lambda: date(2026, 10, 3))
     monkeypatch.setattr(races_api, "SupabaseClientWrapper", lambda: client)
-
-    current_frame = _frame(race_date="03/10/2026")
-    current_frame["MUSIQUE"] = music
-    current_frame["RACE_CONDITIONS"] = "Haies - 3600 mètres"
     monkeypatch.setattr(
         races_api,
         "find_turfomania_quinte_meeting",
-        lambda meetings: (meeting, current_frame),
+        lambda *_args: pytest.fail("subscriber reads must not scrape"),
     )
-    persisted: dict[str, object] = {}
+    monkeypatch.setattr(
+        races_api,
+        "persist_scraped_meeting",
+        lambda *_args, **_kwargs: pytest.fail("subscriber reads must not persist analyses"),
+    )
+    monkeypatch.setattr(
+        races_api,
+        "_analysis_response",
+        lambda *_args, **_kwargs: pytest.fail("subscriber reads must not analyze"),
+    )
 
-    def persist(frame: pd.DataFrame, **kwargs: object) -> dict:
-        assert frame.loc[0, "MUSIQUE"] == music
-        persisted.update(kwargs)
-        return {"races": [{"id": "race-obstacles"}]}
-
-    monkeypatch.setattr(races_api, "persist_scraped_meeting", persist)
-
-    def analyze_current_frame(frame: pd.DataFrame, **kwargs: object) -> AnalysisResponse:
-        assert frame.loc[0, "MUSIQUE"] == music
-        assert kwargs["race_type"] == "obstacles"
-        return AnalysisResponse(
-            race_type="obstacles",
-            source="turfomania",
-            row_count=1,
-            columns=["N°", "CHEVAL"],
-            rows=[{"N°": "4", "CHEVAL": "Runner", "MUSIQUE": music}],
-            model_version="updated-model",
-            prognosis=[],
-            model_predictions=ModelPredictionResponse(
-                status="ready",
-                rows=[{"NUMERO": 4, "MUSIC_AVAILABLE": 1, "STOP_COUNT": 2, "FALL_COUNT": 1}],
-            ),
+    with pytest.raises(HTTPException, match="ask an admin"):
+        races_api.analyze_today_turfomania_quinte(
+            races_api.TodayQuinteAnalysisRequest(date="2026-10-03")
         )
 
-    monkeypatch.setattr(races_api, "_analysis_response", analyze_current_frame)
-
-    result = races_api.analyze_today_turfomania_quinte(
-        races_api.TodayQuinteAnalysisRequest(date="2026-10-03")
-    )
-
-    assert result.race_id == "race-obstacles"
-    assert result.model_predictions is not None
-    assert result.model_predictions.rows[0]["STOP_COUNT"] == 2
-    assert result.model_predictions.rows[0]["FALL_COUNT"] == 1
-    assert persisted["meeting"] == meeting
-    assert client.inserted[0][1]["summary"]["homepage_cache_version"] == races_api.HOMEPAGE_QUINTE_CACHE_VERSION
+    assert client.inserted == []
 
 
 def test_race_day_quinte_reuses_cache_prepared_the_previous_day(

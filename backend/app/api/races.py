@@ -497,7 +497,10 @@ def analyze_today_turfomania_quinte(
     request: TodayQuinteAnalysisRequest,
     _: dict[str, Any] = Depends(require_subscriber_features),
 ) -> TurfomaniaQuinteAnalysisResponse:
-    return _localize_commentary(_analyze_today_turfomania_quinte(request), request.locale)
+    return _localize_commentary(
+        _analyze_today_turfomania_quinte(request, cached_only=True),
+        request.locale,
+    )
 
 
 @router.post(
@@ -537,7 +540,8 @@ def _public_today_quinte_payload(meeting_date: date | None) -> dict[str, Any]:
             return entry[1]
 
     analysis = _analyze_today_turfomania_quinte(
-        TodayQuinteAnalysisRequest(date=target_date)
+        TodayQuinteAnalysisRequest(date=target_date),
+        cached_only=True,
     )
 
     def numeric_score(value: Any, fallback: float = -1.0) -> float:
@@ -598,6 +602,7 @@ def _analyze_today_turfomania_quinte(
     *,
     allow_tomorrow_analysis: bool = False,
     force_refresh: bool = False,
+    cached_only: bool = False,
 ) -> TurfomaniaQuinteAnalysisResponse:
     client = SupabaseClientWrapper()
     paris_today = _paris_today()
@@ -619,6 +624,16 @@ def _analyze_today_turfomania_quinte(
         )
         if cached and not force_refresh:
             return cached
+
+        if cached_only:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "Tomorrow's Quinté+ analysis is not available yet. Please check back after an administrator prepares it."
+                    if meeting_date == paris_today + timedelta(days=1)
+                    else f"No prepared Quinté analysis found for {meeting_date.isoformat()}; ask an admin to run it."
+                ),
+            )
 
         if (
             meeting_date == paris_today + timedelta(days=1)
