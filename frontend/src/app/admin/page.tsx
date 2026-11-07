@@ -468,7 +468,6 @@ function AdminPageContent() {
     }
     setRaceType(selectedRaceOption.race_type ?? raceType);
     setTypeSource("automatic");
-    void analyzeSelectedRace(selectedRaceOption);
   }
 
   async function analyzeTurfomaniaQuinte() {
@@ -650,7 +649,7 @@ function AdminPageContent() {
           </div>}
 
           <button className="analyze-button" type="submit" disabled={loading || detectingType || !meetingUrl && !url}>{loading ? "Saving meeting..." : storedMeeting && !forceRefresh ? "Load saved meeting" : "Download & save meeting"}<span aria-hidden="true">↗</span></button>
-          {selectedRace && <button className="analyze-button" type="button" onClick={() => void analyzeSelectedRace(undefined, true)} disabled={loading || detectingType}>{loading ? "Analyzing race..." : "Re-run analysis"}<span aria-hidden="true">↗</span></button>}
+          {selectedRace && <button className="analyze-button" type="button" onClick={() => void analyzeSelectedRace(undefined, Boolean(analysis))} disabled={loading || detectingType}>{loading ? "Analyzing race..." : analysis ? "Re-run analysis" : "Analyze selected race"}<span aria-hidden="true">↗</span></button>}
           {meetingUrl.startsWith("turfomania://meetings/") && !showManualUrl && meetingDate === today && <button className="analyze-button quinte-button" type="button" onClick={() => void analyzeTurfomaniaQuinte()} disabled={loading}>
             {loading ? "Refreshing Quinté analysis..." : "Refresh today’s Quinté analysis"}<span aria-hidden="true">↗</span>
           </button>}
