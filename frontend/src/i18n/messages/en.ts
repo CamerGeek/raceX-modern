@@ -440,7 +440,7 @@ const en = {
       },
       {
         question: "How are the automatic combinations generated?",
-        answer: "RaceX AI takes the Model Shortlist and plays every combination of the selected size: Quinté+ (5 horses, up to 56 tickets), Quarté+ (4 horses, up to 70 tickets) and Tiercé/Trio (3 horses, up to 56 tickets). With eight shortlist horses you therefore get 56, 70 or 56 tickets depending on the game. Before those combinations, the app shows three ready-made tickets taken from the highest win scores: Winner (1 horse), Quinella (2 horses) and Trio (3 horses). The top three shortlist horses are shown as an indicative base, but they are not forced into every ticket: each shortlist horse appears in several combinations. Each game is generated once and served from the race cache; it is regenerated when the data or the plan version changes.",
+        answer: "RaceX AI takes the Model Shortlist and plays every combination of the selected size: Quinté+ (5 horses, up to 56 tickets), Quarté+ (4 horses, up to 70 tickets) and Tiercé/Trio (3 horses, up to 56 tickets). With eight shortlist horses you therefore get 56, 70 or 56 tickets depending on the game. Before those combinations, the app shows three ready-made tickets: Winner (1 horse) and Quinella (2 horses) from the highest win scores, then Trio (4 horses) from the highest place scores so bettors can cover every three-horse combination. The top three shortlist horses are shown as an indicative base, but they are not forced into every ticket: each shortlist horse appears in several combinations. Each game is generated once and served from the race cache; it is regenerated when the data or the plan version changes.",
       },
       {
         question: "Can I build my own combinations?",

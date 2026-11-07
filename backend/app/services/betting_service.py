@@ -19,7 +19,7 @@ SHORTLIST_SIZE = 8
 BASE_SIZE = 3
 PLOT_TWIST_LIMIT = 4
 PLOT_TWIST_SCORE_WINDOW = 0.05
-READY_TICKET_SIZES = (("winner", 1), ("quinella", 2), ("trio", 3))
+READY_TICKET_SIZES = (("winner", 1), ("quinella", 2), ("trio", 4))
 
 
 def simulate_race(frame: pd.DataFrame, race_type: str, simulations: int = 5000, seed: int | None = 42) -> list[dict[str, Any]]:
@@ -103,36 +103,20 @@ def _row_score(row: dict[str, Any], columns: tuple[str, ...]) -> float | None:
     return None
 
 
-def model_shortlist_numbers(model_predictions: dict[str, Any] | None) -> list[str]:
-    """Top model rows by deep score, matching the frontend Model Shortlist."""
+def _ranked_numbers(
+    model_predictions: dict[str, Any] | None,
+    columns: tuple[str, ...],
+    fallback_columns: tuple[str, ...] | None = None,
+    limit: int | None = None,
+) -> list[str]:
     if not model_predictions or model_predictions.get("status") != "ready":
         return []
     ranked: list[tuple[str, float, int]] = []
     for index, row in enumerate(model_predictions.get("rows") or []):
         number = _row_number(row)
-        score = _row_score(row, DEEP_SCORE_COLUMNS)
-        if number and score is not None:
-            ranked.append((number, score, index))
-    ranked.sort(key=lambda item: (-item[1], item[2]))
-    numbers: list[str] = []
-    for number, _, _ in ranked:
-        if number not in numbers:
-            numbers.append(number)
-        if len(numbers) >= SHORTLIST_SIZE:
-            break
-    return numbers
-
-
-def model_win_ranked_numbers(model_predictions: dict[str, Any] | None, limit: int | None = None) -> list[str]:
-    """Horses ordered by model win score, falling back to the deep score when it is missing."""
-    if not model_predictions or model_predictions.get("status") != "ready":
-        return []
-    ranked: list[tuple[str, float, int]] = []
-    for index, row in enumerate(model_predictions.get("rows") or []):
-        number = _row_number(row)
-        score = _row_score(row, WIN_SCORE_COLUMNS)
-        if score is None:
-            score = _row_score(row, DEEP_SCORE_COLUMNS)
+        score = _row_score(row, columns)
+        if score is None and fallback_columns:
+            score = _row_score(row, fallback_columns)
         if number and score is not None:
             ranked.append((number, score, index))
     ranked.sort(key=lambda item: (-item[1], item[2]))
@@ -145,14 +129,35 @@ def model_win_ranked_numbers(model_predictions: dict[str, Any] | None, limit: in
     return numbers
 
 
+def model_shortlist_numbers(model_predictions: dict[str, Any] | None) -> list[str]:
+    """Top model rows by deep score, matching the frontend Model Shortlist."""
+    return _ranked_numbers(model_predictions, DEEP_SCORE_COLUMNS, limit=SHORTLIST_SIZE)
+
+
+def model_win_ranked_numbers(model_predictions: dict[str, Any] | None, limit: int | None = None) -> list[str]:
+    """Horses ordered by model win score, falling back to the deep score when it is missing."""
+    return _ranked_numbers(model_predictions, WIN_SCORE_COLUMNS, DEEP_SCORE_COLUMNS, limit)
+
+
+def model_place_ranked_numbers(model_predictions: dict[str, Any] | None, limit: int | None = None) -> list[str]:
+    """Horses ordered by model place score."""
+    return _ranked_numbers(model_predictions, DEEP_SCORE_COLUMNS, limit=limit)
+
+
 def _ready_tickets(model_predictions: dict[str, Any] | None, all_horses: list[str]) -> list[dict[str, Any]]:
-    """Model straight picks shown before the generated combinations."""
+    """Model straight picks shown before the generated combinations.
+
+    Winner and quinella follow the win score. The trio follows the place score and
+    keeps four horses so bettors can cover every three-horse combination.
+    """
     eligible = set(all_horses)
-    ranked = [number for number in model_win_ranked_numbers(model_predictions) if number in eligible]
+    win_ranked = [number for number in model_win_ranked_numbers(model_predictions) if number in eligible]
+    place_ranked = [number for number in model_place_ranked_numbers(model_predictions) if number in eligible]
+    pools = {"winner": win_ranked, "quinella": win_ranked, "trio": place_ranked}
     return [
-        {"type": kind, "numbers": ranked[:size]}
+        {"type": kind, "numbers": pools[kind][:size]}
         for kind, size in READY_TICKET_SIZES
-        if len(ranked) >= size
+        if len(pools[kind]) >= size
     ]
 
 

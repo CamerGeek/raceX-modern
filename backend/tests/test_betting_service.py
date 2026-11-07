@@ -78,12 +78,12 @@ def test_plan_reports_the_shortlist_top_three_as_the_base(monkeypatch) -> None:
     assert plan["ready_tickets"] == [
         {"type": "winner", "numbers": ["6"]},
         {"type": "quinella", "numbers": ["6", "3"]},
-        {"type": "trio", "numbers": ["6", "3", "14"]},
+        {"type": "trio", "numbers": ["6", "3", "14", "1"]},
     ]
     assert plan["combinations"]
 
 
-def test_ready_tickets_follow_the_highest_win_score(monkeypatch) -> None:
+def test_ready_tickets_use_win_score_for_winner_and_place_score_for_trio(monkeypatch) -> None:
     monkeypatch.setattr(
         betting_service,
         "analyze_race",
@@ -99,6 +99,7 @@ def test_ready_tickets_follow_the_highest_win_score(monkeypatch) -> None:
                 {"NUMERO": 2, "place_prob_deep": 0.70, "p_win": 0.55},
                 {"NUMERO": 3, "place_prob_deep": 0.60, "p_win": 0.20},
                 {"NUMERO": 4, "place_prob_deep": 0.50, "p_win": 0.15},
+                {"NUMERO": 5, "place_prob_deep": 0.40, "p_win": 0.05},
             ],
         },
     )
@@ -108,7 +109,7 @@ def test_ready_tickets_follow_the_highest_win_score(monkeypatch) -> None:
     assert plan["ready_tickets"] == [
         {"type": "winner", "numbers": ["2"]},
         {"type": "quinella", "numbers": ["2", "3"]},
-        {"type": "trio", "numbers": ["2", "3", "4"]},
+        {"type": "trio", "numbers": ["1", "2", "3", "4"]},
     ]
 
 
@@ -118,6 +119,7 @@ def test_ready_tickets_skip_non_starters(monkeypatch) -> None:
         {"N°": 2, "Composite": 0.6, "NON_PARTANT": ""},
         {"N°": 3, "Composite": 0.5, "NON_PARTANT": ""},
         {"N°": 4, "Composite": 0.4, "NON_PARTANT": ""},
+        {"N°": 5, "Composite": 0.3, "NON_PARTANT": ""},
     ])
     monkeypatch.setattr(
         betting_service,
@@ -127,7 +129,7 @@ def test_ready_tickets_skip_non_starters(monkeypatch) -> None:
     monkeypatch.setattr(
         betting_service,
         "predict_model_race",
-        lambda *_args, **_kwargs: predictions_with_top(1, 2, 3, 4),
+        lambda *_args, **_kwargs: predictions_with_top(1, 2, 3, 4, 5),
     )
 
     plan = betting_service.generate_combination_plan(frame, "flat")
@@ -135,7 +137,32 @@ def test_ready_tickets_skip_non_starters(monkeypatch) -> None:
     assert plan["ready_tickets"] == [
         {"type": "winner", "numbers": ["2"]},
         {"type": "quinella", "numbers": ["2", "3"]},
-        {"type": "trio", "numbers": ["2", "3", "4"]},
+        {"type": "trio", "numbers": ["2", "3", "4", "5"]},
+    ]
+
+
+def test_ready_tickets_omit_trio_when_fewer_than_four_starters(monkeypatch) -> None:
+    frame = pd.DataFrame([
+        {"N°": 1, "Composite": 0.7, "NON_PARTANT": ""},
+        {"N°": 2, "Composite": 0.6, "NON_PARTANT": ""},
+        {"N°": 3, "Composite": 0.5, "NON_PARTANT": ""},
+    ])
+    monkeypatch.setattr(
+        betting_service,
+        "analyze_race",
+        lambda *_args, **_kwargs: (frame, pd.DataFrame(), None),
+    )
+    monkeypatch.setattr(
+        betting_service,
+        "predict_model_race",
+        lambda *_args, **_kwargs: predictions_with_top(1, 2, 3),
+    )
+
+    plan = betting_service.generate_combination_plan(frame, "flat")
+
+    assert plan["ready_tickets"] == [
+        {"type": "winner", "numbers": ["1"]},
+        {"type": "quinella", "numbers": ["1", "2"]},
     ]
 
 
