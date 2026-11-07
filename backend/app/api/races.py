@@ -25,6 +25,7 @@ from app.schemas.races import (
 from app.services.betting_service import (
     generate_combination_plan,
     generate_custom_combinations,
+    ready_tickets_for,
     simulate_race,
 )
 from app.services.analysis_service import analyze_race
@@ -62,7 +63,7 @@ router = APIRouter(prefix="/races", tags=["races"])
 logger = logging.getLogger(__name__)
 
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
-HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v8"
+HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v9"
 RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v3"
 BETTING_CACHE_VERSION = "betting-analysis-v7"
 PUBLIC_QUINTE_TTL_SECONDS = 300
@@ -345,6 +346,15 @@ def _analysis_response(
         else {}
     )
     model_predictions = predict_model_race(frame, race_type, source)
+    number_column = next(
+        (column for column in ("N°", "N", "Numero", "NUMERO", "N?", "NUM") if column in display_frame.columns),
+        None,
+    )
+    starter_numbers = list(dict.fromkeys(
+        str(value).strip().removesuffix(".0")
+        for value in (display_frame[number_column] if number_column else [])
+        if pd.notna(value) and str(value).strip()
+    ))
     model_check = _model_check_disagreements(
         prognosis_rows, display_frame, model_predictions, len(frame)
     )
@@ -365,6 +375,7 @@ def _analysis_response(
         race_details=str(frame["DESCRIPTIF"].iloc[0]) if "DESCRIPTIF" in frame.columns and not frame.empty else "",
         handicap=handicap,
         model_predictions=model_predictions,
+        ready_tickets=ready_tickets_for(model_predictions, starter_numbers),
     )
 
 

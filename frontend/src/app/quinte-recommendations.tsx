@@ -90,6 +90,29 @@ export function winScoreOf(row: Horse) {
   return raw && Number.isFinite(score) ? raw : "";
 }
 
+export type ReadyTicket = { type: string; numbers: string[] };
+
+type ReadyTicketLabels = { readyWinner: string; readyQuinella: string; readyTrio: string };
+
+export function readyTicketLabel(type: string, labels: ReadyTicketLabels) {
+  if (type === "quinella") return labels.readyQuinella;
+  if (type === "trio") return labels.readyTrio;
+  return labels.readyWinner;
+}
+
+export function ReadyTicketsGrid({ tickets, labels }: { tickets: ReadyTicket[]; labels: ReadyTicketLabels }) {
+  return (
+    <div className="ready-ticket-grid">
+      {tickets.map((ticket) => (
+        <div className={`ready-ticket ready-${ticket.type}`} key={ticket.type}>
+          <span>{readyTicketLabel(ticket.type, labels)}</span>
+          <strong>{ticket.numbers.join(" · ")}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function hasShodDef(row: Horse) {
   const defField = Object.keys(row).find((field) =>
     ["DEF.", "DEF"].includes(field.trim().toUpperCase()),

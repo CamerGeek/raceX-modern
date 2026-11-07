@@ -1,7 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { getModelShortlistRows, type PlotTwistItem, type QuinteModelPredictions } from "../quinte-recommendations";
+import {
+  getModelShortlistRows,
+  ReadyTicketsGrid,
+  type PlotTwistItem,
+  type QuinteModelPredictions,
+  type ReadyTicket,
+} from "../quinte-recommendations";
 import { interpolate } from "../../i18n/format";
 import { useI18n } from "../../i18n/provider";
 
@@ -17,7 +23,7 @@ type CombinationAnalysis = {
 type CombinationPlan = {
   race_type: string;
   combination_size: number;
-  ready_tickets?: { type: string; numbers: string[] }[];
+  ready_tickets?: ReadyTicket[];
   base: string[];
   substitutes?: string[];
   combinations: string[][];
@@ -84,12 +90,6 @@ function orderedStarters(analysis: CombinationAnalysis) {
     }));
 }
 
-function readyTicketLabel(type: string, t: { readyWinner: string; readyQuinella: string; readyTrio: string }) {
-  if (type === "quinella") return t.readyQuinella;
-  if (type === "trio") return t.readyTrio;
-  return t.readyWinner;
-}
-
 function CombinationResults({ plan }: { plan: CombinationPlan }) {
   const { messages } = useI18n();
   const t = messages.subscribers.combinations;
@@ -101,14 +101,7 @@ function CombinationResults({ plan }: { plan: CombinationPlan }) {
       {readyTickets.length > 0 && (
         <div className="ready-tickets">
           <h4>{t.readyTitle}</h4>
-          <div className="ready-ticket-grid">
-            {readyTickets.map((ticket) => (
-              <div className={`ready-ticket ready-${ticket.type}`} key={ticket.type}>
-                <span>{readyTicketLabel(ticket.type, t)}</span>
-                <strong>{ticket.numbers.join(" · ")}</strong>
-              </div>
-            ))}
-          </div>
+          <ReadyTicketsGrid tickets={readyTickets} labels={t} />
         </div>
       )}
       <p className="muted-result">

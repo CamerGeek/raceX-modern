@@ -144,7 +144,7 @@ def model_place_ranked_numbers(model_predictions: dict[str, Any] | None, limit: 
     return _ranked_numbers(model_predictions, DEEP_SCORE_COLUMNS, limit=limit)
 
 
-def _ready_tickets(model_predictions: dict[str, Any] | None, all_horses: list[str]) -> list[dict[str, Any]]:
+def ready_tickets_for(model_predictions: dict[str, Any] | None, all_horses: list[str]) -> list[dict[str, Any]]:
     """Model straight picks shown before the generated combinations.
 
     Winner and quinella follow the win score. The trio follows the place score and
@@ -301,7 +301,7 @@ def generate_combination_plan(
     else:
         prediction = predict_model_race(frame, race_type, source)
         shortlist = model_shortlist_numbers(prediction)
-        ready_tickets = _ready_tickets(prediction, all_horses)
+        ready_tickets = ready_tickets_for(prediction, all_horses)
         base = _derived_base(shortlist, twists, all_horses, combination_size)
     substitutes = [number for number in twists if number not in base]
 

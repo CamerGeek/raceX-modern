@@ -80,6 +80,7 @@ class AnalysisResponse(RaceResponse):
     race_details: str = ""
     handicap: dict[str, Any] | None = None
     model_predictions: ModelPredictionResponse | None = None
+    ready_tickets: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class TurfomaniaQuinteAnalysisResponse(AnalysisResponse):

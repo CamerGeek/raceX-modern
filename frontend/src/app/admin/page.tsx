@@ -9,6 +9,7 @@ import QuinteRecommendations, {
   getModelShortlistRows,
   getModelWinRows,
   PriorityTierPickCard,
+  ReadyTicketsGrid,
   ShodHorsesCard,
   winScoreOf,
   type PlotTwistItem,
@@ -36,6 +37,7 @@ type Analysis = {
   overview?: FlatOverview;
   race_details: string;
   model_predictions?: ModelPredictions | null;
+  ready_tickets?: { type: string; numbers: string[] }[];
 };
 
 type ScrapeResult = {
@@ -819,6 +821,17 @@ function AdminPageContent() {
             modelPredictions={analysis.model_predictions ?? null}
             plotTwistRows={plotTwistRows}
           />
+          {(analysis.ready_tickets ?? []).length > 0 && (
+            <section className="subscriber-ready-tickets public-widget">
+              <div className="ready-tickets">
+                <h4>Tickets prêts à jouer</h4>
+                <ReadyTicketsGrid
+                  tickets={analysis.ready_tickets ?? []}
+                  labels={{ readyWinner: "Gagnant", readyQuinella: "Couplé gagnant", readyTrio: "Trio" }}
+                />
+              </div>
+            </section>
+          )}
           {analysis.race_type === "trot" && (
             <div className="subscriber-insights-grid subscriber-insights-grid-single">
               <ShodHorsesCard rows={analysis.rows} />

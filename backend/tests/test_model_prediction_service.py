@@ -147,6 +147,45 @@ def test_obstacles_analysis_generates_report_with_model_predictions(monkeypatch)
     assert report.model_predictions.rows == [{"NUMERO": 4, "place_prob": 0.75}]
 
 
+def test_analysis_response_includes_ready_tickets(monkeypatch) -> None:
+    frame = pd.DataFrame([
+        {"N°": number, "CHEVAL": f"Runner {number}", "Composite": 0.9 - 0.05 * number}
+        for number in range(1, 6)
+    ])
+    prediction = {
+        "status": "ready",
+        "model_version": "test",
+        "bet_list": [],
+        "rows": [
+            {"NUMERO": 1, "place_prob_deep": 0.90, "p_win": 0.10},
+            {"NUMERO": 2, "place_prob_deep": 0.70, "p_win": 0.55},
+            {"NUMERO": 3, "place_prob_deep": 0.60, "p_win": 0.20},
+            {"NUMERO": 4, "place_prob_deep": 0.50, "p_win": 0.15},
+            {"NUMERO": 5, "place_prob_deep": 0.40, "p_win": 0.05},
+        ],
+        "message": None,
+    }
+    monkeypatch.setattr(races, "analyze_race", lambda source, *_args, **_kwargs: (source, pd.DataFrame(), None))
+    monkeypatch.setattr(races, "_prognosis_rows", lambda *_: [])
+    monkeypatch.setattr(races, "_legacy_sections", lambda *_: [])
+    monkeypatch.setattr(races, "_flat_overview", lambda *_: {})
+    monkeypatch.setattr(races, "predict_model_race", lambda *_: prediction)
+
+    report = races._analysis_response(
+        frame,
+        race_type="flat",
+        source="turfomania",
+        include_handicap=True,
+        max_horses=8,
+    )
+
+    assert report.ready_tickets == [
+        {"type": "winner", "numbers": ["2"]},
+        {"type": "quinella", "numbers": ["2", "3"]},
+        {"type": "trio", "numbers": ["1", "2", "3", "4"]},
+    ]
+
+
 @pytest.mark.parametrize("force_refresh", [False, True])
 def test_saved_race_analysis_uses_cache_unless_admin_forces_refresh(monkeypatch, force_refresh: bool) -> None:
     cache_response = AnalysisResponse(

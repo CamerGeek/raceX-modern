@@ -5,10 +5,12 @@ import QuinteOddsChart from "../quinte-odds-chart";
 import QuinteRecommendations, {
   getModelShortlistRows,
   getModelWinRows,
+  ReadyTicketsGrid,
   ShodHorsesCard,
   winScoreOf,
   type PlotTwistItem,
   type QuinteModelPredictions,
+  type ReadyTicket,
 } from "../quinte-recommendations";
 import SiteNavigation from "../site-navigation";
 import AccessGate from "../access-gate";
@@ -48,6 +50,7 @@ type Analysis = {
   overview: FlatOverview;
   handicap: { distance: number | null; penalized_count: number } | null;
   model_predictions: QuinteModelPredictions | null;
+  ready_tickets?: ReadyTicket[];
 };
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -534,6 +537,7 @@ function SubscriberDashboard() {
     });
   const plotTwistRows = analysis ? plotTwistCandidates(analysis.rows) : [];
   const modelShortlistRows = getModelShortlistRows(analysis?.model_predictions ?? null);
+  const readyTickets = analysis?.ready_tickets ?? [];
   const leadingHorse = getModelWinRows(analysis?.model_predictions ?? null)[0];
   const leaderScoreText = leadingHorse ? winScoreOf(leadingHorse) : "";
   const leaderScoreValue = Number(leaderScoreText.trim().replace(",", "."));
@@ -789,6 +793,15 @@ function SubscriberDashboard() {
           </section>
 
           <DisciplineHighlights analysis={analysis} />
+
+          {readyTickets.length > 0 && (
+            <section className="subscriber-ready-tickets public-widget" aria-labelledby="subscriber-ready-tickets-title">
+              <div className="ready-tickets">
+                <h4 id="subscriber-ready-tickets-title">{t.combinations.readyTitle}</h4>
+                <ReadyTicketsGrid tickets={readyTickets} labels={t.combinations} />
+              </div>
+            </section>
+          )}
 
           <footer className="subscriber-print-footer">
             <p>{t.footer.disclaimer}</p>
