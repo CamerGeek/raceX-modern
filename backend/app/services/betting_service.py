@@ -144,21 +144,54 @@ def model_place_ranked_numbers(model_predictions: dict[str, Any] | None, limit: 
     return _ranked_numbers(model_predictions, DEEP_SCORE_COLUMNS, limit=limit)
 
 
-def ready_tickets_for(model_predictions: dict[str, Any] | None, all_horses: list[str]) -> list[dict[str, Any]]:
+def composite_ranked_numbers(analyzed: pd.DataFrame) -> list[str]:
+    """Horse numbers ordered by composite score, matching the report's composite board."""
+    number_column = next((column for column in NUMBER_COLUMNS if column in analyzed.columns), None)
+    score_column = next((column for column in COMPOSITE_COLUMNS if column in analyzed.columns), None)
+    if number_column is None or score_column is None:
+        return []
+    ranked: list[tuple[str, float, int]] = []
+    for index, row in enumerate(analyzed.to_dict("records")):
+        number = _number(row.get(number_column))
+        score = _row_score(row, (score_column,))
+        if number and score is not None:
+            ranked.append((number, score, index))
+    ranked.sort(key=lambda item: (-item[1], item[2]))
+    return list(dict.fromkeys(number for number, _, _ in ranked))
+
+
+def ready_tickets_for(
+    model_predictions: dict[str, Any] | None,
+    all_horses: list[str],
+    composite_numbers: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Model straight picks shown before the generated combinations.
 
-    Winner and quinella follow the win score. The trio follows the place score and
-    keeps four horses so bettors can cover every three-horse combination.
+    Winner and quinella follow the win score. A second quinella follows the composite
+    ranking when it differs from the win-score pair. The trio follows the place score
+    and keeps four horses so bettors can cover every three-horse combination.
     """
     eligible = set(all_horses)
     win_ranked = [number for number in model_win_ranked_numbers(model_predictions) if number in eligible]
     place_ranked = [number for number in model_place_ranked_numbers(model_predictions) if number in eligible]
+    composite_ranked = [number for number in (composite_numbers or []) if number in eligible]
     pools = {"winner": win_ranked, "quinella": win_ranked, "trio": place_ranked}
-    return [
+    tickets = [
         {"type": kind, "numbers": pools[kind][:size]}
         for kind, size in READY_TICKET_SIZES
         if len(pools[kind]) >= size
     ]
+    composite_pair = composite_ranked[:2]
+    if len(composite_pair) == 2 and composite_pair != win_ranked[:2]:
+        insert_at = len(tickets)
+        for index, ticket in enumerate(tickets):
+            if ticket["type"] in {"winner", "quinella"}:
+                insert_at = index + 1
+            elif ticket["type"] == "trio":
+                insert_at = min(insert_at, index)
+                break
+        tickets.insert(insert_at, {"type": "composite_quinella", "numbers": composite_pair})
+    return tickets
 
 
 def plot_twist_numbers(analyzed: pd.DataFrame) -> list[str]:
@@ -301,7 +334,7 @@ def generate_combination_plan(
     else:
         prediction = predict_model_race(frame, race_type, source)
         shortlist = model_shortlist_numbers(prediction)
-        ready_tickets = ready_tickets_for(prediction, all_horses)
+        ready_tickets = ready_tickets_for(prediction, all_horses, composite_ranked_numbers(analyzed))
         base = _derived_base(shortlist, twists, all_horses, combination_size)
     substitutes = [number for number in twists if number not in base]
 

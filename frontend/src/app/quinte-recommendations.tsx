@@ -92,10 +92,11 @@ export function winScoreOf(row: Horse) {
 
 export type ReadyTicket = { type: string; numbers: string[] };
 
-type ReadyTicketLabels = { readyWinner: string; readyQuinella: string; readyTrio: string };
+type ReadyTicketLabels = { readyWinner: string; readyQuinella: string; readyQuinellaComposite: string; readyTrio: string };
 
 export function readyTicketLabel(type: string, labels: ReadyTicketLabels) {
   if (type === "quinella") return labels.readyQuinella;
+  if (type === "composite_quinella") return labels.readyQuinellaComposite;
   if (type === "trio") return labels.readyTrio;
   return labels.readyWinner;
 }

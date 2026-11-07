@@ -957,7 +957,7 @@ function AdminPageContent() {
                 <h4>Tickets prêts à jouer</h4>
                 <ReadyTicketsGrid
                   tickets={analysis.ready_tickets ?? []}
-                  labels={{ readyWinner: "Gagnant", readyQuinella: "Couplé gagnant", readyTrio: "Trio" }}
+                  labels={{ readyWinner: "Gagnant", readyQuinella: "Couplé gagnant", readyQuinellaComposite: "Couplé Composite", readyTrio: "Trio" }}
                 />
               </div>
             </section>

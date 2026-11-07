@@ -182,6 +182,7 @@ def test_analysis_response_includes_ready_tickets(monkeypatch) -> None:
     assert report.ready_tickets == [
         {"type": "winner", "numbers": ["2"]},
         {"type": "quinella", "numbers": ["2", "3"]},
+        {"type": "composite_quinella", "numbers": ["1", "2"]},
         {"type": "trio", "numbers": ["1", "2", "3", "4"]},
     ]
 

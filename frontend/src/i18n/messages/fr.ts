@@ -339,6 +339,7 @@ const fr = {
       readyTitle: "Tickets prêts à jouer",
       readyWinner: "Gagnant",
       readyQuinella: "Couplé gagnant",
+      readyQuinellaComposite: "Couplé Composite",
       readyTrio: "Trio",
       autoTitle: "Plan automatique",
       autoDescription: "Toutes les combinaisons de {size} chevaux du Model Shortlist, jusqu’à {count} tickets.",
@@ -438,7 +439,7 @@ const fr = {
       },
       {
         question: "Comment les combinaisons automatiques sont-elles générées ?",
-        answer: "RaceX AI prend le Model Shortlist et joue toutes les combinaisons de la taille choisie : Quinté+ (5 chevaux, jusqu’à 56 tickets), Quarté+ (4 chevaux, jusqu’à 70 tickets) et Tiercé/Trio (3 chevaux, jusqu’à 56 tickets). Avec 8 chevaux au shortlist, vous obtenez donc 56, 70 ou 56 tickets selon le jeu. Avant ces combinaisons, l’application affiche trois tickets prêts à jouer : Gagnant (1 cheval) et Couplé gagnant (2 chevaux) issus des meilleurs scores gagnants, puis Trio (4 chevaux) issu des meilleurs scores de place, afin de couvrir toutes les combinaisons de trois chevaux. Les trois premiers chevaux du shortlist sont affichés comme base indicative, mais ils ne sont pas imposés sur chaque ticket : chaque cheval du shortlist apparaît dans plusieurs combinaisons. Chaque jeu est calculé une fois puis partagé depuis le cache de la course ; il est recalculé lorsque les données ou la version du plan changent.",
+        answer: "RaceX AI prend le Model Shortlist et joue toutes les combinaisons de la taille choisie : Quinté+ (5 chevaux, jusqu’à 56 tickets), Quarté+ (4 chevaux, jusqu’à 70 tickets) et Tiercé/Trio (3 chevaux, jusqu’à 56 tickets). Avec 8 chevaux au shortlist, vous obtenez donc 56, 70 ou 56 tickets selon le jeu. Avant ces combinaisons, l’application affiche quatre tickets prêts à jouer : Gagnant (1 cheval) et Couplé gagnant (2 chevaux) issus des meilleurs scores gagnants, puis Couplé Composite (les deux premiers chevaux du score composite, proposé seulement s’il diffère du Couplé gagnant), et enfin Trio (4 chevaux) issu des meilleurs scores de place, afin de couvrir toutes les combinaisons de trois chevaux. Les trois premiers chevaux du shortlist sont affichés comme base indicative, mais ils ne sont pas imposés sur chaque ticket : chaque cheval du shortlist apparaît dans plusieurs combinaisons. Chaque jeu est calculé une fois puis partagé depuis le cache de la course ; il est recalculé lorsque les données ou la version du plan changent.",
       },
       {
         question: "Puis-je composer mes propres combinaisons ?",

@@ -23,6 +23,7 @@ from app.schemas.races import (
     TurfomaniaQuinteAnalysisResponse,
 )
 from app.services.betting_service import (
+    composite_ranked_numbers,
     generate_combination_plan,
     generate_custom_combinations,
     ready_tickets_for,
@@ -63,9 +64,9 @@ router = APIRouter(prefix="/races", tags=["races"])
 logger = logging.getLogger(__name__)
 
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
-HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v9"
-RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v3"
-BETTING_CACHE_VERSION = "betting-analysis-v7"
+HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v10"
+RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v4"
+BETTING_CACHE_VERSION = "betting-analysis-v8"
 PUBLIC_QUINTE_TTL_SECONDS = 300
 
 _public_quinte_cache: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -375,7 +376,11 @@ def _analysis_response(
         race_details=str(frame["DESCRIPTIF"].iloc[0]) if "DESCRIPTIF" in frame.columns and not frame.empty else "",
         handicap=handicap,
         model_predictions=model_predictions,
-        ready_tickets=ready_tickets_for(model_predictions, starter_numbers),
+        ready_tickets=ready_tickets_for(
+            model_predictions,
+            starter_numbers,
+            composite_ranked_numbers(display_frame),
+        ),
     )
 
 
