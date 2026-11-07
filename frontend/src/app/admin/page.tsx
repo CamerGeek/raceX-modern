@@ -52,7 +52,28 @@ type ScrapeResult = {
 
 type RaceOption = { id: string; race_key: string; url: string; race_type?: "flat" | "trot" | "obstacles"; q_plus?: boolean };
 
+type AnalysisRun = {
+  id: string;
+  created_at: string | null;
+  model_version: string | null;
+  cache_version: string | null;
+  is_current: boolean;
+  restorable: boolean;
+  restore_blocked_reason: string | null;
+};
+
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+function formatRunTimestamp(value: string | null) {
+  if (!value) return "Unknown date";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Europe/Paris",
+  }).format(parsed);
+}
 
 async function fetchMeetings(date: string, apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) {
   const response = await apiFetch(`${apiUrl}/api/v1/meetings?date=${date}&refresh=true`);
@@ -231,6 +252,29 @@ function AdminPageContent() {
   const [combinationSize, setCombinationSize] = useState(5);
   const [bettingLoading, setBettingLoading] = useState(false);
   const [bettingError, setBettingError] = useState("");
+  const [analysisIsQuinte, setAnalysisIsQuinte] = useState(false);
+  const [analysisRuns, setAnalysisRuns] = useState<AnalysisRun[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState("");
+  const [historyNotice, setHistoryNotice] = useState("");
+  const [restoringRunId, setRestoringRunId] = useState("");
+
+  function resetAnalysisHistory() {
+    setAnalysisRuns([]);
+    setHistoryOpen(false);
+    setHistoryLoading(false);
+    setHistoryError("");
+    setHistoryNotice("");
+    setRestoringRunId("");
+  }
+
+  const selectedRaceOption = races.find((race) => race.id === selectedRace);
+  const historyRaceId = selectedRaceOption?.q_plus
+    ? selectedRaceOption.id
+    : analysisIsQuinte
+      ? analysis?.race_id ?? ""
+      : "";
 
   const rankedHorses = analysis?.prognosis.length ? analysis.prognosis : analysis?.rows ?? [];
   const modelShortlistRows = [...(analysis?.model_predictions?.rows ?? [])]
@@ -348,6 +392,8 @@ function AdminPageContent() {
     setError("");
     setShowManualUrl(false);
     setTypeSource("automatic");
+    setAnalysisIsQuinte(false);
+    resetAnalysisHistory();
     if (nextUrl) {
       apiFetch(`${apiUrl}/api/v1/meetings/stored?meeting_url=${encodeURIComponent(nextUrl)}&date=${encodeURIComponent(meetingDate)}`)
         .then(async (response) => {
@@ -405,6 +451,9 @@ function AdminPageContent() {
     setError("");
     setAnalysis(null);
     setScrapeResult(null);
+    setAnalysisIsQuinte(false);
+    resetAnalysisHistory();
+
     try {
       const source = meetingUrl.startsWith("turfomania://") ? "turfomania" : "zone-turf";
       const response = await apiFetch(`${apiUrl}/api/v1/races/analyze`, {
@@ -439,6 +488,8 @@ function AdminPageContent() {
     setUrl(race?.url ?? meetingUrl);
     setAnalysis(null);
     setScrapeResult(null);
+    setAnalysisIsQuinte(false);
+    resetAnalysisHistory();
     const shouldDetectType = Boolean(race && (!race.race_type || isTurfomaniaMeeting));
     setDetectingType(shouldDetectType);
     if (!race) {
@@ -477,6 +528,8 @@ function AdminPageContent() {
     setError("");
     setAnalysis(null);
     setScrapeResult(null);
+    setAnalysisIsQuinte(true);
+    resetAnalysisHistory();
     try {
       const response = await apiFetch(`${apiUrl}/api/v1/races/turfomania/quinte/analyze`, {
         method: "POST",
@@ -522,6 +575,8 @@ function AdminPageContent() {
     setError("");
     setAnalysis(null);
     setScrapeResult(null);
+    setAnalysisIsQuinte(true);
+    resetAnalysisHistory();
     try {
       const response = await apiFetch(`${apiUrl}/api/v1/races/turfomania/quinte/tomorrow/analyze`, {
         method: "POST",
@@ -552,6 +607,63 @@ function AdminPageContent() {
       setError(requestError instanceof Error ? requestError.message : "Tomorrow's Quinté+ analysis failed");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadAnalysisRuns(raceId: string) {
+    setHistoryLoading(true);
+    setHistoryError("");
+    try {
+      const response = await apiFetch(`${apiUrl}/api/v1/races/${raceId}/analysis-runs`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Unable to load previous analyses");
+      setAnalysisRuns((payload.runs ?? []) as AnalysisRun[]);
+    } catch (requestError) {
+      setAnalysisRuns([]);
+      setHistoryError(requestError instanceof Error ? requestError.message : "Unable to load previous analyses");
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  function toggleAnalysisHistory() {
+    if (historyOpen) {
+      setHistoryOpen(false);
+      return;
+    }
+    setHistoryOpen(true);
+    if (historyRaceId) void loadAnalysisRuns(historyRaceId);
+  }
+
+  async function restoreAnalysisRun(run: AnalysisRun) {
+    if (!historyRaceId || !run.restorable || run.is_current) return;
+    const raceId = historyRaceId;
+    setRestoringRunId(run.id);
+    setHistoryError("");
+    setHistoryNotice("");
+    try {
+      const response = await apiFetch(`${apiUrl}/api/v1/races/${raceId}/analysis-runs/${run.id}/restore`, {
+        method: "POST",
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Unable to restore this analysis");
+      setAnalysis(payload as Analysis);
+      setAnalysisIsQuinte(true);
+      setRaceType((payload as Analysis).race_type);
+      setTypeSource("automatic");
+      setReportTab("overview");
+      setSimulationRows([]);
+      setCombinations([]);
+      setCombinationReadyTickets([]);
+      setCombinationBase([]);
+      setCombinationSubstitutes([]);
+      setHistoryNotice(`Restored the analysis from ${formatRunTimestamp(run.created_at)}.`);
+      setHistoryOpen(false);
+      await loadAnalysisRuns(raceId);
+    } catch (requestError) {
+      setHistoryError(requestError instanceof Error ? requestError.message : "Unable to restore this analysis");
+    } finally {
+      setRestoringRunId("");
     }
   }
 
@@ -650,6 +762,7 @@ function AdminPageContent() {
 
           <button className="analyze-button" type="submit" disabled={loading || detectingType || !meetingUrl && !url}>{loading ? "Saving meeting..." : storedMeeting && !forceRefresh ? "Load saved meeting" : "Download & save meeting"}<span aria-hidden="true">↗</span></button>
           {selectedRace && <button className="analyze-button" type="button" onClick={() => void analyzeSelectedRace(undefined, Boolean(analysis))} disabled={loading || detectingType}>{loading ? "Analyzing race..." : analysis ? "Re-run analysis" : "Analyze selected race"}<span aria-hidden="true">↗</span></button>}
+          {selectedRaceOption?.q_plus && !analysis && <button className="analyze-button" type="button" onClick={toggleAnalysisHistory} aria-expanded={historyOpen} disabled={loading}>{historyOpen ? "Hide previous analyses" : "Previous analyses"}<span aria-hidden="true">↗</span></button>}
           {meetingUrl.startsWith("turfomania://meetings/") && !showManualUrl && meetingDate === today && <button className="analyze-button quinte-button" type="button" onClick={() => void analyzeTurfomaniaQuinte()} disabled={loading}>
             {loading ? "Refreshing Quinté analysis..." : "Refresh today’s Quinté analysis"}<span aria-hidden="true">↗</span>
           </button>}
@@ -662,10 +775,28 @@ function AdminPageContent() {
         </form>
 
         <section className="results-panel" aria-live="polite">
-          <div className="section-heading"><div><div className="eyebrow">PROGNOSIS / {analysis ? analysis.race_type.toUpperCase() : "WAITING"}</div><h2>{analysis ? "Race report" : "Short list"}</h2></div>{analysis && <div className="admin-report-actions"><span className="count">{analysis.row_count} runners read</span><button type="button" className="admin-print-button" onClick={printActiveRace}>Print / Save PDF</button></div>}</div>
+          <div className="section-heading"><div><div className="eyebrow">PROGNOSIS / {analysis ? analysis.race_type.toUpperCase() : "WAITING"}</div><h2>{analysis ? "Race report" : "Short list"}</h2></div>{analysis && <div className="admin-report-actions"><span className="count">{analysis.row_count} runners read</span>{historyRaceId && <button type="button" className="admin-history-button" onClick={toggleAnalysisHistory} aria-expanded={historyOpen} disabled={loading}>{historyOpen ? "Hide previous" : "Previous analyses"}</button>}<button type="button" className="admin-print-button" onClick={printActiveRace}>Print / Save PDF</button></div>}</div>
           {!analysis && !scrapeResult && !loading && <div className="empty-state"><span className="starting-mark">01</span><p>Select a date and meeting to begin.</p></div>}
           {loading && <div className="empty-state"><span className="starting-mark pulse">...</span><p>Scraping and preparing the race report.</p></div>}
           {scrapeResult && <div className="saved-state"><span className="starting-mark">✓</span><h3>Meeting saved</h3><p>{scrapeResult.race_count} races and {scrapeResult.runner_count} runners stored in <strong>{scrapeResult.runner_table}</strong>.</p><span>{scrapeResult.columns.length} source columns preserved</span></div>}
+          {historyNotice && <p className="stored-notice" role="status">{historyNotice}</p>}
+          {historyOpen && historyRaceId && <section className="analysis-history" aria-label="Previous analyses">
+            <div className="analysis-history-heading">
+              <div><span>ANALYSIS HISTORY</span><h3>Previous cached analyses</h3></div>
+              {historyLoading && <span className="count">Loading...</span>}
+            </div>
+            {historyError && <p className="error" role="alert">{historyError}</p>}
+            {!historyLoading && !historyError && analysisRuns.length === 0 && <p className="muted-result">No previous cached analyses for this race yet.</p>}
+            {analysisRuns.length > 0 && <ul className="analysis-history-list">
+              {analysisRuns.map((run) => <li key={run.id}>
+                <div>
+                  <strong>{formatRunTimestamp(run.created_at)}</strong>
+                  <span>{run.model_version ?? "Unknown model"}{run.is_current ? " · current" : ""}{run.restorable ? "" : ` · ${run.restore_blocked_reason}`}</span>
+                </div>
+                <button type="button" onClick={() => void restoreAnalysisRun(run)} disabled={!run.restorable || run.is_current || Boolean(restoringRunId)}>{restoringRunId === run.id ? "Restoring..." : run.is_current ? "Current" : "Restore"}</button>
+              </li>)}
+            </ul>}
+          </section>}
           {analysis && <>
             {analysis.race_details && <div className="race-details"><span>RACE DETAILS</span><p>{analysis.race_details}</p></div>}
             <section className="prognosis-miss-signal" aria-label="Horses not shared by prognosis, deep-score top eight, and composite top eight">
