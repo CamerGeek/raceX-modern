@@ -30,8 +30,12 @@ type CombinationsPanelProps = {
 };
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const COMBINATION_SIZE = 5;
-const MAX_BASE = COMBINATION_SIZE - 1;
+const GAME_OPTIONS = [
+  { size: 5, label: "gameQuinte" as const, maxTickets: 56 },
+  { size: 4, label: "gameQuarte" as const, maxTickets: 70 },
+  { size: 3, label: "gameTierce" as const, maxTickets: 56 },
+];
+const DEFAULT_GAME_SIZE = 5;
 const numberFields = ["N°", "N", "Numero", "NUMERO", "NUM"];
 const nameFields = ["CHEVAL", "Cheval", "NOM", "NAME"];
 const scoreFields = ["Composite", "COMPOSITE_SCORE", "SCORE", "CS_norm", "Score"];
@@ -114,6 +118,9 @@ function CombinationResults({ plan }: { plan: CombinationPlan }) {
 export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, online }: CombinationsPanelProps) {
   const { messages, intlLocale } = useI18n();
   const t = messages.subscribers.combinations;
+  const [combinationSize, setCombinationSize] = useState(DEFAULT_GAME_SIZE);
+  const maxBase = combinationSize - 1;
+  const maxTickets = GAME_OPTIONS.find(({ size }) => size === combinationSize)?.maxTickets ?? 56;
   const starters = useMemo(() => orderedStarters(analysis), [analysis]);
   const starterNumbers = useMemo(() => new Set(starters.map(({ number }) => number)), [starters]);
   const suggestedBase = useMemo(() => {
@@ -121,8 +128,8 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
       .map((row) => normalizeNumber(firstValue(row, numberFields)))
       .filter((number) => starterNumbers.has(number));
     const seeds = shortlist.length > 0 ? shortlist : starters.map(({ number }) => number);
-    return [...new Set(seeds)].slice(0, Math.min(3, MAX_BASE));
-  }, [analysis.model_predictions, starters, starterNumbers]);
+    return [...new Set(seeds)].slice(0, Math.min(3, combinationSize - 1));
+  }, [analysis.model_predictions, starters, starterNumbers, combinationSize]);
   const plotTwistNumbers = useMemo(
     () => plotTwistRows
       .map(({ horse }) => normalizeNumber(firstValue(horse, numberFields)))
@@ -161,7 +168,7 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
     }
     setAutoLoading(true);
     try {
-      setAutoPlan(await requestPlan("/combinations"));
+      setAutoPlan(await requestPlan("/combinations", { combination_size: combinationSize }));
     } catch (error) {
       setAutoError(error instanceof Error && error.message ? error.message : t.error);
     } finally {
@@ -176,8 +183,8 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
       setBase(base.filter((selected) => selected !== number));
       return;
     }
-    if (base.length >= MAX_BASE) {
-      setCustomError(t.validationBaseMax);
+    if (base.length >= maxBase) {
+      setCustomError(interpolate(t.validationBaseMax, { maxBase, size: combinationSize }));
       return;
     }
     setAssociates(associates.filter((selected) => selected !== number));
@@ -209,6 +216,16 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
     setAssociates([]);
   }
 
+  function changeGame(size: number) {
+    if (size === combinationSize) return;
+    setCombinationSize(size);
+    setAutoError("");
+    setAutoPlan(null);
+    setCustomError("");
+    setCustomPlan(null);
+    setBase((current) => current.slice(0, size - 1));
+  }
+
   async function generateCustom() {
     setCustomError("");
     setCustomPlan(null);
@@ -220,14 +237,14 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
       setCustomError(t.validationBase);
       return;
     }
-    const needed = COMBINATION_SIZE - base.length;
+    const needed = combinationSize - base.length;
     if (associates.length > 0 && associates.length < needed) {
       setCustomError(interpolate(t.validationAssociates, { count: needed }));
       return;
     }
     setCustomLoading(true);
     try {
-      setCustomPlan(await requestPlan("/combinations/custom", { base, associates }));
+      setCustomPlan(await requestPlan("/combinations/custom", { base, associates, combination_size: combinationSize }));
     } catch (error) {
       setCustomError(error instanceof Error && error.message ? error.message : t.error);
     } finally {
@@ -254,11 +271,24 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
         </div>
       </div>
 
+      <div className="combination-game-switch" role="group" aria-label={t.gameAria}>
+        {GAME_OPTIONS.map((option) => (
+          <button
+            key={option.size}
+            type="button"
+            aria-pressed={combinationSize === option.size}
+            onClick={() => changeGame(option.size)}
+          >
+            {t[option.label]}
+          </button>
+        ))}
+      </div>
+
       <article className="combination-panel public-widget">
         <div className="combination-panel-heading">
           <div>
             <h3>{t.autoTitle}</h3>
-            <p>{t.autoDescription}</p>
+            <p>{interpolate(t.autoDescription, { size: combinationSize, count: maxTickets })}</p>
           </div>
           <button
             type="button"
@@ -277,7 +307,7 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
         <div className="combination-panel-heading">
           <div>
             <h3>{t.customTitle}</h3>
-            <p>{t.customDescription}</p>
+            <p>{interpolate(t.customDescription, { size: combinationSize })}</p>
           </div>
           <div className="combination-panel-actions">
             <button type="button" className="cache-refresh-button" onClick={useSuggestedBase} disabled={suggestedBase.length === 0}>
@@ -324,7 +354,7 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
           })}
         </div>
         <p className="muted-result">
-          {t.baseHint} {t.associatesHint}
+          {interpolate(t.baseHint, { maxBase, size: combinationSize })} {t.associatesHint}
           {plotTwistNumbers.length > 0 && <> {interpolate(t.plotTwistHint, { numbers: plotTwistNumbers.join(" · ") })}.</>}
         </p>
         {customError && <p className="error" role="alert">{customError}</p>}

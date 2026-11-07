@@ -404,6 +404,10 @@ h2 { font-size: 2.4rem; font-weight: 500; margin: .4rem 0 0; }
 .combination-panel-heading h3 { margin: 0; color: var(--deep); font-size: 1.05rem; font-weight: 500; }
 .combination-panel-heading p { max-width: 62ch; margin: .35rem 0 0; color: var(--muted); font: .78rem/1.55 ui-sans-serif, system-ui, sans-serif; }
 .combination-panel-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.combination-game-switch { display: inline-flex; flex-wrap: wrap; gap: .3rem; justify-self: start; padding: .25rem; border: 1px solid var(--line); border-radius: .55rem; background: var(--card-wash); }
+.combination-game-switch button { border: 0; border-radius: .4rem; padding: .5rem .85rem; color: var(--muted); background: transparent; cursor: pointer; font: 700 .68rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .05em; text-transform: uppercase; }
+.combination-game-switch button:hover { color: var(--green); background: #f1f0e8; }
+.combination-game-switch button[aria-pressed="true"] { color: #fff; background: var(--green); }
 .combination-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .45rem; }
 .combination-pick { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; align-items: center; gap: .45rem .6rem; padding: .5rem .6rem; border: 1px solid var(--card-line); border-radius: .5rem; background: #fff; font: .78rem ui-sans-serif, system-ui, sans-serif; }
 .combination-pick > strong { color: var(--green); }

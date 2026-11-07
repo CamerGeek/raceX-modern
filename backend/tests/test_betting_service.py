@@ -5,7 +5,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.api import races
-from app.schemas.races import CustomCombinationRequest
+from app.schemas.races import CustomCombinationRequest, SubscriberCombinationRequest
 from app.services import betting_service
 
 
@@ -78,8 +78,20 @@ def test_plan_reports_the_shortlist_top_three_as_the_base(monkeypatch) -> None:
     assert plan["combinations"]
 
 
-@pytest.mark.parametrize("race_type", ["flat", "trot"])
-def test_plan_generates_all_combinations_of_the_eight_horse_shortlist(monkeypatch, race_type: str) -> None:
+@pytest.mark.parametrize(
+    ("race_type", "combination_size", "tickets"),
+    [
+        ("flat", 5, 56),
+        ("flat", 4, 70),
+        ("flat", 3, 56),
+        ("trot", 5, 56),
+        ("trot", 4, 70),
+        ("trot", 3, 56),
+    ],
+)
+def test_plan_generates_all_combinations_of_the_eight_horse_shortlist(
+    monkeypatch, race_type: str, combination_size: int, tickets: int
+) -> None:
     monkeypatch.setattr(
         betting_service,
         "analyze_race",
@@ -92,13 +104,15 @@ def test_plan_generates_all_combinations_of_the_eight_horse_shortlist(monkeypatc
         lambda *_args, **_kwargs: predictions_with_top(*shortlist),
     )
 
-    plan = betting_service.generate_combination_plan(pd.DataFrame(), race_type)
+    plan = betting_service.generate_combination_plan(
+        pd.DataFrame(), race_type, combination_size, max_combinations=tickets
+    )
 
     expected = [str(number) for number in shortlist]
-    assert len(plan["combinations"]) == 56
-    assert all(len(combination) == 5 for combination in plan["combinations"])
+    assert len(plan["combinations"]) == tickets
+    assert all(len(combination) == combination_size for combination in plan["combinations"])
     assert {frozenset(combination) for combination in plan["combinations"]} == {
-        frozenset(combination) for combination in itertools.combinations(expected, 5)
+        frozenset(combination) for combination in itertools.combinations(expected, combination_size)
     }
 
 
@@ -293,6 +307,56 @@ def test_subscriber_combinations_return_the_cached_plan(monkeypatch) -> None:
     assert races.subscriber_combinations("race-id", {}) == {"cached": True}
 
 
+def test_subscriber_combinations_use_the_requested_game_size(monkeypatch) -> None:
+    captured: dict = {}
+    monkeypatch.setattr(races, "SupabaseClientWrapper", lambda: object())
+    monkeypatch.setattr(
+        races,
+        "_saved_frame",
+        lambda *_args: (
+            pd.DataFrame(),
+            {"race_type": "flat", "source": "turfomania", "summary": {"q_plus": True}},
+        ),
+    )
+
+    def cached(*_args, **kwargs):
+        captured.update(kwargs["options"])
+        return {"cached": True}
+
+    monkeypatch.setattr(races, "_cached_result", cached)
+
+    response = races.subscriber_combinations(
+        "race-id", {}, SubscriberCombinationRequest(combination_size=4)
+    )
+
+    assert response == {"cached": True}
+    assert captured["combination_size"] == 4
+    assert captured["max_combinations"] == 70
+
+
+def test_subscriber_combinations_default_to_quinte(monkeypatch) -> None:
+    monkeypatch.setattr(races, "SupabaseClientWrapper", lambda: object())
+    monkeypatch.setattr(
+        races,
+        "_saved_frame",
+        lambda *_args: (
+            pd.DataFrame(),
+            {"race_type": "flat", "source": "turfomania", "summary": {"q_plus": True}},
+        ),
+    )
+    captured: dict = {}
+
+    def cached(*_args, **kwargs):
+        captured.update(kwargs["options"])
+        return {"cached": True}
+
+    monkeypatch.setattr(races, "_cached_result", cached)
+
+    assert races.subscriber_combinations("race-id", {}) == {"cached": True}
+    assert captured["combination_size"] == 5
+    assert captured["max_combinations"] == 56
+
+
 def test_subscriber_combinations_reject_non_quinte_races(monkeypatch) -> None:
     monkeypatch.setattr(races, "SupabaseClientWrapper", lambda: object())
     monkeypatch.setattr(
@@ -342,3 +406,35 @@ def test_subscriber_custom_combinations_use_the_reducing_system(monkeypatch) -> 
     assert captured["max_combinations"] == 56
     assert response["combinations"] == [["2", "5", "1", "3", "4"]]
     assert response["base"] == ["2", "5"]
+
+
+def test_subscriber_custom_combinations_follow_the_requested_game_size(monkeypatch) -> None:
+    captured: dict = {}
+    monkeypatch.setattr(races, "SupabaseClientWrapper", lambda: object())
+    monkeypatch.setattr(
+        races,
+        "_saved_frame",
+        lambda *_args: (
+            pd.DataFrame(),
+            {"race_type": "flat", "source": "turfomania", "summary": {"q_plus": True}},
+        ),
+    )
+
+    def custom(frame, race_type, base, associates, combination_size, max_combinations):
+        captured.update(
+            combination_size=combination_size,
+            max_combinations=max_combinations,
+        )
+        return {"combinations": [["2", "5", "1"]], "base": base, "associates": associates}
+
+    monkeypatch.setattr(races, "generate_custom_combinations", custom)
+
+    response = races.subscriber_custom_combinations(
+        "race-id",
+        CustomCombinationRequest(base=["2", "5"], associates=["1"], combination_size=3),
+        {},
+    )
+
+    assert captured["combination_size"] == 3
+    assert captured["max_combinations"] == 56
+    assert response["combination_size"] == 3

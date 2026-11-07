@@ -17,6 +17,7 @@ from app.schemas.races import (
     CustomCombinationRequest,
     RaceResponse,
     ScrapeRequest,
+    SubscriberCombinationRequest,
     TodayQuinteAnalysisRequest,
     TurfomaniaQuinteAnalysisRequest,
     TurfomaniaQuinteAnalysisResponse,
@@ -63,7 +64,7 @@ logger = logging.getLogger(__name__)
 TROT_DISPLAY_EXCLUDED_COLUMNS = {"POIDS", "IC", "HANDICAP_DISTANCE"}
 HOMEPAGE_QUINTE_CACHE_VERSION = "daily-quinte-composite-v8"
 RACE_ANALYSIS_CACHE_VERSION = "race-analysis-v3"
-BETTING_CACHE_VERSION = "betting-analysis-v4"
+BETTING_CACHE_VERSION = "betting-analysis-v5"
 PUBLIC_QUINTE_TTL_SECONDS = 300
 
 _public_quinte_cache: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -981,8 +982,15 @@ def combinations(request: BettingRequest, _: dict[str, Any] = Depends(require_ad
         raise HTTPException(status_code=502, detail=f"Combination generation failed: {exc}") from exc
 
 
+# Quinté+ (5), Quarté+ (4) and Tiercé/Trio (3) play the same Model Shortlist.
+SUBSCRIBER_COMBINATION_SIZES = (5, 4, 3)
+SUBSCRIBER_MAX_COMBINATIONS_BY_SIZE = {5: 56, 4: 70, 3: 56}
 SUBSCRIBER_COMBINATION_SIZE = 5
-SUBSCRIBER_MAX_COMBINATIONS = 56
+
+
+def _subscriber_combination_options(combination_size: int) -> tuple[int, int]:
+    size = combination_size if combination_size in SUBSCRIBER_COMBINATION_SIZES else SUBSCRIBER_COMBINATION_SIZE
+    return size, SUBSCRIBER_MAX_COMBINATIONS_BY_SIZE[size]
 
 
 def _subscriber_quinte_frame(client: SupabaseClientWrapper, race_id: str) -> tuple[pd.DataFrame, dict]:
@@ -997,15 +1005,19 @@ def _subscriber_quinte_frame(client: SupabaseClientWrapper, race_id: str) -> tup
 def subscriber_combinations(
     race_id: str,
     _: dict[str, Any] = Depends(require_subscriber_features),
+    request: SubscriberCombinationRequest | None = None,
 ) -> dict[str, Any]:
-    """Serve the cached Quinté+ combination plan, generating it once when needed."""
+    """Serve the cached combination plan for the chosen game, generating it once when needed."""
     try:
         client = SupabaseClientWrapper()
         frame, race = _subscriber_quinte_frame(client, race_id)
+        combination_size, max_combinations = _subscriber_combination_options(
+            request.combination_size if request else SUBSCRIBER_COMBINATION_SIZE
+        )
         options = {
             "race_type": race["race_type"],
-            "combination_size": SUBSCRIBER_COMBINATION_SIZE,
-            "max_combinations": SUBSCRIBER_MAX_COMBINATIONS,
+            "combination_size": combination_size,
+            "max_combinations": max_combinations,
             "mandatory": [],
             "excluded": [],
         }
@@ -1027,14 +1039,14 @@ def subscriber_combinations(
         plan = generate_combination_plan(
             frame,
             race["race_type"],
-            SUBSCRIBER_COMBINATION_SIZE,
-            SUBSCRIBER_MAX_COMBINATIONS,
+            combination_size,
+            max_combinations,
             source=str(race.get("source") or "turfomania"),
         )
         result = {
             "race_id": race_id,
             "race_type": race["race_type"],
-            "combination_size": SUBSCRIBER_COMBINATION_SIZE,
+            "combination_size": combination_size,
             "base": plan["base"],
             "substitutes": plan["substitutes"],
             "combinations": plan["combinations"],
@@ -1067,18 +1079,19 @@ def subscriber_custom_combinations(
     try:
         client = SupabaseClientWrapper()
         frame, race = _subscriber_quinte_frame(client, race_id)
+        combination_size, max_combinations = _subscriber_combination_options(request.combination_size)
         plan = generate_custom_combinations(
             frame,
             race["race_type"],
             request.base,
             request.associates,
-            SUBSCRIBER_COMBINATION_SIZE,
-            SUBSCRIBER_MAX_COMBINATIONS,
+            combination_size,
+            max_combinations,
         )
         return {
             "race_id": race_id,
             "race_type": race["race_type"],
-            "combination_size": SUBSCRIBER_COMBINATION_SIZE,
+            "combination_size": combination_size,
             **plan,
         }
     except HTTPException:
