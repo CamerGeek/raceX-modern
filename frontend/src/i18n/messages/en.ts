@@ -341,7 +341,7 @@ const en = {
       readyTitle: "Ready-made tickets",
       readyWinner: "Winner",
       readyQuinella: "Quinella",
-      readyQuinellaComposite: "Composite quinella",
+      readyQuinellaPlace: "Quinella Place",
       readyTrio: "Trio",
       autoTitle: "Automatic plan",
       autoDescription: "Every {size}-horse combination from the Model Shortlist, up to {count} tickets.",
@@ -441,7 +441,7 @@ const en = {
       },
       {
         question: "How are the automatic combinations generated?",
-        answer: "RaceX AI takes the Model Shortlist and plays every combination of the selected size: Quinté+ (5 horses, up to 56 tickets), Quarté+ (4 horses, up to 70 tickets) and Tiercé/Trio (3 horses, up to 56 tickets). With eight shortlist horses you therefore get 56, 70 or 56 tickets depending on the game. Before those combinations, the app shows four ready-made tickets: Winner (1 horse) and Quinella (2 horses) from the highest win scores, then a Composite quinella (the top two horses of the composite score, shown only when it differs from the win quinella), and finally Trio (4 horses) from the highest place scores so bettors can cover every three-horse combination. The top three shortlist horses are shown as an indicative base, but they are not forced into every ticket: each shortlist horse appears in several combinations. Each game is generated once and served from the race cache; it is regenerated when the data or the plan version changes.",
+        answer: "RaceX AI takes the Model Shortlist and plays every combination of the selected size: Quinté+ (5 horses, up to 56 tickets), Quarté+ (4 horses, up to 70 tickets) and Tiercé/Trio (3 horses, up to 56 tickets). With eight shortlist horses you therefore get 56, 70 or 56 tickets depending on the game. Before those combinations, the app shows four ready-made tickets: Winner (1 horse) and Quinella (2 horses) from the highest win scores, then Quinella Place (the top two horses of the composite score, shown only when it differs from the win quinella), and finally Trio (the union of the first four Model Shortlist horses and the first four composite horses, without duplicates). The top three shortlist horses are shown as an indicative base, but they are not forced into every ticket: each shortlist horse appears in several combinations. Each game is generated once and served from the race cache; it is regenerated when the data or the plan version changes.",
       },
       {
         question: "Can I build my own combinations?",

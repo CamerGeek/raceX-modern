@@ -341,7 +341,7 @@ const es = {
       readyTitle: "Boletos listos para jugar",
       readyWinner: "Ganador",
       readyQuinella: "Quiniela",
-      readyQuinellaComposite: "Quiniela Composite",
+      readyQuinellaPlace: "Quinella Place",
       readyTrio: "Trio",
       autoTitle: "Plan automático",
       autoDescription: "Todas las combinaciones de {size} caballos del Model Shortlist, hasta {count} boletos.",
@@ -441,7 +441,7 @@ const es = {
       },
       {
         question: "¿Cómo se generan las combinaciones automáticas?",
-        answer: "RaceX AI toma el Model Shortlist y juega todas las combinaciones del tamaño elegido: Quinté+ (5 caballos, hasta 56 boletos), Quarté+ (4 caballos, hasta 70 boletos) y Tiercé/Trio (3 caballos, hasta 56 boletos). Con ocho caballos en el shortlist obtienes por tanto 56, 70 o 56 boletos según el juego. Antes de esas combinaciones, la aplicación muestra cuatro boletos listos: Ganador (1 caballo) y Quiniela (2 caballos) según los scores de victoria más altos, después Quiniela Composite (los dos primeros caballos del score compuesto, propuesta solo si difiere de la Quiniela) y por último Trio (4 caballos) según los scores de plaza más altos, para cubrir todas las combinaciones de tres caballos. Los tres primeros caballos del shortlist se muestran como base indicativa, pero no se imponen en cada boleto: cada caballo del shortlist aparece en varias combinaciones. Cada juego se calcula una vez y se sirve desde la caché de la carrera; se recalcula cuando cambian los datos o la versión del plan.",
+        answer: "RaceX AI toma el Model Shortlist y juega todas las combinaciones del tamaño elegido: Quinté+ (5 caballos, hasta 56 boletos), Quarté+ (4 caballos, hasta 70 boletos) y Tiercé/Trio (3 caballos, hasta 56 boletos). Con ocho caballos en el shortlist obtienes por tanto 56, 70 o 56 boletos según el juego. Antes de esas combinaciones, la aplicación muestra cuatro boletos listos: Ganador (1 caballo) y Quiniela (2 caballos) según los scores de victoria más altos, después Quinella Place (los dos primeros caballos del score compuesto, propuesta solo si difiere de la Quiniela) y por último Trio (la unión de los cuatro primeros caballos del Model Shortlist y los cuatro primeros del score compuesto, sin duplicados). Los tres primeros caballos del shortlist se muestran como base indicativa, pero no se imponen en cada boleto: cada caballo del shortlist aparece en varias combinaciones. Cada juego se calcula una vez y se sirve desde la caché de la carrera; se recalcula cuando cambian los datos o la versión del plan.",
       },
       {
         question: "¿Puedo componer mis propias combinaciones?",

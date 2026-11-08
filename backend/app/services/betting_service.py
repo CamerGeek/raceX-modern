@@ -19,7 +19,6 @@ SHORTLIST_SIZE = 8
 BASE_SIZE = 3
 PLOT_TWIST_LIMIT = 4
 PLOT_TWIST_SCORE_WINDOW = 0.05
-READY_TICKET_SIZES = (("winner", 1), ("quinella", 2), ("trio", 4))
 
 
 def simulate_race(frame: pd.DataFrame, race_type: str, simulations: int = 5000, seed: int | None = 42) -> list[dict[str, Any]]:
@@ -167,30 +166,26 @@ def ready_tickets_for(
 ) -> list[dict[str, Any]]:
     """Model straight picks shown before the generated combinations.
 
-    Winner and quinella follow the win score. A second quinella follows the composite
-    ranking when it differs from the win-score pair. The trio follows the place score
-    and keeps four horses so bettors can cover every three-horse combination.
+    Winner and quinella follow the win score. A place quinella follows the composite
+    ranking when it differs from the win-score pair. The trio merges the first four
+    Model Shortlist horses with the first four composite horses, so it can hold more
+    than four runners.
     """
     eligible = set(all_horses)
     win_ranked = [number for number in model_win_ranked_numbers(model_predictions) if number in eligible]
-    place_ranked = [number for number in model_place_ranked_numbers(model_predictions) if number in eligible]
+    shortlist_ranked = [number for number in model_shortlist_numbers(model_predictions) if number in eligible]
     composite_ranked = [number for number in (composite_numbers or []) if number in eligible]
-    pools = {"winner": win_ranked, "quinella": win_ranked, "trio": place_ranked}
-    tickets = [
-        {"type": kind, "numbers": pools[kind][:size]}
-        for kind, size in READY_TICKET_SIZES
-        if len(pools[kind]) >= size
-    ]
-    composite_pair = composite_ranked[:2]
-    if len(composite_pair) == 2 and composite_pair != win_ranked[:2]:
-        insert_at = len(tickets)
-        for index, ticket in enumerate(tickets):
-            if ticket["type"] in {"winner", "quinella"}:
-                insert_at = index + 1
-            elif ticket["type"] == "trio":
-                insert_at = min(insert_at, index)
-                break
-        tickets.insert(insert_at, {"type": "composite_quinella", "numbers": composite_pair})
+    trio_numbers = list(dict.fromkeys(shortlist_ranked[:4] + composite_ranked[:4]))
+    tickets: list[dict[str, Any]] = []
+    if win_ranked:
+        tickets.append({"type": "winner", "numbers": win_ranked[:1]})
+    if len(win_ranked) >= 2:
+        tickets.append({"type": "quinella", "numbers": win_ranked[:2]})
+    place_pair = composite_ranked[:2]
+    if len(place_pair) == 2 and place_pair != win_ranked[:2]:
+        tickets.append({"type": "place_quinella", "numbers": place_pair})
+    if len(trio_numbers) >= 4:
+        tickets.append({"type": "trio", "numbers": trio_numbers})
     return tickets
 
 

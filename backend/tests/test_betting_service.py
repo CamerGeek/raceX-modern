@@ -78,8 +78,8 @@ def test_plan_reports_the_shortlist_top_three_as_the_base(monkeypatch) -> None:
     assert plan["ready_tickets"] == [
         {"type": "winner", "numbers": ["6"]},
         {"type": "quinella", "numbers": ["6", "3"]},
-        {"type": "composite_quinella", "numbers": ["1", "2"]},
-        {"type": "trio", "numbers": ["6", "3", "14", "1"]},
+        {"type": "place_quinella", "numbers": ["1", "2"]},
+        {"type": "trio", "numbers": ["6", "3", "14", "1", "2", "4"]},
     ]
     assert plan["combinations"]
 
@@ -94,7 +94,7 @@ def test_composite_ranked_numbers_orders_by_composite_score() -> None:
     assert betting_service.composite_ranked_numbers(frame) == ["2", "3", "1"]
 
 
-def test_ready_tickets_use_win_composite_and_place_scores(monkeypatch) -> None:
+def test_ready_tickets_use_win_score_and_composite_ranking(monkeypatch) -> None:
     monkeypatch.setattr(
         betting_service,
         "analyze_race",
@@ -120,12 +120,48 @@ def test_ready_tickets_use_win_composite_and_place_scores(monkeypatch) -> None:
     assert plan["ready_tickets"] == [
         {"type": "winner", "numbers": ["2"]},
         {"type": "quinella", "numbers": ["2", "3"]},
-        {"type": "composite_quinella", "numbers": ["1", "2"]},
+        {"type": "place_quinella", "numbers": ["1", "2"]},
         {"type": "trio", "numbers": ["1", "2", "3", "4"]},
     ]
 
 
-def test_ready_tickets_omit_the_composite_quinella_when_it_matches_the_win_pair(
+def test_ready_tickets_trio_merges_shortlist_and_composite_top_four(monkeypatch) -> None:
+    frame = pd.DataFrame([
+        {"N°": 1, "Composite": 0.95},
+        {"N°": 2, "Composite": 0.90},
+        {"N°": 3, "Composite": 0.85},
+        {"N°": 4, "Composite": 0.80},
+        {"N°": 5, "Composite": 0.30},
+        {"N°": 6, "Composite": 0.25},
+        {"N°": 7, "Composite": 0.20},
+        {"N°": 8, "Composite": 0.15},
+    ])
+    monkeypatch.setattr(
+        betting_service,
+        "analyze_race",
+        lambda *_args, **_kwargs: (frame, pd.DataFrame(), None),
+    )
+    monkeypatch.setattr(
+        betting_service,
+        "predict_model_race",
+        lambda *_args, **_kwargs: {
+            "status": "ready",
+            "rows": [
+                {"NUMERO": 5, "place_prob_deep": 0.99, "p_win": 0.60},
+                {"NUMERO": 6, "place_prob_deep": 0.90, "p_win": 0.20},
+                {"NUMERO": 7, "place_prob_deep": 0.80, "p_win": 0.10},
+                {"NUMERO": 8, "place_prob_deep": 0.70, "p_win": 0.05},
+            ],
+        },
+    )
+
+    plan = betting_service.generate_combination_plan(frame, "flat")
+
+    trio = next(ticket for ticket in plan["ready_tickets"] if ticket["type"] == "trio")
+    assert trio["numbers"] == ["5", "6", "7", "8", "1", "2", "3", "4"]
+
+
+def test_ready_tickets_omit_the_place_quinella_when_it_matches_the_win_pair(
     monkeypatch,
 ) -> None:
     frame = pd.DataFrame([
