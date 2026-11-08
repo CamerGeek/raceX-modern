@@ -748,20 +748,20 @@ function SubscriberDashboard() {
             plotTwistRows={plotTwistRows}
           />
 
-          {analysis.expert_commentary && (
-            <section className="subscriber-expert-pronostic public-widget" aria-labelledby="subscriber-expert-pronostic-title">
-              <p className="public-kicker">{t.expert.kicker}</p>
-              <h2 id="subscriber-expert-pronostic-title">{t.expert.title}</h2>
-              <p>{analysis.expert_commentary}</p>
-            </section>
-          )}
-
           {readyTickets.length > 0 && (
             <section className="subscriber-ready-tickets public-widget" aria-labelledby="subscriber-ready-tickets-title">
               <div className="ready-tickets">
                 <h4 id="subscriber-ready-tickets-title">{t.combinations.readyTitle}</h4>
                 <ReadyTicketsGrid tickets={readyTickets} labels={t.combinations} />
               </div>
+            </section>
+          )}
+
+          {analysis.expert_commentary && (
+            <section className="subscriber-expert-pronostic public-widget" aria-labelledby="subscriber-expert-pronostic-title">
+              <p className="public-kicker">{t.expert.kicker}</p>
+              <h2 id="subscriber-expert-pronostic-title">{t.expert.title}</h2>
+              <p>{analysis.expert_commentary}</p>
             </section>
           )}
 
