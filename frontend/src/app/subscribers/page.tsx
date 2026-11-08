@@ -756,6 +756,15 @@ function SubscriberDashboard() {
             </section>
           )}
 
+          {readyTickets.length > 0 && (
+            <section className="subscriber-ready-tickets public-widget" aria-labelledby="subscriber-ready-tickets-title">
+              <div className="ready-tickets">
+                <h4 id="subscriber-ready-tickets-title">{t.combinations.readyTitle}</h4>
+                <ReadyTicketsGrid tickets={readyTickets} labels={t.combinations} />
+              </div>
+            </section>
+          )}
+
           <section className="subscriber-composite-scores public-widget" aria-labelledby="subscriber-composite-scores-title">
             <div className="subscriber-section-heading">
               <div>
@@ -793,15 +802,6 @@ function SubscriberDashboard() {
           </section>
 
           <DisciplineHighlights analysis={analysis} />
-
-          {readyTickets.length > 0 && (
-            <section className="subscriber-ready-tickets public-widget" aria-labelledby="subscriber-ready-tickets-title">
-              <div className="ready-tickets">
-                <h4 id="subscriber-ready-tickets-title">{t.combinations.readyTitle}</h4>
-                <ReadyTicketsGrid tickets={readyTickets} labels={t.combinations} />
-              </div>
-            </section>
-          )}
 
           <footer className="subscriber-print-footer">
             <p>{t.footer.disclaimer}</p>
