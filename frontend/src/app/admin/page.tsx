@@ -899,16 +899,14 @@ function AdminPageContent() {
         <article className="admin-print-document">
           <header className="subscriber-print-masthead">
             <div className="subscriber-print-brand">
-              <svg
-                aria-label="RaceX"
-                role="img"
-                viewBox="0 0 512 512"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <rect width="512" height="512" rx="112" fill="#103b32" />
-                <path d="M75 105h362v58H303L124 349h142v58H75v-58l179-186H75z" fill="#f3f0e8" />
-                <path d="M310 224 437 407h-75l-90-130-91 130h-72l127-181-112-161h75l75 108 76-108h72z" fill="#2ac7ff" />
-              </svg>
+              <Image
+                src="/icons/icon-96.png"
+                alt="RaceX"
+                width={96}
+                height={96}
+                priority
+                className="subscriber-print-logo"
+              />
               <div>
                 <p className="subscriber-eyebrow">RACEX · ANALYSE DE LA COURSE</p>
                 <h1>Le journal des courses</h1>
