@@ -414,6 +414,8 @@ h2 { font-size: 2.4rem; font-weight: 500; margin: .4rem 0 0; }
 .ready-ticket strong { color: var(--green); font-weight: 700; }
 .ready-ticket.ready-winner strong { color: var(--orange); }
 .subscriber-ready-tickets { margin: .8rem 0; }
+.quinte-picks-grid > .subscriber-ready-tickets { margin: 0; }
+.quinte-picks-grid > .subscriber-ready-tickets .ready-tickets { height: 100%; background: #fff; }
 .combination-row { display: flex; align-items: center; gap: .55rem; padding: .65rem; border: 1px solid var(--card-line); border-radius: .55rem; background: var(--card-wash); font: .78rem ui-sans-serif, system-ui, sans-serif; }
 .combination-row strong { width: 2rem; color: var(--muted); }
 .combination-row span { min-width: 2rem; padding: .3rem .45rem; color: white; background: var(--green); text-align: center; font-weight: 700; }
@@ -625,7 +627,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   .admin-shell > .admin-print-document { display: block !important; }
   .site-footer, .subscriber-shell > .site-navigation, .subscriber-header,
   .subscriber-race-date-switch,   .subscriber-details, .odds-chart-panel,
-  .subscriber-state { display: none !important; }
+  .subscriber-state, .subscriber-analysis-notice { display: none !important; }
   .subscriber-shell { max-width: none; padding: 0; }
   .subscriber-expert-pronostic { display: none !important; }
   .subscriber-print-masthead {

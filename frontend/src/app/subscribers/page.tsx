@@ -6,7 +6,6 @@ import QuinteOddsChart from "../quinte-odds-chart";
 import QuinteRecommendations, {
   getModelShortlistRows,
   getModelWinRows,
-  ReadyTicketsGrid,
   ShodHorsesCard,
   winScoreOf,
   type PlotTwistItem,
@@ -745,16 +744,12 @@ function SubscriberDashboard() {
           <QuinteRecommendations
             modelPredictions={analysis.model_predictions}
             plotTwistRows={plotTwistRows}
+            readyTickets={readyTickets}
+            readyLabels={t.combinations}
+            showPriority={false}
           />
 
-          {readyTickets.length > 0 && (
-            <section className="subscriber-ready-tickets public-widget" aria-labelledby="subscriber-ready-tickets-title">
-              <div className="ready-tickets">
-                <h4 id="subscriber-ready-tickets-title">{t.combinations.readyTitle}</h4>
-                <ReadyTicketsGrid tickets={readyTickets} labels={t.combinations} />
-              </div>
-            </section>
-          )}
+          <DisciplineHighlights analysis={analysis} />
 
           {analysis.expert_commentary && (
             <section className="subscriber-expert-pronostic public-widget" aria-labelledby="subscriber-expert-pronostic-title">
@@ -799,8 +794,6 @@ function SubscriberDashboard() {
               </table>
             </div>
           </section>
-
-          <DisciplineHighlights analysis={analysis} />
 
           <footer className="subscriber-print-footer">
             <p>{t.footer.disclaimer}</p>

@@ -14,6 +14,9 @@ export type QuinteModelPredictions = {
 type QuinteRecommendationsProps = {
   modelPredictions: QuinteModelPredictions | null;
   plotTwistRows: PlotTwistItem[];
+  readyTickets?: ReadyTicket[];
+  readyLabels?: ReadyTicketLabels;
+  showPriority?: boolean;
 };
 
 export type PlotTwistItem = {
@@ -290,8 +293,12 @@ export function PriorityTierPickCard({
 export default function QuinteRecommendations({
   modelPredictions,
   plotTwistRows,
+  readyTickets,
+  readyLabels,
+  showPriority = true,
 }: QuinteRecommendationsProps) {
-  const t = useI18n().messages.recommendations;
+  const { messages } = useI18n();
+  const t = messages.recommendations;
   const modelNumbers = modelShortlist(modelPredictions);
   const modelMessage = modelPredictions?.status === "ready"
     ? t.modelEmptyReady
@@ -305,8 +312,16 @@ export default function QuinteRecommendations({
         numbers={modelNumbers}
         emptyMessage={modelMessage}
       />
-      <PriorityTierPickCard predictions={modelPredictions} />
+      {showPriority && <PriorityTierPickCard predictions={modelPredictions} />}
       <PlotTwistCard rows={plotTwistRows} />
+      {readyTickets && readyTickets.length > 0 && readyLabels && (
+        <section className="subscriber-ready-tickets public-widget" aria-labelledby="subscriber-ready-tickets-title">
+          <div className="ready-tickets">
+            <h4 id="subscriber-ready-tickets-title">{messages.subscribers.combinations.readyTitle}</h4>
+            <ReadyTicketsGrid tickets={readyTickets} labels={readyLabels} />
+          </div>
+        </section>
+      )}
     </div>
   );
 }
