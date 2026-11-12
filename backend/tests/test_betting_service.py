@@ -19,6 +19,19 @@ def descending_field(size: int = 16) -> pd.DataFrame:
     ])
 
 
+def deep_score_predictions(size: int = 16) -> dict:
+    scores = [round(1.0 - 0.05 * index, 2) for index in range(size)]
+    if size >= 10:
+        scores[9] = scores[8]
+    return {
+        "status": "ready",
+        "rows": [
+            {"NUMERO": number, "place_prob_deep": score}
+            for number, score in enumerate(scores, 1)
+        ],
+    }
+
+
 def predictions_with_top(*numbers: int) -> dict:
     scores = {number: 0.99 - 0.03 * rank for rank, number in enumerate(numbers)}
     rows = [
@@ -52,11 +65,16 @@ def test_model_shortlist_is_empty_when_predictions_are_unavailable() -> None:
 
 
 def test_plot_twist_matches_frontend_criteria() -> None:
-    assert betting_service.plot_twist_numbers(descending_field()) == ["9", "10"]
+    assert betting_service.plot_twist_numbers(deep_score_predictions()) == ["9", "10"]
 
 
 def test_plot_twist_requires_more_than_eight_scored_horses() -> None:
-    assert betting_service.plot_twist_numbers(descending_field(8)) == []
+    assert betting_service.plot_twist_numbers(deep_score_predictions(8)) == []
+
+
+def test_plot_twist_is_empty_when_predictions_are_unavailable() -> None:
+    assert betting_service.plot_twist_numbers(None) == []
+    assert betting_service.plot_twist_numbers({"status": "unavailable", "rows": []}) == []
 
 
 def test_plan_reports_the_shortlist_top_three_as_the_base(monkeypatch) -> None:
@@ -74,7 +92,7 @@ def test_plan_reports_the_shortlist_top_three_as_the_base(monkeypatch) -> None:
     plan = betting_service.generate_combination_plan(pd.DataFrame(), "flat")
 
     assert plan["base"] == ["6", "3", "14"]
-    assert plan["substitutes"] == ["9", "10"]
+    assert plan["substitutes"] == ["8", "9", "10", "11"]
     assert plan["ready_tickets"] == [
         {"type": "winner", "numbers": ["6"]},
         {"type": "quinella", "numbers": ["6", "3"]},
@@ -311,7 +329,7 @@ def test_plan_tops_up_associates_when_the_shortlist_cannot_fill_the_ticket(monke
 
     assert plan["base"] == ["6", "3", "14"]
     assert len(plan["combinations"]) == 1
-    assert set(plan["combinations"][0]) == {"6", "3", "14", "4", "9", "10"}
+    assert set(plan["combinations"][0]) == {"6", "3", "14", "4", "1", "2"}
 
 
 def test_plot_twist_horses_substitute_for_unavailable_shortlist_horses(monkeypatch) -> None:
@@ -332,8 +350,8 @@ def test_plot_twist_horses_substitute_for_unavailable_shortlist_horses(monkeypat
 
     plan = betting_service.generate_combination_plan(frame, "flat")
 
-    assert plan["base"] == ["6", "14", "9"]
-    assert plan["substitutes"] == ["10"]
+    assert plan["base"] == ["6", "14", "8"]
+    assert plan["substitutes"] == ["9", "10", "11"]
     assert all("3" not in combination for combination in plan["combinations"])
 
 
@@ -360,16 +378,16 @@ def test_explicit_mandatory_overrides_the_derived_base(monkeypatch) -> None:
         "analyze_race",
         lambda *_args, **_kwargs: (descending_field(), pd.DataFrame(), None),
     )
-
-    def fail(*_args, **_kwargs):
-        raise AssertionError("model predictions should not be requested for an explicit base")
-
-    monkeypatch.setattr(betting_service, "predict_model_race", fail)
+    monkeypatch.setattr(
+        betting_service,
+        "predict_model_race",
+        lambda *_args, **_kwargs: predictions_with_top(6, 3, 14),
+    )
 
     plan = betting_service.generate_combination_plan(pd.DataFrame(), "flat", mandatory=["7"])
 
     assert plan["base"] == ["7"]
-    assert plan["substitutes"] == ["9", "10"]
+    assert plan["substitutes"] == ["8", "9", "10", "11"]
     assert all("7" in combination for combination in plan["combinations"])
 
 

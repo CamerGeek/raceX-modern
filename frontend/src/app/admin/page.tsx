@@ -8,11 +8,11 @@ import { useAuth } from "../auth-context";
 import QuinteRecommendations, {
   getModelShortlistRows,
   getModelWinRows,
+  getPlotTwistRows,
   PriorityTierPickCard,
   ReadyTicketsGrid,
   ShodHorsesCard,
   winScoreOf,
-  type PlotTwistItem,
 } from "../quinte-recommendations";
 
 type Horse = Record<string, string | number | boolean | null>;
@@ -112,33 +112,6 @@ function compositeScore(row: Horse) {
     .replace(",", ".");
   const score = Number(raw);
   return raw && Number.isFinite(score) ? score : null;
-}
-
-function plotTwistCandidates(rows: Horse[]): PlotTwistItem[] {
-  const rankedRows = rows
-    .map((horse, index) => ({ horse, index, score: compositeScore(horse) }))
-    .filter((item): item is { horse: Horse; index: number; score: number } =>
-      item.score !== null,
-    )
-    .sort((first, second) => second.score - first.score || first.index - second.index);
-  if (rankedRows.length <= 8) return [];
-
-  const scores = rankedRows.map(({ score }) => score);
-  const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-  const middle = Math.floor(scores.length / 2);
-  const median = scores.length % 2 === 0
-    ? (scores[middle - 1] + scores[middle]) / 2
-    : scores[middle];
-
-  return rankedRows
-    .map((item, index) => ({
-      ...item,
-      rank: index + 1,
-      nearMean: Math.abs(item.score - mean) <= 0.05,
-      nearMedian: Math.abs(item.score - median) <= 0.05,
-    }))
-    .filter((item) => item.rank > 8 && (item.nearMean || item.nearMedian))
-    .slice(0, 4);
 }
 
 function horseNumbers(rows: Horse[]) {
@@ -283,7 +256,7 @@ function AdminPageContent() {
   const modelCheck = analysis
     ? analysis.model_check ?? modelCheckFromVisibleRankings(analysis)
     : null;
-  const plotTwistRows = analysis ? plotTwistCandidates(analysis.rows) : [];
+  const plotTwistRows = getPlotTwistRows(analysis?.model_predictions ?? null);
   const topHorse = rankedHorses[0];
   const topScore = topHorse ? numberField(topHorse, ["SCORE", "COMPOSITE_SCORE", "Composite", "Score"]) : 0;
   const topOdds = topHorse ? field(topHorse, ["COTE", "Cote", "Odds"]) : "-";
@@ -816,9 +789,9 @@ function AdminPageContent() {
             </section>
             <section className="prognosis-miss-signal plot-twist-signal" aria-labelledby="admin-plot-twist-title">
               <div className="prognosis-miss-heading">
-                <span>COMPOSITE · OUTSIDE TOP 8</span>
+                <span>DEEP SCORE · OUTSIDE TOP 8</span>
                 <h3 id="admin-plot-twist-title">Plot twist · horses to watch</h3>
-                <p>Up to four runners ranked below 8 whose composite score is within ±0.05 of the field mean or median.</p>
+                <p>Up to four runners ranked below 8 whose model deep score is within ±0.05 of the field mean or median.</p>
               </div>
               {plotTwistRows.length > 0
                 ? <ul>{plotTwistRows.map(({ horse, score, rank, nearMean, nearMedian }, index) => {

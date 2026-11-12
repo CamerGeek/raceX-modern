@@ -47,6 +47,42 @@ function horseName(row: Horse, fallback: string) {
   return key ? String(row[key]) : fallback;
 }
 
+function deepScoreOf(row: Horse) {
+  const key = deepScoreFields.find((field) =>
+    row[field] !== null && row[field] !== undefined && row[field] !== "",
+  );
+  const raw = key ? String(row[key]).trim().replace(",", ".") : "";
+  const score = Number(raw);
+  return raw && Number.isFinite(score) ? score : null;
+}
+
+export function getPlotTwistRows(predictions: QuinteModelPredictions | null): PlotTwistItem[] {
+  if (predictions?.status !== "ready") return [];
+
+  const rankedRows = predictions.rows
+    .map((horse, index) => ({ horse, index, score: deepScoreOf(horse) }))
+    .filter((item): item is { horse: Horse; index: number; score: number } => item.score !== null)
+    .sort((first, second) => second.score - first.score || first.index - second.index);
+  if (rankedRows.length <= 8) return [];
+
+  const scores = rankedRows.map(({ score }) => score);
+  const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+  const middle = Math.floor(scores.length / 2);
+  const median = scores.length % 2 === 0
+    ? (scores[middle - 1] + scores[middle]) / 2
+    : scores[middle];
+
+  return rankedRows
+    .map((item, index) => ({
+      ...item,
+      rank: index + 1,
+      nearMean: Math.abs(item.score - mean) <= 0.05,
+      nearMedian: Math.abs(item.score - median) <= 0.05,
+    }))
+    .filter((item) => item.rank > 8 && (item.nearMean || item.nearMedian))
+    .slice(0, 4);
+}
+
 export function getModelShortlistRows(predictions: QuinteModelPredictions | null) {
   if (predictions?.status !== "ready") return [];
 

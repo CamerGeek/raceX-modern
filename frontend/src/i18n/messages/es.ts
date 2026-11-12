@@ -80,7 +80,7 @@ const es = {
     priorityNone: "Ningún caballo tiene un nivel de prioridad disponible.",
     priorityUnavailable: "Los niveles de prioridad del modelo no están disponibles para esta carrera.",
     plotTwistTitle: "Plot twist · caballos a seguir",
-    plotTwistDescription: "Participantes fuera del top 8 compuesto cuya puntuación está a ±0,05 de la media o la mediana. Es una referencia complementaria, no una garantía de rendimiento.",
+    plotTwistDescription: "Participantes fuera del top 8 de la puntuación Deep de RaceX AI cuya puntuación está a ±0,05 de la media o la mediana. Es una referencia complementaria, no una garantía de rendimiento.",
     plotTwistRank: "puesto {rank}",
     nearMeanMedian: "media · mediana",
     nearMean: "media",
@@ -437,7 +437,7 @@ const es = {
       },
       {
         question: "¿Qué son los caballos Plot Twist?",
-        answer: "Son participantes clasificados fuera de los ocho primeros del score compuesto cuyo score se mantiene cerca de la media o la mediana (±0,05). RaceX AI los señala como caballos a seguir. También actúan como sustitutos cuando un caballo del Model Shortlist no es participante, y completan la selección si esta tiene menos caballos que el tamaño del boleto.",
+        answer: "Son participantes clasificados fuera de los ocho primeros de la puntuación Deep de RaceX AI cuyo score se mantiene cerca de la media o la mediana (±0,05). RaceX AI los señala como caballos a seguir. También actúan como sustitutos cuando un caballo del Model Shortlist no es participante, y completan la selección si esta tiene menos caballos que el tamaño del boleto.",
       },
       {
         question: "¿Cómo se generan las combinaciones automáticas?",

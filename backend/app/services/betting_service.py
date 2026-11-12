@@ -189,17 +189,17 @@ def ready_tickets_for(
     return tickets
 
 
-def plot_twist_numbers(analyzed: pd.DataFrame) -> list[str]:
-    """Horses ranked outside the composite top eight and sitting near the mean or median."""
-    number_column = next((column for column in NUMBER_COLUMNS if column in analyzed.columns), None)
-    score_column = next((column for column in COMPOSITE_COLUMNS if column in analyzed.columns), None)
-    if number_column is None or score_column is None:
+def plot_twist_numbers(model_predictions: dict[str, Any] | None) -> list[str]:
+    """Horses ranked outside the model deep-score top eight and sitting near the mean or median."""
+    if not model_predictions or model_predictions.get("status") != "ready":
         return []
     ranked: list[tuple[str, float, int]] = []
-    for index, row in enumerate(analyzed.to_dict("records")):
-        number = _number(row.get(number_column))
-        score = _row_score(row, (score_column,))
-        if number and score is not None:
+    seen: set[str] = set()
+    for index, row in enumerate(model_predictions.get("rows") or []):
+        number = _row_number(row)
+        score = _row_score(row, DEEP_SCORE_COLUMNS)
+        if number and number not in seen and score is not None:
+            seen.add(number)
             ranked.append((number, score, index))
     if len(ranked) <= SHORTLIST_SIZE:
         return []
@@ -320,14 +320,14 @@ def generate_combination_plan(
     if not all_horses:
         return {"ready_tickets": [], "combinations": [], "base": [], "substitutes": []}
 
-    twists = [number for number in plot_twist_numbers(analyzed) if number in all_horses]
+    prediction = predict_model_race(frame, race_type, source)
+    twists = [number for number in plot_twist_numbers(prediction) if number in all_horses]
     combination_size = max(1, min(combination_size, len(all_horses)))
     shortlist: list[str] = []
     ready_tickets: list[dict[str, Any]] = []
     if mandatory:
         base = [number for number in dict.fromkeys(_number(value) for value in mandatory) if number in all_horses]
     else:
-        prediction = predict_model_race(frame, race_type, source)
         shortlist = model_shortlist_numbers(prediction)
         ready_tickets = ready_tickets_for(prediction, all_horses, composite_ranked_numbers(analyzed))
         base = _derived_base(shortlist, twists, all_horses, combination_size)

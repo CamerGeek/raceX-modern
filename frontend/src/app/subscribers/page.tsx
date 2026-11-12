@@ -6,9 +6,9 @@ import QuinteOddsChart from "../quinte-odds-chart";
 import QuinteRecommendations, {
   getModelShortlistRows,
   getModelWinRows,
+  getPlotTwistRows,
   ShodHorsesCard,
   winScoreOf,
-  type PlotTwistItem,
   type QuinteModelPredictions,
   type ReadyTicket,
 } from "../quinte-recommendations";
@@ -69,33 +69,6 @@ function scoreOf(row: Horse) {
   const raw = firstValue(row, scoreFields).trim().replace(",", ".");
   const score = Number(raw);
   return raw && Number.isFinite(score) ? score : null;
-}
-
-function plotTwistCandidates(rows: Horse[]): PlotTwistItem[] {
-  const rankedRows = rows
-    .map((horse, index) => ({ horse, index, score: scoreOf(horse) }))
-    .filter((item): item is { horse: Horse; index: number; score: number } =>
-      item.score !== null,
-    )
-    .sort((first, second) => second.score - first.score || first.index - second.index);
-  if (rankedRows.length <= 8) return [];
-
-  const scores = rankedRows.map(({ score }) => score);
-  const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-  const middle = Math.floor(scores.length / 2);
-  const median = scores.length % 2 === 0
-    ? (scores[middle - 1] + scores[middle]) / 2
-    : scores[middle];
-
-  return rankedRows
-    .map((item, index) => ({
-      ...item,
-      rank: index + 1,
-      nearMean: Math.abs(item.score - mean) <= 0.05,
-      nearMedian: Math.abs(item.score - median) <= 0.05,
-    }))
-    .filter((item) => item.rank > 8 && (item.nearMean || item.nearMedian))
-    .slice(0, 4);
 }
 
 function displayScore(score: number | null, intlLocale: string) {
@@ -535,7 +508,7 @@ function SubscriberDashboard() {
       if (second.score === null) return -1;
       return second.score - first.score || first.index - second.index;
     });
-  const plotTwistRows = analysis ? plotTwistCandidates(analysis.rows) : [];
+  const plotTwistRows = getPlotTwistRows(analysis?.model_predictions ?? null);
   const modelShortlistRows = getModelShortlistRows(analysis?.model_predictions ?? null);
   const readyTickets = analysis?.ready_tickets ?? [];
   const leadingHorse = getModelWinRows(analysis?.model_predictions ?? null)[0];

@@ -80,7 +80,7 @@ const en = {
     priorityNone: "No horse has an available priority tier.",
     priorityUnavailable: "The model’s priority tiers are not available for this race.",
     plotTwistTitle: "Plot twist · horses to watch",
-    plotTwistDescription: "Runners outside the composite top 8 whose score is within ±0.05 of the mean or median. This is a complementary cue, not a guarantee of performance.",
+    plotTwistDescription: "Runners outside the RaceX AI Deep score top 8 whose score is within ±0.05 of the mean or median. This is a complementary cue, not a guarantee of performance.",
     plotTwistRank: "rank {rank}",
     nearMeanMedian: "mean · median",
     nearMean: "mean",
@@ -437,7 +437,7 @@ const en = {
       },
       {
         question: "What are Plot Twist horses?",
-        answer: "They are runners ranked outside the composite top eight whose score remains close to the mean or median (±0.05). RaceX AI flags them as horses to watch. They also act as substitutes when a Model Shortlist horse is not a starter, and complete the selection when it has fewer horses than the ticket size.",
+        answer: "They are runners ranked outside the RaceX AI Deep score top eight whose score remains close to the mean or median (±0.05). RaceX AI flags them as horses to watch. They also act as substitutes when a Model Shortlist horse is not a starter, and complete the selection when it has fewer horses than the ticket size.",
       },
       {
         question: "How are the automatic combinations generated?",

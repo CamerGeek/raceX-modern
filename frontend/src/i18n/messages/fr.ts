@@ -78,7 +78,7 @@ const fr = {
     priorityNone: "Aucun cheval n’a de niveau de priorité disponible.",
     priorityUnavailable: "Les niveaux de priorité du modèle ne sont pas disponibles pour cette course.",
     plotTwistTitle: "Plot twist · chevaux à surveiller",
-    plotTwistDescription: "Partants hors du top 8 composite dont le score se situe à ±0,05 de la moyenne ou de la médiane. C’est un repère complémentaire, pas une garantie de performance.",
+    plotTwistDescription: "Partants hors du top 8 du score Deep de RaceX AI dont le score se situe à ±0,05 de la moyenne ou de la médiane. C’est un repère complémentaire, pas une garantie de performance.",
     plotTwistRank: "rang {rank}",
     nearMeanMedian: "moyenne · médiane",
     nearMean: "moyenne",
@@ -435,7 +435,7 @@ const fr = {
       },
       {
         question: "Que sont les chevaux Plot Twist ?",
-        answer: "Ce sont des partants classés en dehors des huit premiers du score composite, dont le score reste proche de la moyenne ou de la médiane (à ±0,05). RaceX AI les signale comme chevaux à surveiller. Ils servent aussi de substituts lorsqu’un cheval du Model Shortlist n’est pas partant, et complètent la sélection si elle compte moins de chevaux que la taille du ticket.",
+        answer: "Ce sont des partants classés en dehors des huit premiers du score Deep de RaceX AI, dont le score reste proche de la moyenne ou de la médiane (à ±0,05). RaceX AI les signale comme chevaux à surveiller. Ils servent aussi de substituts lorsqu’un cheval du Model Shortlist n’est pas partant, et complètent la sélection si elle compte moins de chevaux que la taille du ticket.",
       },
       {
         question: "Comment les combinaisons automatiques sont-elles générées ?",
