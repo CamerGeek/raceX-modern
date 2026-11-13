@@ -11,7 +11,11 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from turfomania_race import fetch_race_html, scrape_turfomania_race
+from turfomania_race import (
+    extract_track_from_multiple_parenthetical_items,
+    fetch_race_html,
+    scrape_turfomania_race,
+)
 from turfomania_reunions import HEADERS, TIMEOUT_SECONDS, _session, detect_race_type_from_text
 
 QUINTE_URL = "https://www.turfomania.fr/quinte/"
@@ -43,6 +47,7 @@ def find_turfomania_quinte_meeting(
     frame = _scrape_quinte_landing(QUINTE_URL)
     if frame.empty:
         raise ValueError("Turfomania Quinté page returned no runners")
+    frame = _correct_track_from_title(frame)
     race_date_text = str(frame["RACE_DATE"].iloc[0] or "")
     try:
         race_date = datetime.strptime(race_date_text, "%d/%m/%Y").date()
@@ -137,6 +142,7 @@ def _validate_quinte_frame(meeting: dict[str, Any], source_frame: pd.DataFrame) 
     frame = source_frame
     if frame.empty:
         raise ValueError("Turfomania Quinté page returned no runners")
+    frame = _correct_track_from_title(frame)
 
     race_date_text = str(frame["RACE_DATE"].iloc[0] or "")
     try:
@@ -167,6 +173,19 @@ def _validate_quinte_frame(meeting: dict[str, Any], source_frame: pd.DataFrame) 
     if "STARTERS" not in frame.columns or frame["STARTERS"].isna().all():
         frame["STARTERS"] = len(frame)
     return frame
+
+
+def _correct_track_from_title(frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty or "DESCRIPTIF" not in frame.columns:
+        return frame
+    track = extract_track_from_multiple_parenthetical_items(
+        str(frame["DESCRIPTIF"].iloc[0] or "")
+    )
+    if not track:
+        return frame
+    corrected = frame.copy()
+    corrected["HIPPODROME"] = track
+    return corrected
 
 
 def turfomania_quinte_race_type(frame: pd.DataFrame) -> str:

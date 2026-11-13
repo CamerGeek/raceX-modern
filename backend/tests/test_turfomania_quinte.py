@@ -58,6 +58,23 @@ def test_scrape_quinte_accepts_matching_meeting(monkeypatch: pytest.MonkeyPatch)
     assert turfomania_quinte_race_type(result.drop(columns=["POIDS"])) == "trot"
 
 
+def test_scrape_quinte_uses_last_parenthetical_title_item_over_stale_track() -> None:
+    meeting = {
+        **MEETING,
+        "meeting_date": "2026-11-13",
+        "name": "Paris Vincennes",
+    }
+    frame = _frame(
+        race_date="13/11/2026",
+        track="PRIX MIZAR",
+    )
+    frame["DESCRIPTIF"] = "GRAND PRIX DU VENDREDI 13 (PRIX MIZAR) (PARIS VINCENNES)"
+
+    result = scrape_turfomania_quinte(meeting, frame)
+
+    assert result["HIPPODROME"].tolist() == ["PARIS VINCENNES"]
+
+
 def test_find_quinte_meeting_uses_first_partants_link_from_more_links(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -94,6 +111,24 @@ def test_find_quinte_meeting_uses_first_partants_link_from_more_links(
     ]
     assert frame["REF_COURSE"].tolist() == ["R1C4"]
     assert frame.attrs["turfomania_expert_commentary"] == "Analyse des experts."
+
+
+def test_find_quinte_meeting_corrects_stale_track_from_race_title(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    meeting = {
+        **MEETING,
+        "meeting_date": "2026-11-13",
+        "name": "Paris Vincennes",
+    }
+    frame = _frame(race_date="13/11/2026", track="PRIX MIZAR")
+    frame["DESCRIPTIF"] = "GRAND PRIX DU VENDREDI 13 (PRIX MIZAR) (PARIS VINCENNES)"
+    monkeypatch.setattr(quinte_module, "_scrape_quinte_landing", lambda _url: frame)
+
+    selected_meeting, result = quinte_module.find_turfomania_quinte_meeting([meeting])
+
+    assert selected_meeting == meeting
+    assert result["HIPPODROME"].tolist() == ["PARIS VINCENNES"]
 
 
 def test_fetch_expert_commentary_extracts_prono_commentaire(monkeypatch: pytest.MonkeyPatch) -> None:
