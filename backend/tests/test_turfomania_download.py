@@ -159,6 +159,27 @@ def test_parse_quinte_uses_last_parenthetical_item_when_prize_is_parenthesized()
     assert metadata["HIPPODROME"] == "PARIS VINCENNES"
 
 
+def test_parse_quinte_prefers_explicit_hippodrome_label_when_title_has_only_prize() -> None:
+    soup = BeautifulSoup(
+        '''<title>GRAND PRIX DU VENDREDI 13 (PRIX MIZAR) - PARIS VINCENNES</title>
+        <div class="table-head-bloc-title">
+          <h1>GRAND PRIX DU VENDREDI 13 (PRIX MIZAR)</h1>
+        </div>
+        <div class="photo-hippo-container">
+          <div class="hippo-label">PARIS VINCENNES</div>
+        </div>''',
+        "html.parser",
+    )
+
+    metadata = turfomania_race.parse_race_metadata(
+        soup,
+        "https://www.turfomania.fr/pronostics/partants.html?idcourse=690424",
+    )
+
+    assert metadata["DESCRIPTIF"] == "GRAND PRIX DU VENDREDI 13 (PRIX MIZAR)"
+    assert metadata["HIPPODROME"] == "PARIS VINCENNES"
+
+
 def test_fetch_race_html_returns_runner_page_from_requests(monkeypatch: pytest.MonkeyPatch) -> None:
     request_html = '<table><tr><td><a href="/cheval/demo">DEMO</a></td></tr></table>'
     request_response = SimpleNamespace(text=request_html, raise_for_status=lambda: None)

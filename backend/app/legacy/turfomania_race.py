@@ -79,9 +79,11 @@ def parse_race_metadata(soup: BeautifulSoup, url: str) -> dict[str, Any]:
         old_detail = soup.find("div", class_="detailCourseCaract")
         descriptif = _clean(old_detail.get_text(" ")) if old_detail else ""
     header2 = _clean(h2.get_text()) if h2 else ""
+    venue_label = soup.select_one(".hippo-label")
     parenthetical_items = re.findall(r"\(([^()]+)\)", descriptif)
     track_from_multiple_items = extract_track_from_multiple_parenthetical_items(descriptif)
-    venue_candidates = (
+    venue_candidates = [_clean(venue_label.get_text())] if venue_label else []
+    venue_candidates.extend(
         [track_from_multiple_items]
         if track_from_multiple_items
         else list(reversed(parenthetical_items))
