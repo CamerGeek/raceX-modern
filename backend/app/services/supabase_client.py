@@ -62,6 +62,14 @@ class SupabaseClientWrapper:
         result = self.client.table(table).update(payload).eq("id", id_value).execute()
         return result.data[0] if result.data else {}
 
+    def delete(self, table: str, *, filters: list[tuple[str, str, Any]]) -> list[dict[str, Any]]:
+        query = self.client.table(table).delete()
+        for column, operator, value in filters:
+            if operator != "eq":
+                raise ValueError(f"Unsupported filter operator: {operator}")
+            query = query.eq(column, value)
+        return query.execute().data or []
+
     def upsert(self, table: str, *, key: str, key_value: Any, payload: dict[str, Any], on_conflict: str | None = None) -> dict[str, Any]:
         request = {key: key_value, **payload}
         if on_conflict:

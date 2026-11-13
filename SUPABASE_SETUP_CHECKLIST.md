@@ -24,12 +24,15 @@ Do not commit the `service_role` key or place it in the Next.js frontend. It byp
    If upgrading an existing database, also run
    [`backend/migrations/20261014_allow_obstacles_race_type.sql`](backend/migrations/20261014_allow_obstacles_race_type.sql)
    so saved races can be repaired to the `obstacles` type.
+   Apply [`backend/migrations/20261113_saved_combinations.sql`](backend/migrations/20261113_saved_combinations.sql)
+   to enable account-backed saved combination plans.
 4. Open **Table Editor** and confirm these tables exist:
    - `meetings`
    - `races`
    - `race_runners`
    - `analysis_runs`
    - `quinte_odds_snapshots`
+   - `saved_combinations`
    - `user_profiles`
    - `jobs`
 5. Confirm the `latest_analysis` view exists under **Database > Views**.

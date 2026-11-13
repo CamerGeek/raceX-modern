@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getModelShortlistRows,
   ReadyTicketsGrid,
@@ -27,6 +27,13 @@ type CombinationPlan = {
   base: string[];
   substitutes?: string[];
   combinations: string[][];
+};
+
+type SavedCombination = {
+  id: string;
+  name: string;
+  created_at: string;
+  plan: CombinationPlan;
 };
 
 type CombinationsPanelProps = {
@@ -90,7 +97,19 @@ function orderedStarters(analysis: CombinationAnalysis) {
     }));
 }
 
-function CombinationResults({ plan }: { plan: CombinationPlan }) {
+function CombinationResults({
+  plan,
+  onSave,
+  onPrint,
+  saving = false,
+  saveDisabled = false,
+}: {
+  plan: CombinationPlan;
+  onSave?: () => void;
+  onPrint?: () => void;
+  saving?: boolean;
+  saveDisabled?: boolean;
+}) {
   const { messages } = useI18n();
   const t = messages.subscribers.combinations;
   const base = new Set(plan.base);
@@ -125,6 +144,16 @@ function CombinationResults({ plan }: { plan: CombinationPlan }) {
           </div>
         ))}
       </div>
+      {(onSave || onPrint) && (
+        <div className="combination-result-actions">
+          {onSave && (
+            <button type="button" onClick={onSave} disabled={saving || saveDisabled}>
+              {saving ? t.saving : t.save}
+            </button>
+          )}
+          {onPrint && <button type="button" onClick={onPrint}>{t.print}</button>}
+        </div>
+      )}
     </div>
   );
 }
@@ -158,6 +187,49 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
   const [customPlan, setCustomPlan] = useState<CombinationPlan | null>(null);
   const [customLoading, setCustomLoading] = useState(false);
   const [customError, setCustomError] = useState("");
+  const [savedPlans, setSavedPlans] = useState<SavedCombination[]>([]);
+  const [saveName, setSaveName] = useState("");
+  const [savedError, setSavedError] = useState("");
+  const [savedMessage, setSavedMessage] = useState("");
+  const [loadedSavedRace, setLoadedSavedRace] = useState<string | null>(null);
+  const [savingPlan, setSavingPlan] = useState(false);
+  const [printingTarget, setPrintingTarget] = useState<string | null>(null);
+  const savedLoading = online && loadedSavedRace !== analysis.race_id && !savedError;
+
+  useEffect(() => {
+    if (!online) return;
+    let active = true;
+    void (async () => {
+      try {
+        const response = await apiFetch(`${apiUrl}/api/v1/races/${analysis.race_id}/combinations/saved`, {
+          cache: "no-store",
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(typeof payload.detail === "string" && payload.detail ? payload.detail : t.savedLoadError);
+        }
+        if (active) setSavedPlans(Array.isArray(payload.saved_combinations) ? payload.saved_combinations : []);
+      } catch (error) {
+        if (active) setSavedError(error instanceof Error && error.message ? error.message : t.savedLoadError);
+      } finally {
+        if (active) setLoadedSavedRace(analysis.race_id);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [analysis.race_id, apiFetch, online, t.savedLoadError]);
+
+  useEffect(() => {
+    if (!printingTarget) return;
+    document.body.classList.add("printing-combination");
+    const finishPrinting = () => setPrintingTarget(null);
+    window.addEventListener("afterprint", finishPrinting, { once: true });
+    return () => {
+      document.body.classList.remove("printing-combination");
+      window.removeEventListener("afterprint", finishPrinting);
+    };
+  }, [printingTarget]);
 
   async function requestPlan(path: string, body?: Record<string, unknown>) {
     const response = await apiFetch(`${apiUrl}/api/v1/races/${analysis.race_id}${path}`, {
@@ -266,6 +338,68 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
     }
   }
 
+  async function savePlan(plan: CombinationPlan) {
+    setSavedError("");
+    setSavedMessage("");
+    if (!saveName.trim()) {
+      setSavedError(t.savedNameRequired);
+      return;
+    }
+    setSavingPlan(true);
+    try {
+      const response = await apiFetch(`${apiUrl}/api/v1/races/${analysis.race_id}/combinations/saved`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: saveName.trim(),
+          plan: {
+            race_type: plan.race_type,
+            combination_size: plan.combination_size,
+            ready_tickets: plan.ready_tickets ?? [],
+            base: plan.base,
+            substitutes: plan.substitutes ?? [],
+            combinations: plan.combinations,
+          },
+        }),
+        cache: "no-store",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || !payload.saved_combination) {
+        throw new Error(typeof payload.detail === "string" && payload.detail ? payload.detail : t.savedError);
+      }
+      setSavedPlans((current) => [payload.saved_combination, ...current]);
+      setSavedMessage(t.savedConfirmation);
+      setSaveName("");
+    } catch (error) {
+      setSavedError(error instanceof Error && error.message ? error.message : t.savedError);
+    } finally {
+      setSavingPlan(false);
+    }
+  }
+
+  async function deleteSavedPlan(saved: SavedCombination) {
+    setSavedError("");
+    setSavedMessage("");
+    try {
+      const response = await apiFetch(
+        `${apiUrl}/api/v1/races/${analysis.race_id}/combinations/saved/${saved.id}`,
+        { method: "DELETE", cache: "no-store" },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof payload.detail === "string" && payload.detail ? payload.detail : t.savedError);
+      }
+      setSavedPlans((current) => current.filter(({ id }) => id !== saved.id));
+    } catch (error) {
+      setSavedError(error instanceof Error && error.message ? error.message : t.savedError);
+    }
+  }
+
+  function printPlan(target: string) {
+    setPrintingTarget(target);
+    window.setTimeout(() => window.print(), 50);
+  }
+
   const selectionSummary = [
     base.length > 0
       ? interpolate(t.baseSummary, { numbers: base.join(" · ") })
@@ -298,7 +432,23 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
         ))}
       </div>
 
-      <article className="combination-panel public-widget">
+      <div className="saved-combinations-controls">
+        <label htmlFor="saved-combination-name">{t.savedNameLabel}</label>
+        <input
+          id="saved-combination-name"
+          value={saveName}
+          onChange={(event) => setSaveName(event.target.value)}
+          maxLength={80}
+          placeholder={t.savedNamePlaceholder}
+        />
+      </div>
+      {savedError && <p className="error" role="alert">{savedError}</p>}
+      {savedMessage && <p className="free-analysis-status" role="status">{savedMessage}</p>}
+      {savedLoading && <p className="muted-result">{t.savedLoading}</p>}
+
+      <article
+        className={`combination-panel public-widget${printingTarget === "auto" ? " combination-print-target" : ""}`}
+      >
         <div className="combination-panel-heading">
           <div>
             <h3>{t.autoTitle}</h3>
@@ -314,10 +464,20 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
           </button>
         </div>
         {autoError && <p className="error" role="alert">{autoError}</p>}
-        {autoPlan ? <CombinationResults plan={autoPlan} /> : <p className="muted-result">{t.none}</p>}
+        {autoPlan ? (
+          <CombinationResults
+            plan={autoPlan}
+            onSave={() => void savePlan(autoPlan)}
+            onPrint={() => printPlan("auto")}
+            saving={savingPlan}
+            saveDisabled={!online}
+          />
+        ) : <p className="muted-result">{t.none}</p>}
       </article>
 
-      <article className="combination-panel public-widget">
+      <article
+        className={`combination-panel public-widget${printingTarget === "custom" ? " combination-print-target" : ""}`}
+      >
         <div className="combination-panel-heading">
           <div>
             <h3>{t.customTitle}</h3>
@@ -380,8 +540,35 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
         >
           {customLoading ? t.generating : t.generateCustom}
         </button>
-        {customPlan && <CombinationResults plan={customPlan} />}
+        {customPlan && (
+          <CombinationResults
+            plan={customPlan}
+            onSave={() => void savePlan(customPlan)}
+            onPrint={() => printPlan("custom")}
+            saving={savingPlan}
+            saveDisabled={!online}
+          />
+        )}
       </article>
+      {savedPlans.map((saved) => (
+        <article
+          className={`combination-panel public-widget saved-combination-card${printingTarget === saved.id ? " combination-print-target" : ""}`}
+          key={saved.id}
+        >
+          <div className="combination-panel-heading">
+            <div>
+              <h3>{saved.name}</h3>
+              <p>{new Date(saved.created_at).toLocaleString(intlLocale)}</p>
+            </div>
+            <div className="combination-panel-actions">
+              <button type="button" className="cache-refresh-button" onClick={() => printPlan(saved.id)}>{t.print}</button>
+              <button type="button" className="cache-refresh-button" onClick={() => void deleteSavedPlan(saved)}>{t.deleteSaved}</button>
+            </div>
+          </div>
+          <CombinationResults plan={saved.plan} />
+        </article>
+      ))}
+      {savedPlans.length === 0 && !savedError && !savedLoading && <p className="muted-result">{t.savedEmpty}</p>}
     </section>
   );
 }

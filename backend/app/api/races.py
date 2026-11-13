@@ -16,6 +16,7 @@ from app.schemas.races import (
     BettingRequest,
     CustomCombinationRequest,
     RaceResponse,
+    SavedCombinationRequest,
     ScrapeRequest,
     SubscriberCombinationRequest,
     TodayQuinteAnalysisRequest,
@@ -1269,6 +1270,86 @@ def subscriber_custom_combinations(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Combination generation failed: {exc}") from exc
+
+
+@router.get("/{race_id}/combinations/saved")
+def list_saved_subscriber_combinations(
+    race_id: str,
+    current_user: dict[str, Any] = Depends(require_subscriber_features),
+) -> dict[str, Any]:
+    try:
+        client = SupabaseClientWrapper()
+        _subscriber_quinte_frame(client, race_id)
+        saved = client.list(
+            "saved_combinations",
+            filters=[("user_id", "eq", current_user["id"]), ("race_id", "eq", race_id)],
+            limit=100,
+            order_by=("created_at", "desc"),
+        )
+        return {"saved_combinations": saved}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Could not load saved combinations")
+        raise HTTPException(status_code=502, detail="Saved combinations could not be loaded") from exc
+
+
+@router.post("/{race_id}/combinations/saved")
+def save_subscriber_combinations(
+    race_id: str,
+    request: SavedCombinationRequest,
+    current_user: dict[str, Any] = Depends(require_subscriber_features),
+) -> dict[str, Any]:
+    try:
+        client = SupabaseClientWrapper()
+        _, race = _subscriber_quinte_frame(client, race_id)
+        plan = request.plan
+        if not request.name.strip():
+            raise HTTPException(status_code=422, detail="Saved combination name must not be empty")
+        if plan.race_type != race["race_type"]:
+            raise HTTPException(status_code=422, detail="Saved combination race type does not match the race")
+        if any(len(combination) != plan.combination_size for combination in plan.combinations):
+            raise HTTPException(status_code=422, detail="Each saved combination must match the selected game size")
+        saved = client.insert(
+            "saved_combinations",
+            {
+                "user_id": current_user["id"],
+                "race_id": race_id,
+                "name": request.name.strip(),
+                "plan": plan.model_dump(mode="json"),
+            },
+        )
+        return {"saved_combination": saved}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Could not save combinations")
+        raise HTTPException(status_code=502, detail="Combinations could not be saved") from exc
+
+
+@router.delete("/{race_id}/combinations/saved/{saved_id}")
+def delete_saved_subscriber_combinations(
+    race_id: str,
+    saved_id: str,
+    current_user: dict[str, Any] = Depends(require_subscriber_features),
+) -> dict[str, str]:
+    try:
+        client = SupabaseClientWrapper()
+        filters = [
+            ("id", "eq", saved_id),
+            ("user_id", "eq", current_user["id"]),
+            ("race_id", "eq", race_id),
+        ]
+        existing = client.select_one("saved_combinations", filters=filters)
+        if not existing:
+            raise HTTPException(status_code=404, detail="Saved combination not found")
+        client.delete("saved_combinations", filters=filters)
+        return {"status": "deleted"}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Could not delete saved combinations")
+        raise HTTPException(status_code=502, detail="Saved combination could not be deleted") from exc
 
 
 def _prognosis_rows(prognosis: pd.DataFrame, analyzed: pd.DataFrame, race_type: str = "flat") -> list[dict]:

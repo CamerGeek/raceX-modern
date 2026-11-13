@@ -50,6 +50,25 @@ class CustomCombinationRequest(BaseModel):
     combination_size: int = Field(default=5, ge=3, le=5)
 
 
+class SavedCombinationTicket(BaseModel):
+    type: str
+    numbers: list[str]
+
+
+class SavedCombinationPlan(BaseModel):
+    race_type: Literal["flat", "trot", "obstacles"]
+    combination_size: Literal[3, 4, 5]
+    ready_tickets: list[SavedCombinationTicket] = Field(default_factory=list)
+    base: list[str] = Field(default_factory=list)
+    substitutes: list[str] = Field(default_factory=list)
+    combinations: list[list[str]] = Field(min_length=1, max_length=70)
+
+
+class SavedCombinationRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    plan: SavedCombinationPlan
+
+
 class RaceResponse(BaseModel):
     race_type: str
     source: str
