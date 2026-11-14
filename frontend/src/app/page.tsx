@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import QuinteTopEight from "./quinte-top-eight";
 import SiteNavigation from "./site-navigation";
+import HomeAuthRedirect from "./home-auth-redirect";
 import { fetchPublicTopEight } from "./race-data";
 import { getRequestMessages } from "../i18n/server";
 import { localeMeta } from "../i18n/config";
@@ -195,7 +196,8 @@ export default async function Home() {
   const lang = localeMeta[locale].htmlLang;
 
   return (
-    <main className="public-home" lang={lang}>
+    <HomeAuthRedirect>
+      <main className="public-home" lang={lang}>
       <header className="public-header">
         <Link className="public-brand" href="/" aria-label={t.brandAria}>
           <Image
@@ -276,6 +278,7 @@ export default async function Home() {
           . {t.sourceSuffix}
         </p>
       </footer>
-    </main>
+      </main>
+    </HomeAuthRedirect>
   );
 }
