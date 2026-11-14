@@ -406,6 +406,10 @@ h2 { font-size: 2.4rem; font-weight: 500; margin: .4rem 0 0; }
 .post-list span { padding: .55rem .7rem; color: white; background: var(--green); font: 700 .75rem ui-sans-serif, system-ui, sans-serif; }
 .muted-result { color: var(--muted); font: .78rem ui-sans-serif, system-ui, sans-serif; }
 .combination-grid { display: grid; gap: .45rem; }
+.combination-grid-three-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .35rem; }
+.combination-grid-three-columns .combination-row { gap: .35rem; padding: .45rem; }
+.combination-grid-three-columns .combination-row strong { width: 1.5rem; }
+.combination-grid-three-columns .combination-row span { min-width: 1.5rem; padding: .25rem .35rem; }
 .ready-tickets { display: grid; gap: .45rem; padding: .8rem; border: 1px solid var(--line); border-radius: .55rem; background: var(--card-wash); }
 .ready-tickets h4 { margin: 0; color: var(--green); font: 700 .68rem ui-sans-serif, system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .ready-ticket-grid { display: flex; flex-wrap: wrap; gap: .45rem; }
@@ -452,6 +456,9 @@ h2 { font-size: 2.4rem; font-weight: 500; margin: .4rem 0 0; }
 .combination-result-actions button { border: 1px solid var(--green); border-radius: .35rem; padding: .45rem .7rem; color: var(--green); background: transparent; cursor: pointer; font: 700 .68rem ui-sans-serif, system-ui, sans-serif; }
 .combination-result-actions button:hover { color: #fff; background: var(--green); }
 .saved-combination-card .combination-panel-heading p { font-size: .68rem; }
+@media (max-width: 600px) {
+  .combination-grid-three-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 .report-section { margin-top: 2rem; }
 .section-title { display: flex; align-items: baseline; gap: .7rem; margin-bottom: 1rem; }
 .section-title span { color: var(--orange); font: 700 .7rem ui-sans-serif, system-ui, sans-serif; }
@@ -646,8 +653,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
   body.printing-combination .combination-print-target .combination-panel-heading button,
   body.printing-combination .combination-result-actions,
   body.printing-combination .combination-results > .ready-tickets { display: none !important; }
-  body.printing-combination .combination-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .25rem; }
-  body.printing-combination .combination-row { break-inside: avoid; padding: .35rem; border-radius: .25rem; font-size: .7rem; }
+  body.printing-combination .combination-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .25rem; }
+  body.printing-combination .combination-row { break-inside: avoid; gap: .35rem; padding: .35rem; border-radius: .25rem; font-size: .7rem; }
+  body.printing-combination .combination-row strong { width: 1.5rem; }
   body.printing-combination .combination-row span { min-width: 1.5rem; padding: .2rem .3rem; }
   .subscriber-expert-pronostic { display: none !important; }
   .subscriber-print-masthead {

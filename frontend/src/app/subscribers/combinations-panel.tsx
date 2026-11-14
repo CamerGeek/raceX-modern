@@ -103,12 +103,14 @@ function CombinationResults({
   onPrint,
   saving = false,
   saveDisabled = false,
+  threeColumns = false,
 }: {
   plan: CombinationPlan;
   onSave?: () => void;
   onPrint?: () => void;
   saving?: boolean;
   saveDisabled?: boolean;
+  threeColumns?: boolean;
 }) {
   const { messages } = useI18n();
   const t = messages.subscribers.combinations;
@@ -134,7 +136,7 @@ function CombinationResults({
           <> — {interpolate(t.substitutesSummary, { numbers: substitutes.join(" · ") })}</>
         )}
       </p>
-      <div className="combination-grid">
+      <div className={`combination-grid${threeColumns ? " combination-grid-three-columns" : ""}`}>
         {plan.combinations.map((combination, index) => (
           <div className="combination-row" key={`combination-${index}`}>
             <strong>{String(index + 1).padStart(2, "0")}</strong>
@@ -565,7 +567,7 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
               <button type="button" className="cache-refresh-button" onClick={() => void deleteSavedPlan(saved)}>{t.deleteSaved}</button>
             </div>
           </div>
-          <CombinationResults plan={saved.plan} />
+          <CombinationResults plan={saved.plan} threeColumns />
         </article>
       ))}
       {savedPlans.length === 0 && !savedError && !savedLoading && <p className="muted-result">{t.savedEmpty}</p>}
