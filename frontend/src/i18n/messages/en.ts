@@ -69,7 +69,7 @@ const en = {
     pickKicker: "TODAY’S SELECTION",
     numbersAria: "Selected numbers: {title}",
     modelTitle: "Model Shortlist (RaceX AI picks)",
-    modelDescription: "Up to 8 numbers ranked by descending deep score.",
+    modelDescription: "Up to 8 numbers ranked by descending win score.",
     modelEmptyReady: "The model did not provide any rankable horses.",
     modelUnavailable: "The Model Shortlist is not available for this race.",
     priorityAria: "Horse priority according to the model",
@@ -314,7 +314,7 @@ const en = {
       summary: "Understanding the signals and the limits of the analysis",
       ranking: "The ranking above reflects the composite score available for each runner.",
       prognosis: "Forecast (Prono Flash): in flat and jump racing, it cross-references the form (IF), class (IC) and success coefficient (S_COEFF) rankings. Horses in the upper half of all three rankings come first, then those in two; horses flagged by only one ranking can complete the selection, up to eight. In trot racing, it combines seven weighted indicators: success coefficient (20%), form/fitness (15%), trend (15%), disqualification risk (20%), odds (15%), recent races (10%) and shoeing (5%). Each available indicator contributes for the horses in its upper half.",
-      modelShortlist: "Model Shortlist: a ranking distinct from the Forecast, built by RaceX AI sorting horses by descending Deep score, up to eight runners. The scores are used for ranking; they are not calibrated win or place probabilities.",
+      modelShortlist: "Model Shortlist: a ranking distinct from the Forecast, built by RaceX AI sorting horses by descending win score, up to eight runners. The scores are used for ranking; they are not calibrated win or place probabilities.",
       priorityTier: "Model priority: Tier levels show the order in which the model’s selection rules retain horses; Tier 1 comes first. In trot and jump racing, Tier 1 corresponds to at least three votes from model sources, Tier 2 to two votes, then the remaining places are filled by the average place score. In flat racing, Tier 1 groups horses with at least three votes, Tier 2 the two best by S_COEFF (or by average place score when S_COEFF is missing), Tier 3 the best dark-horse score, Tier 4 the other horses with two votes, and Tier 5 completes by average place score. The selection is capped at six horses. Tiers are a shortlist rule, not probabilities or a guaranteed prediction of the finishing order; horses without a tier were not retained in this selection.",
       odds: "Odds are periodic captures, not real-time data.",
       signals: "Signals may be incomplete or change before the start.",
@@ -441,7 +441,7 @@ const en = {
       },
       {
         question: "How is the Model Shortlist chosen?",
-        answer: "This ranking, distinct from the Forecast, is produced by RaceX AI: horses are sorted by descending Deep score and the first eight are kept. The scores are used only to rank runners; they are not calibrated win or place probabilities. The favourite highlighted as the model's top pick is the horse with the highest win score.",
+        answer: "This ranking, distinct from the Forecast, is produced by RaceX AI: horses are sorted by descending win score and the first eight are kept. The scores are used only to rank runners; they are not calibrated win or place probabilities.",
       },
       {
         question: "What does the RaceX AI Priority Tier mean?",

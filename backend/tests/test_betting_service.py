@@ -46,17 +46,20 @@ def predictions_with_top(*numbers: int) -> dict:
     return {"status": "ready", "rows": rows}
 
 
-def test_model_shortlist_orders_by_deep_score_and_limits_eight() -> None:
+def test_model_shortlist_orders_by_win_score_and_limits_eight() -> None:
     predictions = {
         "status": "ready",
         "rows": [
-            {"NUMERO": number, "place_prob_deep": score}
-            for number, score in [(1, 0.2), (2, 0.9), (3, 0.5), (4, 0.7), (5, 0.1),
-                                  (6, 0.8), (7, 0.3), (8, 0.6), (9, 0.4), (10, 0.85)]
+            {"NUMERO": number, "place_prob_deep": deep, "p_win": win}
+            for number, deep, win in [
+                (1, 0.2, 0.99), (2, 0.9, 0.1), (3, 0.5, 0.8), (4, 0.7, 0.7),
+                (5, 0.1, 0.6), (6, 0.8, 0.5), (7, 0.3, 0.4), (8, 0.6, 0.3),
+                (9, 0.4, 0.2), (10, 0.85, 0.9),
+            ]
         ],
     }
 
-    assert betting_service.model_shortlist_numbers(predictions) == ["2", "10", "6", "4", "8", "3", "9", "7"]
+    assert betting_service.model_shortlist_numbers(predictions) == ["1", "10", "3", "4", "5", "6", "7", "8"]
 
 
 def test_model_shortlist_is_empty_when_predictions_are_unavailable() -> None:
@@ -139,7 +142,7 @@ def test_ready_tickets_use_win_score_and_composite_ranking(monkeypatch) -> None:
         {"type": "winner", "numbers": ["2"]},
         {"type": "quinella", "numbers": ["2", "3"]},
         {"type": "place_quinella", "numbers": ["1", "2"]},
-        {"type": "trio", "numbers": ["1", "2", "3", "4"]},
+        {"type": "trio", "numbers": ["2", "3", "4", "1"]},
     ]
 
 

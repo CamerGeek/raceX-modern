@@ -84,22 +84,7 @@ export function getPlotTwistRows(predictions: QuinteModelPredictions | null): Pl
 }
 
 export function getModelShortlistRows(predictions: QuinteModelPredictions | null) {
-  if (predictions?.status !== "ready") return [];
-
-  return predictions.rows
-    .map((row, index) => {
-      const scoreKey = deepScoreFields.find((field) =>
-        row[field] !== null && row[field] !== undefined && row[field] !== "",
-      );
-      const rawScore = scoreKey ? String(row[scoreKey]).trim().replace(",", ".") : "";
-      const score = Number(rawScore);
-      return { row, index, score: rawScore && Number.isFinite(score) ? score : null };
-    })
-    .filter((item): item is { row: Horse; index: number; score: number } => item.score !== null)
-    .sort((first, second) => second.score - first.score || first.index - second.index)
-    .map(({ row }) => row)
-    .filter((row) => Boolean(horseNumber(row)))
-    .slice(0, 8);
+  return getModelWinRows(predictions).slice(0, 8);
 }
 
 export function getModelWinRows(predictions: QuinteModelPredictions | null) {

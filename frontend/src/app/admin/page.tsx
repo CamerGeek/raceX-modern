@@ -102,10 +102,6 @@ function formatValue(value: Horse[string]) {
   return String(value);
 }
 
-function deepScore(row: Horse) {
-  return numberField(row, ["place_prob_deep", "DEEP_SCORE", "Deep score", "Deep Score"]);
-}
-
 function compositeScore(row: Horse) {
   const raw = field(row, ["Composite", "COMPOSITE_SCORE", "SCORE", "CS_norm", "Score"], "")
     .trim()
@@ -250,8 +246,7 @@ function AdminPageContent() {
       : "";
 
   const rankedHorses = analysis?.prognosis.length ? analysis.prognosis : analysis?.rows ?? [];
-  const modelShortlistRows = [...(analysis?.model_predictions?.rows ?? [])]
-    .sort((a, b) => deepScore(b) - deepScore(a));
+  const modelShortlistRows = getModelShortlistRows(analysis?.model_predictions ?? null);
   const modelOverviewRows = modelShortlistRows.slice(0, 8);
   const modelCheck = analysis
     ? analysis.model_check ?? modelCheckFromVisibleRankings(analysis)
@@ -843,9 +838,9 @@ function AdminPageContent() {
               <div className="overview-card"><h3>Odds divergence</h3><p>Composite rank versus market rank</p><ol>{analysis.overview.odds_divergence.slice(0, 8).map((horse, index) => <li key={`divergence-${index}`}><strong>{field(horse, ["N", "N°", "Numero"])}</strong><span>{field(horse, ["Cheval", "CHEVAL"], "Unknown")}</span><b>{formatValue(horse.Divergence)}</b></li>)}</ol></div>
               <div className="overview-card starting-post-card"><h3>Best starting posts</h3><p>{analysis.overview.track || "Track unavailable"}{analysis.overview.distance ? ` / ${analysis.overview.distance}m` : ""}</p>{analysis.overview.best_starting_posts.length ? <div className="post-list">{analysis.overview.best_starting_posts.map((horseNumber) => <span key={horseNumber}>{horseNumber}</span>)}</div> : <strong className="muted-result">No track-specific post data</strong>}</div>
             </div>}
-            {analysis.model_predictions && <div className="overview-grid"><article className="overview-card"><h3>Model shortlist</h3><p>Top 8 horses sorted by deep score</p>{analysis.model_predictions.status === "ready" ? <div className="post-list">{modelOverviewRows.map((horse, index) => <span key={`shortlist-${field(horse, ["NUMERO", "N°", "N"], String(index))}`}>{field(horse, ["NUMERO", "N°", "N"], String(index + 1))}</span>)}</div> : <strong className="muted-result">{analysis.model_predictions.message}</strong>}</article><PriorityTierPickCard predictions={analysis.model_predictions} /></div>}
+            {analysis.model_predictions && <div className="overview-grid"><article className="overview-card"><h3>Model shortlist</h3><p>Top 8 horses sorted by win score</p>{analysis.model_predictions.status === "ready" ? <div className="post-list">{modelOverviewRows.map((horse, index) => <span key={`shortlist-${field(horse, ["NUMERO", "N°", "N"], String(index))}`}>{field(horse, ["NUMERO", "N°", "N"], String(index + 1))}</span>)}</div> : <strong className="muted-result">{analysis.model_predictions.message}</strong>}</article><PriorityTierPickCard predictions={analysis.model_predictions} /></div>}
             </>}
-            {reportTab === "model" && analysis.model_predictions && <div className="report-section"><div className="section-title"><span>ML</span><h3>Model shortlist</h3><p>{analysis.model_predictions.status === "ready" ? `${modelShortlistRows.length} horses · sorted by deep score` : analysis.model_predictions.status}</p></div>{analysis.model_predictions.status === "ready" ? <><p className="muted-result">Class-balanced model scores are useful for ranking, not as calibrated probabilities. Model {analysis.model_predictions.model_version ?? "version unavailable"}.</p><div className="table-scroll-hint" aria-hidden="true">Swipe to see all columns <span>→</span></div><div className="table-wrap"><table><thead><tr><th>Rank</th><th>Horse</th><th>Place score</th><th>Deep score</th><th>Win score</th><th>Dark-horse score</th><th>Votes</th><th>Priority tier</th></tr></thead><tbody>{modelShortlistRows.map((horse, index) => <tr key={`model-${field(horse, ["NUMERO", "N°", "N"], String(index))}`}><td className="rank">{index + 1}</td><td>{field(horse, ["NUMERO", "N°", "N"], "-")} / {field(horse, ["CHEVAL", "Cheval"], "Unknown")}</td><td>{formatValue(horse.place_prob)}</td><td>{formatValue(horse.place_prob_deep)}</td><td>{formatValue(horse.p_win)}</td><td>{formatValue(horse.dark_prob)}</td><td>{formatValue(horse.votes)}</td><td>{formatValue(horse.bet_tier)}</td></tr>)}</tbody></table></div></> : <p className="muted-result">{analysis.model_predictions.message}</p>}</div>}
+            {reportTab === "model" && analysis.model_predictions && <div className="report-section"><div className="section-title"><span>ML</span><h3>Model shortlist</h3><p>{analysis.model_predictions.status === "ready" ? `${modelShortlistRows.length} horses · sorted by win score` : analysis.model_predictions.status}</p></div>{analysis.model_predictions.status === "ready" ? <><p className="muted-result">Class-balanced model scores are useful for ranking, not as calibrated probabilities. Model {analysis.model_predictions.model_version ?? "version unavailable"}.</p><div className="table-scroll-hint" aria-hidden="true">Swipe to see all columns <span>→</span></div><div className="table-wrap"><table><thead><tr><th>Rank</th><th>Horse</th><th>Place score</th><th>Deep score</th><th>Win score</th><th>Dark-horse score</th><th>Votes</th><th>Priority tier</th></tr></thead><tbody>{modelShortlistRows.map((horse, index) => <tr key={`model-${field(horse, ["NUMERO", "N°", "N"], String(index))}`}><td className="rank">{index + 1}</td><td>{field(horse, ["NUMERO", "N°", "N"], "-")} / {field(horse, ["CHEVAL", "Cheval"], "Unknown")}</td><td>{formatValue(horse.place_prob)}</td><td>{formatValue(horse.place_prob_deep)}</td><td>{formatValue(horse.p_win)}</td><td>{formatValue(horse.dark_prob)}</td><td>{formatValue(horse.votes)}</td><td>{formatValue(horse.bet_tier)}</td></tr>)}</tbody></table></div></> : <p className="muted-result">{analysis.model_predictions.message}</p>}</div>}
             {reportTab === "composite" && <>
             <div className="report-section"><div className="section-title"><span>01</span><h3>Composite ranking</h3><p>Score and market odds at a glance</p></div><div className="ranking-grid">{(() => { const displayedHorses = rankedHorses.slice(0, 16); const maxOdds = Math.max(...displayedHorses.map((item) => numberField(item, ["COTE", "Cote", "Odds"])), 1); return displayedHorses.map((horse, index) => {
               const score = numberField(horse, ["SCORE", "COMPOSITE_SCORE", "Composite", "Score"]);

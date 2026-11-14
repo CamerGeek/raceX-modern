@@ -129,8 +129,8 @@ def _ranked_numbers(
 
 
 def model_shortlist_numbers(model_predictions: dict[str, Any] | None) -> list[str]:
-    """Top model rows by deep score, matching the frontend Model Shortlist."""
-    return _ranked_numbers(model_predictions, DEEP_SCORE_COLUMNS, limit=SHORTLIST_SIZE)
+    """Top model rows by win score, falling back to the deep score."""
+    return _ranked_numbers(model_predictions, WIN_SCORE_COLUMNS, DEEP_SCORE_COLUMNS, limit=SHORTLIST_SIZE)
 
 
 def model_win_ranked_numbers(model_predictions: dict[str, Any] | None, limit: int | None = None) -> list[str]:

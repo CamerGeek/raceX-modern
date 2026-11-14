@@ -69,7 +69,7 @@ const es = {
     pickKicker: "SELECCIÓN DEL DÍA",
     numbersAria: "Números seleccionados: {title}",
     modelTitle: "Model Shortlist (elección de RaceX AI)",
-    modelDescription: "Hasta 8 números clasificados por puntuación deep descendente.",
+    modelDescription: "Hasta 8 números clasificados por puntuación de victoria descendente.",
     modelEmptyReady: "El modelo no proporcionó caballos clasificables.",
     modelUnavailable: "El Model Shortlist no está disponible para esta carrera.",
     priorityAria: "Prioridad de los caballos según el modelo",
@@ -314,7 +314,7 @@ const es = {
       summary: "Entender las señales y los límites del análisis",
       ranking: "La clasificación anterior refleja la puntuación compuesta disponible para cada participante.",
       prognosis: "Pronóstico (Prono Flash): en liso y obstáculos, cruza las clasificaciones de forma (IF), clase (IC) y coeficiente de éxito (S_COEFF). Tienen prioridad los caballos presentes en la mitad superior de las tres clasificaciones y después los presentes en dos; los detectados en una sola pueden completar la selección hasta ocho. En trote, combina siete indicadores ponderados: coeficiente de éxito (20 %), forma/fitness (15 %), tendencia (15 %), riesgo de descalificación (20 %), cuota (15 %), carreras recientes (10 %) y herrado (5 %). Cada indicador disponible contribuye para los caballos situados en su mitad superior.",
-      modelShortlist: "Model Shortlist: clasificación distinta del Pronóstico, establecida por RaceX AI ordenando los caballos por puntuación Deep descendente, hasta ocho participantes. Las puntuaciones sirven para clasificar; no son probabilidades calibradas de victoria ni de puesto.",
+      modelShortlist: "Model Shortlist: clasificación distinta del Pronóstico, establecida por RaceX AI ordenando los caballos por puntuación de victoria descendente, hasta ocho participantes. Las puntuaciones sirven para clasificar; no son probabilidades calibradas de victoria ni de puesto.",
       priorityTier: "Prioridad del modelo: los niveles Tier indican el orden en que las reglas de selección del modelo retienen a los caballos; Tier 1 tiene prioridad. En trote y obstáculos, Tier 1 corresponde a al menos tres votos de fuentes del modelo, Tier 2 a dos votos, y las plazas restantes se completan con la puntuación media de puesto. En liso, Tier 1 agrupa a los caballos con al menos tres votos, Tier 2 a los dos mejores por S_COEFF (o por puntuación media de puesto si falta S_COEFF), Tier 3 a la mejor puntuación «dark horse», Tier 4 a los demás caballos con dos votos y Tier 5 completa según la puntuación media de puesto. La selección se limita a seis caballos. Los niveles no son probabilidades ni una predicción garantizada del orden de llegada; los caballos sin tier no fueron retenidos en esta selección.",
       odds: "Las cuotas son registros periódicos, no datos en tiempo real.",
       signals: "Las señales pueden estar incompletas o cambiar antes de la salida.",
@@ -441,7 +441,7 @@ const es = {
       },
       {
         question: "¿Cómo se elige el Model Shortlist?",
-        answer: "Esta clasificación, distinta del Pronóstico, la elabora RaceX AI: los caballos se ordenan por puntuación Deep descendente y se retienen los ocho primeros. Las puntuaciones sirven únicamente para clasificar a los participantes; no son probabilidades calibradas de victoria ni de puesto. El favorito destacado como punto fuerte del modelo es el caballo con el score de victoria más alto.",
+        answer: "Esta clasificación, distinta del Pronóstico, la elabora RaceX AI: los caballos se ordenan por puntuación de victoria descendente y se retienen los ocho primeros. Las puntuaciones sirven únicamente para clasificar a los participantes; no son probabilidades calibradas de victoria ni de puesto.",
       },
       {
         question: "¿Qué significa el Priority Tier de RaceX AI?",
