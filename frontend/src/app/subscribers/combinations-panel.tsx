@@ -190,7 +190,6 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
   const [customLoading, setCustomLoading] = useState(false);
   const [customError, setCustomError] = useState("");
   const [savedPlans, setSavedPlans] = useState<SavedCombination[]>([]);
-  const [saveName, setSaveName] = useState("");
   const [savedError, setSavedError] = useState("");
   const [savedMessage, setSavedMessage] = useState("");
   const [loadedSavedRace, setLoadedSavedRace] = useState<string | null>(null);
@@ -340,20 +339,20 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
     }
   }
 
-  async function savePlan(plan: CombinationPlan) {
+  async function savePlan(plan: CombinationPlan, sourceName: string) {
     setSavedError("");
     setSavedMessage("");
-    if (!saveName.trim()) {
-      setSavedError(t.savedNameRequired);
-      return;
-    }
+    const gameLabel = GAME_OPTIONS.find(({ size }) => size === plan.combination_size)?.label;
+    const generatedName = gameLabel
+      ? `${sourceName} · ${t[gameLabel]}`
+      : `${sourceName} · ${plan.combination_size} horses`;
     setSavingPlan(true);
     try {
       const response = await apiFetch(`${apiUrl}/api/v1/races/${analysis.race_id}/combinations/saved`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: saveName.trim(),
+          name: generatedName,
           plan: {
             race_type: plan.race_type,
             combination_size: plan.combination_size,
@@ -371,7 +370,6 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
       }
       setSavedPlans((current) => [payload.saved_combination, ...current]);
       setSavedMessage(t.savedConfirmation);
-      setSaveName("");
     } catch (error) {
       setSavedError(error instanceof Error && error.message ? error.message : t.savedError);
     } finally {
@@ -434,16 +432,6 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
         ))}
       </div>
 
-      <div className="saved-combinations-controls">
-        <label htmlFor="saved-combination-name">{t.savedNameLabel}</label>
-        <input
-          id="saved-combination-name"
-          value={saveName}
-          onChange={(event) => setSaveName(event.target.value)}
-          maxLength={80}
-          placeholder={t.savedNamePlaceholder}
-        />
-      </div>
       {savedError && <p className="error" role="alert">{savedError}</p>}
       {savedMessage && <p className="free-analysis-status" role="status">{savedMessage}</p>}
       {savedLoading && <p className="muted-result">{t.savedLoading}</p>}
@@ -469,7 +457,7 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
         {autoPlan ? (
           <CombinationResults
             plan={autoPlan}
-            onSave={() => void savePlan(autoPlan)}
+            onSave={() => void savePlan(autoPlan, t.autoTitle)}
             onPrint={() => printPlan("auto")}
             saving={savingPlan}
             saveDisabled={!online}
@@ -545,7 +533,7 @@ export default function CombinationsPanel({ analysis, plotTwistRows, apiFetch, o
         {customPlan && (
           <CombinationResults
             plan={customPlan}
-            onSave={() => void savePlan(customPlan)}
+            onSave={() => void savePlan(customPlan, t.customTitle)}
             onPrint={() => printPlan("custom")}
             saving={savingPlan}
             saveDisabled={!online}

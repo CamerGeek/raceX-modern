@@ -65,7 +65,7 @@ class SavedCombinationPlan(BaseModel):
 
 
 class SavedCombinationRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=80)
+    name: str | None = Field(default=None, max_length=80)
     plan: SavedCombinationPlan
 
 

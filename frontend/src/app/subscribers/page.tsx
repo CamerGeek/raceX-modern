@@ -195,7 +195,7 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
       ]
     : [];
 
-  const fitnessRows = isTrot ? sectionRows(analysis, "Fitness (FA/FM)").slice(0, 4) : [];
+  const fitnessRows = isTrot ? sectionRows(analysis, "Fitness (FA/FM)").slice(0, 5) : [];
   const obstacleModelRows = isObstacles
     ? (analysis.model_predictions?.rows ?? [])
         .map((horse) => {
@@ -209,7 +209,7 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
           item.score !== null && Number.isFinite(item.score),
         )
         .sort((first, second) => second.score - first.score)
-        .slice(0, 4)
+        .slice(0, 5)
     : [];
   const obstacleFormRows = isObstacles
     ? (analysis.model_predictions?.rows ?? [])
@@ -224,7 +224,7 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
           item.score !== null && Number.isFinite(item.score),
         )
         .sort((first, second) => first.score - second.score || first.index - second.index)
-        .slice(0, 4)
+        .slice(0, 5)
     : [];
   const obstacleDisciplineCode = firstValue(analysis.model_predictions?.rows[0] ?? {}, ["DISCIPLINE"]);
   const obstacleDisciplineLabel = ({
@@ -246,7 +246,7 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
           || second.falls - first.falls
           || first.index - second.index,
         )
-        .slice(0, 4)
+        .slice(0, 5)
     : [];
   const obstacleMusicAvailable = isObstacles
     && (analysis.model_predictions?.rows ?? []).some(
@@ -274,7 +274,7 @@ function DisciplineHighlights({ analysis }: { analysis: Analysis }) {
           const orderedRows = card.id === "safe"
             ? lowestMetricFirst(card.rows, card.metricKeys)
             : card.rows;
-          const rows = orderedRows.slice(0, 4);
+          const rows = orderedRows.slice(0, 5);
           if (!rows.length) return null;
           return (
             <article className="subscriber-discipline-card" key={card.id}>

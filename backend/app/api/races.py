@@ -1304,8 +1304,14 @@ def save_subscriber_combinations(
         client = SupabaseClientWrapper()
         _, race = _subscriber_quinte_frame(client, race_id)
         plan = request.plan
-        if not request.name.strip():
-            raise HTTPException(status_code=422, detail="Saved combination name must not be empty")
+        generated_name = {
+            5: "Quinté+",
+            4: "Quarté+",
+            3: "Tiercé/Trio",
+        }[plan.combination_size]
+        name = request.name.strip() if request.name and request.name.strip() else generated_name
+        if len(name) > 80:
+            raise HTTPException(status_code=422, detail="Saved combination name must not exceed 80 characters")
         if plan.race_type != race["race_type"]:
             raise HTTPException(status_code=422, detail="Saved combination race type does not match the race")
         if any(len(combination) != plan.combination_size for combination in plan.combinations):
@@ -1315,7 +1321,7 @@ def save_subscriber_combinations(
             {
                 "user_id": current_user["id"],
                 "race_id": race_id,
-                "name": request.name.strip(),
+                "name": name,
                 "plan": plan.model_dump(mode="json"),
             },
         )

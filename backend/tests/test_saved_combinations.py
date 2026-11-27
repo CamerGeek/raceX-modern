@@ -84,6 +84,19 @@ def test_save_combinations_records_account_owner_and_plan(monkeypatch: pytest.Mo
     }
 
 
+def test_save_combinations_generates_name_when_omitted(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = SavedCombinationClient()
+    _client(monkeypatch, client)
+
+    result = races.save_subscriber_combinations(
+        "race-1",
+        SavedCombinationRequest(plan=PLAN),
+        USER,
+    )
+
+    assert result["saved_combination"]["name"] == "Tiercé/Trio"
+
+
 def test_save_combinations_rejects_mismatched_ticket_size(monkeypatch: pytest.MonkeyPatch) -> None:
     client = SavedCombinationClient()
     _client(monkeypatch, client)
